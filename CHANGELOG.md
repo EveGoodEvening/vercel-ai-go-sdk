@@ -4,11 +4,22 @@ All notable changes, including every exported breaking change during v0, are rec
 
 ## Unreleased
 
-### Added
+### Supported behavior
 
 - Experimental Evaluation Model V4 Go client for boolean, choice, and score evaluation questions.
-- Typed request, result, metadata, retry, warning, and error surfaces.
-- Hermetic CI, a separately gated paid live-contract workflow, and a clean local-consumer compile gate.
+- Typed request, result, metadata, retry-policy, warning, and error surfaces for evaluation calls.
+- Credential-free hermetic checks, a separately gated paid live-contract workflow, and a clean local-consumer compile gate.
+
+### Explicit non-goals
+
+- No OpenAI-compatible `/v1/chat/completions`, `/v1/responses`, or public `/v1/evaluate` client.
+- No language-generation or streaming API.
+- No claim of full Vercel AI SDK or provider feature parity.
+- No Gateway-native `x_search` API. Gateway support for native xAI `x_search` is unconfirmed, so it remains unsupported here; confirmed direct-xAI behavior does not establish Gateway support.
+
+### Experimental status and risk
+
+This is an experimental v0 surface. Exported APIs may change incompatibly during v0, and no v1 compatibility is promised while the evaluation contract remains experimental. The checks and workflows named above describe repository support and release gates; they are not evidence of a published release or a successful credentialed live run.
 
 ### Release status
 
