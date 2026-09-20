@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/EveGoodEvening/vercel-ai-gateway-go-sdk/internal/httpx"
-	"github.com/EveGoodEvening/vercel-ai-gateway-go-sdk/internal/testserver"
+	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
+	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/testserver"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

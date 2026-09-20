@@ -1,3 +1,3 @@
-module github.com/EveGoodEvening/vercel-ai-gateway-go-sdk
+module github.com/EveGoodEvening/vercel-ai-go-sdk
 
 go 1.26

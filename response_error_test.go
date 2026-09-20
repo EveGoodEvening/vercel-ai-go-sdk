@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/EveGoodEvening/vercel-ai-gateway-go-sdk/internal/httpx"
+	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 )
 
 func TestResponseErrorStatusClassification(t *testing.T) {

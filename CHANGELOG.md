@@ -23,8 +23,8 @@ This is an experimental v0 surface. Exported APIs may change incompatibly during
 
 ### Release status
 
-No public version has been published. Release remains blocked by the owner-selected license, configured remote/repository metadata, completed authorized live-contract evidence, and reviewed publication/provenance configuration. No tag is created or implied by this changelog.
+No public version has been published. Release remains blocked by the owner-selected license, a hosted-repository rename and matching `origin`, completed authorized live-contract evidence, and reviewed publication/provenance configuration. No tag is created or implied by this changelog.
 
 ### Migration
 
-This is the initial unreleased surface, so there are no removed or renamed exported APIs and no caller migration action yet. Future exported breaking changes, including during v0, must name each removed or changed API and the required caller action here and in the corresponding release notes.
+Before the initial public release, the module path changed from `github.com/EveGoodEvening/vercel-ai-gateway-go-sdk` to `github.com/EveGoodEvening/vercel-ai-go-sdk`. Consumers of earlier checkouts must update `go.mod` `require`/`replace` directives and Go imports. No exported Go identifiers changed.

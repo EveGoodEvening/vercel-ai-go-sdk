@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/EveGoodEvening/vercel-ai-gateway-go-sdk/internal/httpx"
+	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 )
 
 type responseErrorEnvelope struct {

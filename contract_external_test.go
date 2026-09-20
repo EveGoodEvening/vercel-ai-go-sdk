@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	gateway "github.com/EveGoodEvening/vercel-ai-gateway-go-sdk"
+	gateway "github.com/EveGoodEvening/vercel-ai-go-sdk"
 )
 
 type tokenSource struct{}

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	gateway "github.com/EveGoodEvening/vercel-ai-gateway-go-sdk"
+	gateway "github.com/EveGoodEvening/vercel-ai-go-sdk"
 )
 
 const (

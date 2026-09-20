@@ -10,9 +10,9 @@ module example.com/gateway-local-consumer
 
 go 1.26
 
-require github.com/EveGoodEvening/vercel-ai-gateway-go-sdk v0.0.0
+require github.com/EveGoodEvening/vercel-ai-go-sdk v0.0.0
 
-replace github.com/EveGoodEvening/vercel-ai-gateway-go-sdk => $repo_root
+replace github.com/EveGoodEvening/vercel-ai-go-sdk => $repo_root
 EOF
 
 cat >"$consumer_dir/main.go" <<'EOF'
@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"time"
 
-	gateway "github.com/EveGoodEvening/vercel-ai-gateway-go-sdk"
+	gateway "github.com/EveGoodEvening/vercel-ai-go-sdk"
 )
 
 type tokenSource struct{}

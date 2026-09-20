@@ -5,9 +5,9 @@
 No candidate tag may be created yet. The following external or authorized prerequisites remain unresolved:
 
 - **Owner-selected license:** blocked; repository ownership has not selected a license, so no `LICENSE` is present. Do not infer or add one.
-- **Remote and repository metadata:** blocked; no remote or hosting-repository metadata has been configured. Do not invent a remote.
+- **Remote and repository metadata:** blocked; the hosted repository and local `origin` still use `EveGoodEvening/vercel-ai-gateway-go-sdk`, while the module now declares `github.com/EveGoodEvening/vercel-ai-go-sdk`. Rename the hosted repository and update `origin` before release.
 - **Authorized paid live contract:** blocked; the sanitized evidence record remains `NOT RUN` and requires the protected live workflow or the exact authorized local command.
-- **Publication and provenance configuration:** blocked pending the hosting repository, its release environment/protection policy, and owner decisions. Review artifact attestations and any package-publication permissions after the remote exists; do not grant write or identity-token permissions to ordinary CI.
+- **Publication and provenance configuration:** blocked pending the hosted-repository rename, its release environment/protection policy, and owner decisions. Review artifact attestations and any package-publication permissions after repository metadata matches the module path; do not grant write or identity-token permissions to ordinary CI.
 
 The pinned CI and local-consumer checks are configured but their results are not recorded here as passes. Run and record every pre-tag gate from a clean checkout before proceeding to Chunk 12. This chunk must not create, move, delete, push, or publish a tag or release.
 

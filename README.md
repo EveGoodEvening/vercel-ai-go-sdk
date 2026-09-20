@@ -1,4 +1,4 @@
-# Vercel AI Gateway Go SDK
+# Vercel AI Go SDK
 
 Experimental Go client for Vercel AI Gateway's **AI SDK Evaluation Model V4 provider protocol**. It calls `POST https://ai-gateway.vercel.sh/v4/ai/evaluation-model`; it is not a client for the separate public REST `POST /v1/evaluate` API and is not an OpenAI-compatible wrapper.
 
@@ -9,10 +9,10 @@ Evaluation is experimental and compatibility-sensitive. The contract is pinned t
 ## Install
 
 ```sh
-go get github.com/EveGoodEvening/vercel-ai-gateway-go-sdk
+go get github.com/EveGoodEvening/vercel-ai-go-sdk
 ```
 
-A public release remains blocked until the repository owner selects and commits a license, configures the remote/repository metadata, completes the authorized live contract, and reviews publication provenance. See the [release-readiness policy and checklist](docs/releasing.md); no tag or published release currently exists.
+A public release remains blocked until the repository owner selects and commits a license, renames the hosted repository and updates `origin` to match the module path, completes the authorized live contract, and reviews publication provenance. See the [release-readiness policy and checklist](docs/releasing.md); no tag or published release currently exists.
 
 ## Evaluation
 
