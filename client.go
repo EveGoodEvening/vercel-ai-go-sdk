@@ -46,18 +46,23 @@ type clientConfig struct {
 // construction stops at the first error.
 type Option func(*clientConfig) error
 
-// TokenSource supplies an OIDC bearer token for an HTTP attempt.
+// TokenSource supplies an OIDC bearer token once per HTTP attempt using the
+// Evaluate context. Errors and blank tokens become a TransportError whose
+// Operation is "resolve OIDC token"; no credential fallback occurs.
 type TokenSource interface {
 	Token(context.Context) (string, error)
 }
 
 // RetryPolicy configures bounded retries. MaxAttempts counts the initial
-// request; zero and one both mean one attempt, while values 2 through 10 opt
-// in to retries that may duplicate billable evaluation work. For enabled
-// retries, zero InitialDelay, MaxDelay, and Multiplier default to 100ms, 2s,
-// and 2. Explicit delays use time.Duration and must be 1ms..1m and 1ms..5m,
-// respectively, with MaxDelay at least InitialDelay. Multiplier must be 1..10.
-// Jitter is a symmetric fraction in [0,1], with zero disabling jitter.
+// request: zero and one mean one attempt, and 2 through 10 enable retries that
+// may duplicate billable, non-idempotent evaluation work. With retries enabled,
+// zero InitialDelay, MaxDelay, and Multiplier resolve to 100*time.Millisecond,
+// 2*time.Second, and 2; zero Jitter disables jitter. Explicit InitialDelay must
+// be 1ms..1m, MaxDelay 1ms..5m and at least InitialDelay, Multiplier 1..10,
+// and Jitter 0..1. Delay before retry r (starting at 1) is the saturated
+// min(MaxDelay, InitialDelay*Multiplier^(r-1)), with symmetric jitter applied
+// as a fraction and rounded to a time.Duration nanosecond. Valid Retry-After
+// replaces and is capped by MaxDelay. Waiting is context-cancellable.
 type RetryPolicy struct {
 	MaxAttempts  int
 	InitialDelay time.Duration
@@ -89,7 +94,10 @@ func defaultRetryHooks() retryHooks {
 	}
 }
 
-// NewClient constructs a client without performing network calls.
+// NewClient applies options in order and constructs a client without network
+// calls. Credential precedence is explicit API key, AI_GATEWAY_API_KEY,
+// explicit OIDC token/source, then VERCEL_OIDC_TOKEN. Blank environment values
+// are absent. Missing credentials and invalid options return ConfigurationError.
 func NewClient(opts ...Option) (*Client, error) {
 	config := clientConfig{
 		baseURL:    defaultBaseURL,
@@ -114,7 +122,8 @@ func NewClient(opts ...Option) (*Client, error) {
 	return &Client{config: config}, nil
 }
 
-// WithAPIKey selects an explicit API key.
+// WithAPIKey selects an explicit API key, which has highest precedence. It
+// rejects empty/all-Unicode-whitespace input and otherwise preserves it exactly.
 func WithAPIKey(key string) Option {
 	return func(config *clientConfig) error {
 		if blank(key) {
@@ -126,8 +135,9 @@ func WithAPIKey(key string) Option {
 	}
 }
 
-// WithOIDCToken selects a fixed explicit OIDC token. Between explicit OIDC
-// forms, the last option wins.
+// WithOIDCToken selects a fixed explicit OIDC token. It rejects blank input and
+// otherwise preserves it exactly. The last explicit OIDC form wins, but neither
+// explicit OIDC form displaces an explicit or environment API key.
 func WithOIDCToken(token string) Option {
 	return func(config *clientConfig) error {
 		if blank(token) {
@@ -140,8 +150,9 @@ func WithOIDCToken(token string) Option {
 	}
 }
 
-// WithOIDCTokenSource selects a refresh-capable OIDC token source. Between
-// explicit OIDC forms, the last option wins.
+// WithOIDCTokenSource selects a non-nil refresh-capable OIDC source. It rejects
+// nil and typed-nil sources. The last explicit OIDC form wins, but neither form
+// displaces an explicit or environment API key.
 func WithOIDCTokenSource(source TokenSource) Option {
 	return func(config *clientConfig) error {
 		if nilInterface(source) {
@@ -154,7 +165,11 @@ func WithOIDCTokenSource(source TokenSource) Option {
 	}
 }
 
-// WithBaseURL sets the Evaluation Model V4 provider base URL.
+// WithBaseURL sets the provider base URL. It requires a whitespace-exact,
+// absolute, non-opaque HTTP(S) URL with host and without userinfo, query, or
+// fragment. Existing paths are allowed. Only trailing path slashes are removed;
+// scheme, host, port, escaping, and the remaining path are preserved before
+// Evaluate appends /evaluation-model.
 func WithBaseURL(baseURL string) Option {
 	return func(config *clientConfig) error {
 		if blank(baseURL) || baseURL != strings.TrimSpace(baseURL) {
@@ -174,7 +189,9 @@ func WithBaseURL(baseURL string) Option {
 	}
 }
 
-// WithHTTPClient stores and uses client without cloning or mutating it.
+// WithHTTPClient rejects nil and stores the supplied pointer without cloning or
+// mutating the client or transport. Subsequent concurrent mutation is the
+// caller's responsibility under the same rules as http.Client.
 func WithHTTPClient(client *http.Client) Option {
 	return func(config *clientConfig) error {
 		if client == nil {
@@ -185,7 +202,8 @@ func WithHTTPClient(client *http.Client) Option {
 	}
 }
 
-// WithTeam sets the Vercel team ID or slug.
+// WithTeam sets a nonblank Vercel team ID or slug and preserves it exactly.
+// There is no environment team fallback.
 func WithTeam(teamIDOrSlug string) Option {
 	return func(config *clientConfig) error {
 		if blank(teamIDOrSlug) {
@@ -196,8 +214,12 @@ func WithTeam(teamIDOrSlug string) Option {
 	}
 }
 
-// WithHeaders clones caller-supplied headers and rejects names owned by the
-// Gateway protocol, regardless of their casing or values.
+// WithHeaders accepts nil or clones the supplied map when applied and again per
+// request, preserving values, order, duplicates, and nil/empty slices. It
+// rejects protocol/auth/team-owned names case-insensitively even without values:
+// Authorization, Content-Type, Ai-Gateway-Protocol-Version,
+// Ai-Gateway-Auth-Method, Ai-Evaluation-Model-Specification-Version,
+// Ai-Model-Id, and X-Vercel-Ai-Gateway-Team.
 func WithHeaders(headers http.Header) Option {
 	return func(config *clientConfig) error {
 		if containsProtectedHeader(headers) {
@@ -212,7 +234,8 @@ func WithHeaders(headers http.Header) Option {
 	}
 }
 
-// WithRetryPolicy validates and stores a resolved retry policy.
+// WithRetryPolicy copies, validates, resolves, and stores policy. Invalid fields
+// return ConfigurationError with Option "WithRetryPolicy" and a stable Reason.
 func WithRetryPolicy(policy RetryPolicy) Option {
 	return func(config *clientConfig) error {
 		resolved, err := resolveRetryPolicy(policy)

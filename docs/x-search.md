@@ -6,6 +6,8 @@
 
 Gateway-native xAI `x_search` is unsupported in this SDK. The SDK exports no `x_search` API, sends no `x_search` request, and contains no live Gateway `x_search` probe. This decision does not deny that direct xAI supports the tool; it keeps a direct-xAI contract separate from the unconfirmed Vercel AI Gateway contract.
 
+The implemented public surface is the separate [Evaluation Model V4 provider protocol](evaluation.md). Evaluation support does not provide, imply, or transport either Gateway-native or direct-xAI `x_search`.
+
 ## Confirmed direct-xAI behavior
 
 The official xAI X Search contract documents the direct Responses API request: `POST https://api.x.ai/v1/responses`, with native X search supplied in the top-level `tools` array as an object with `type: "x_search"`. Its wire options use snake_case, including `allowed_x_handles`, `excluded_x_handles`, `from_date`, `to_date`, `enable_image_understanding`, and `enable_video_understanding`. xAI's separate tool-usage documentation identifies provider-executed response items with `type: "x_search_call"`.

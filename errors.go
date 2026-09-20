@@ -5,7 +5,11 @@ import (
 	"time"
 )
 
-// ConfigurationError reports invalid client construction options.
+// ConfigurationError reports client construction failure. Option is one of
+// WithBaseURL, WithHTTPClient, WithAPIKey, WithOIDCToken,
+// WithOIDCTokenSource, WithTeam, WithHeaders, WithRetryPolicy, or credentials;
+// Reason is a stable closed value documented by Option. A nil receiver's
+// accessors return empty strings and Error returns "gateway configuration error".
 type ConfigurationError struct {
 	option string
 	reason string
@@ -42,7 +46,9 @@ func (e *ConfigurationError) Reason() string {
 	return e.reason
 }
 
-// ValidationError reports an invalid evaluation request.
+// ValidationError reports an invalid evaluation request with a canonical public
+// request Path and stable Reason. It does not unwrap. A nil receiver's
+// accessors return empty strings and Error returns "gateway validation error".
 type ValidationError struct {
 	path   string
 	reason string
@@ -75,7 +81,11 @@ func (e *ValidationError) Reason() string {
 	return e.reason
 }
 
-// TransportError reports a failure before a usable response body was obtained.
+// TransportError reports failure resolving an OIDC token, encoding or creating
+// a request, sending it, or reading a body. Operation is exactly
+// "resolve OIDC token", "encode request", "create request", "send request",
+// or "read response body". A nil receiver returns empty Operation, nil Unwrap,
+// and "gateway transport error" from Error.
 type TransportError struct {
 	operation string
 	cause     error
@@ -105,7 +115,10 @@ func (e *TransportError) Unwrap() error {
 	return e.cause
 }
 
-// ResponseError reports a non-200 Gateway HTTP response.
+// ResponseError reports a non-200 Gateway HTTP response. Its structured
+// envelope, ID, retry, truncation, and defensive-copy body accessors are safe
+// for nil receivers and return zero values; Error omits raw bodies, headers,
+// credentials, request data, and wrapped cause text.
 type ResponseError struct {
 	cause           error
 	statusCode      int
@@ -239,7 +252,9 @@ func (e *ResponseError) RawResponseBody() []byte {
 }
 
 // ResponseValidationError reports malformed or contract-invalid status-200
-// provider output.
+// output. Its path/reason, ID, truncation, and defensive-copy body accessors are
+// nil-safe and return zero values; Error omits raw bodies, headers, credentials,
+// request data, and wrapped cause text.
 type ResponseValidationError struct {
 	cause           error
 	statusCode      int

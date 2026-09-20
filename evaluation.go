@@ -6,17 +6,19 @@ import (
 	"time"
 )
 
-// EvaluationRequest contains shared state, keyed questions, and optional
-// provider-specific options.
+// EvaluationRequest contains shared State, a nonempty keyed Questions map, and
+// optional ProviderOptions. State and question instructions/criteria are
+// validated recursively as JSON-compatible input before network I/O.
 type EvaluationRequest struct {
 	State           any
 	Questions       map[string]Question
 	ProviderOptions map[string]map[string]any
 }
 
-// Evaluate validates and submits an Evaluation Model V4 request. Only HTTP
-// status 200 is treated as success; every other response is returned as a
-// ResponseError with bounded response diagnostics.
+// Evaluate validates and submits an Evaluation Model V4 request. A nil context
+// is a ValidationError at $["context"]. Only HTTP status 200 is success; every
+// other status is a ResponseError, and response Content-Type is ignored.
+// Retries occur only when explicitly configured and may duplicate billable work.
 func (client *Client) Evaluate(ctx context.Context, modelID string, request EvaluationRequest) (*EvaluationResult, error) {
 	if ctx == nil {
 		return nil, validationError(memberPath("$", "context"), "required")
@@ -59,7 +61,8 @@ type Question interface {
 	questionType() string
 }
 
-// BooleanQuestion asks for the probability that its criteria are true.
+// BooleanQuestion asks for P(true). Instructions is required and must be a
+// JSON-compatible string, object, or array. Nil Criteria omits the wire field.
 type BooleanQuestion struct {
 	Instructions any
 	Criteria     *BooleanCriteria
@@ -67,7 +70,8 @@ type BooleanQuestion struct {
 
 func (BooleanQuestion) questionType() string { return "boolean" }
 
-// ChoiceQuestion asks the provider to select one keyed criterion.
+// ChoiceQuestion asks the provider to select one keyed criterion. Instructions
+// is required; Criteria must contain at least one JSON-compatible description.
 type ChoiceQuestion struct {
 	Instructions any
 	Criteria     map[string]any
@@ -75,7 +79,8 @@ type ChoiceQuestion struct {
 
 func (ChoiceQuestion) questionType() string { return "choice" }
 
-// ScoreQuestion asks for a score among ordered criteria levels.
+// ScoreQuestion asks for a score over ordered criteria indexed from zero.
+// Instructions is required; Criteria must contain at least two descriptions.
 type ScoreQuestion struct {
 	Instructions any
 	Criteria     []any
@@ -91,13 +96,16 @@ type OptionalJSON struct {
 	Value any
 }
 
-// BooleanCriteria optionally describes the true and false outcomes.
+// BooleanCriteria optionally describes true and false. A non-nil zero value
+// emits an empty criteria object; each OptionalJSON controls key presence.
 type BooleanCriteria struct {
 	True  OptionalJSON
 	False OptionalJSON
 }
 
-// EvaluationResult is a validated Evaluation Model V4 result.
+// EvaluationResult is a strictly validated Evaluation Model V4 result. Missing
+// warnings normalize to a non-nil empty slice; other metadata preserves the
+// documented absent-versus-present distinction.
 type EvaluationResult struct {
 	Answers          map[string]Answer
 	Rounding         *Rounding
@@ -107,16 +115,18 @@ type EvaluationResult struct {
 	Response         ResponseMetadata
 }
 
-// Rounding reports decimal places used by the provider. A nil field means the
-// corresponding wire key was absent; a non-nil pointer may contain zero.
+// Rounding reports provider decimal places. A nil Rounding object means the
+// wire object was absent; an empty object is non-nil. Each nil field means its
+// key was absent, while a non-nil pointer may contain zero and must be 0..15.
 type Rounding struct {
 	ProbabilityDecimals *int
 	ScoreDecimals       *int
 }
 
-// Usage reports token counts. A nil field means the corresponding wire key was
-// absent; a non-nil pointer may contain zero. Present counts are finite,
-// non-negative integers representable as int64.
+// Usage reports token counts. A nil Usage object means the wire object was
+// absent; an empty object is non-nil. Each nil field means its key was absent;
+// a non-nil pointer may contain zero and is a non-negative JSON integer that
+// fits int64.
 type Usage struct {
 	InputTokens  *int64
 	OutputTokens *int64
@@ -149,10 +159,10 @@ type Warning struct {
 }
 
 // ResponseMetadata describes a successful HTTP response. ModelID is the
-// caller-supplied model ID. Headers and Body are defensive copies and are
-// non-nil after a successfully read response, including an empty body; their
-// zero values mean no response metadata. Body may contain echoed request state
-// or provider options and must be sanitized before logging or persistence.
+// caller-supplied ID. Headers and Body are defensive copies and non-nil after a
+// successful bounded read, including an empty body; zero values mean no response
+// metadata. Body is limited to 1 MiB and may contain echoed state or provider
+// options, so it must be sanitized before logging or persistence.
 type ResponseMetadata struct {
 	ModelID string
 	Headers http.Header
