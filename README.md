@@ -18,8 +18,8 @@ The public contract is being implemented in dependency-ordered chunks. The curre
 | OpenAI-compatible `/v1/chat/completions` or `/v1/responses` | Not supported |
 | Language generation, streaming, embeddings, images, video, audio, reranking, realtime, or batches | Not supported |
 | Agents, automatic tool execution, UI helpers, or provider registry | Not supported |
-| Gateway-native xAI `x_search` | Unsupported and unconfirmed |
-| Direct xAI client | Not supported |
+| Gateway-native xAI `x_search` | Unsupported and unconfirmed; see [`docs/x-search.md`](docs/x-search.md) |
+| Direct xAI `x_search` | Confirmed upstream behavior, but no direct xAI client is provided by this SDK |
 | Full parity with JavaScript `ai` or `@ai-sdk/gateway` | Not claimed |
 
 ## Experimental status
