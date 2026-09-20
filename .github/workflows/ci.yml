@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: local
+  GOPROXY: 'off'
+
+jobs:
+  verify:
+    name: Go ${{ matrix.go-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version:
+          - 1.26.8
+          - 1.27.1
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install pinned Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          check-latest: false
+          cache: false
+
+      - name: Run hermetic tests
+        run: env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK go test ./...
+
+      - name: Compile evaluation example
+        run: env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK go test ./examples/evaluate
+
+      - name: Run race detector
+        if: matrix.go-version == '1.27.1'
+        run: env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK go test -race ./...
+
+      - name: Run vet
+        if: matrix.go-version == '1.27.1'
+        run: env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK go vet ./...
+
+      - name: Compile clean local consumer
+        if: matrix.go-version == '1.27.1'
+        run: env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK ./scripts/verify-local-consumer.sh

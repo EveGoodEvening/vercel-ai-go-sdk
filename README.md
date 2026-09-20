@@ -2,9 +2,9 @@
 
 Experimental Go client for Vercel AI Gateway's **AI SDK Evaluation Model V4 provider protocol**. It calls `POST https://ai-gateway.vercel.sh/v4/ai/evaluation-model`; it is not a client for the separate public REST `POST /v1/evaluate` API and is not an OpenAI-compatible wrapper.
 
-The module declares Go 1.26 as its minimum (`go 1.26` in `go.mod`). The intended support window is the maintained Go 1.26 and 1.27 families. Go 1.26.8 and Go 1.27.1 are the planned validation targets; until Chunk 11 adds the pinned CI matrix, validation of those toolchains is manual.
+The module declares Go 1.26 as its minimum (`go 1.26` in `go.mod`). The maintained support window is the Go 1.26 and 1.27 families. CI is pinned to Go 1.26.8 and Go 1.27.1; changing either pin requires a reviewed plan and evidence update.
 
-Evaluation is experimental and compatibility-sensitive. The contract is pinned to `ai@7.0.107`, `@ai-sdk/gateway@4.0.87`, `@ai-sdk/provider@4.0.17`, and `@ai-sdk/provider-utils@5.0.45`. This project remains at v0 and does not claim parity with JavaScript `ai` or `@ai-sdk/gateway`.
+Evaluation is experimental and compatibility-sensitive. The contract is pinned to `ai@7.0.107`, `@ai-sdk/gateway@4.0.87`, `@ai-sdk/provider@4.0.17`, and `@ai-sdk/provider-utils@5.0.45`. Releases begin at v0, v1 compatibility is not promised while evaluation remains experimental, and this project does not claim parity with JavaScript `ai` or `@ai-sdk/gateway`.
 
 ## Install
 
@@ -12,7 +12,7 @@ Evaluation is experimental and compatibility-sensitive. The contract is pinned t
 go get github.com/EveGoodEvening/vercel-ai-gateway-go-sdk
 ```
 
-A public release remains blocked until the repository owner selects and commits a license.
+A public release remains blocked until the repository owner selects and commits a license, configures the remote/repository metadata, completes the authorized live contract, and reviews publication provenance. See the [release-readiness policy and checklist](docs/releasing.md); no tag or published release currently exists.
 
 ## Evaluation
 
@@ -117,3 +117,7 @@ All five types work with `errors.As`; accessors are nil-safe and return their do
 ## Live evidence
 
 The gated contract test and sanitized record are in [`docs/evaluation-live-evidence.md`](docs/evaluation-live-evidence.md). It remains **NOT RUN / PENDING LIVE RUN** because no authorized paid credentialed execution has occurred. Do not claim a live pass until that record is completed from the exact authorized command.
+
+## Release and migration policy
+
+Every exported breaking change, including during v0, requires an appropriate version increment, a changelog entry, and a release-note **Migration** section naming each removed or changed API and the caller action required. Published tags are immutable: never move, delete as a rollback, or reuse one. Correct a defective release with a new patch version containing an appropriate `retract` directive and rationale, mark the hosting release as affected, publish corrected notes, and issue a security advisory when applicable. The complete policy and unresolved external blockers are maintained in [`docs/releasing.md`](docs/releasing.md).
