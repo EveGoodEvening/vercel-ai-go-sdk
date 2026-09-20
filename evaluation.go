@@ -1,6 +1,10 @@
 package gateway
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+	"time"
+)
 
 // EvaluationRequest contains shared state, keyed questions, and optional
 // provider-specific options.
@@ -8,6 +12,37 @@ type EvaluationRequest struct {
 	State           any
 	Questions       map[string]Question
 	ProviderOptions map[string]map[string]any
+}
+
+// Evaluate validates and submits an Evaluation Model V4 request. Only HTTP
+// status 200 is treated as success; every other response is returned as a
+// ResponseError with bounded response diagnostics.
+func (client *Client) Evaluate(ctx context.Context, modelID string, request EvaluationRequest) (*EvaluationResult, error) {
+	if ctx == nil {
+		return nil, validationError(memberPath("$", "context"), "required")
+	}
+	if err := validateEvaluationRequest(modelID, request); err != nil {
+		return nil, err
+	}
+	payload, err := encodeEvaluationRequest(request)
+	if err != nil {
+		return nil, &TransportError{operation: "encode request", cause: err}
+	}
+	raw, err := client.executeEvaluationRequest(ctx, modelID, payload)
+	if err != nil {
+		return nil, err
+	}
+	if raw.statusCode != http.StatusOK {
+		now := time.Now()
+		if client.config.retryHooks.now != nil {
+			now = client.config.retryHooks.now()
+		}
+		return nil, composeResponseError(raw, now)
+	}
+	if raw.bodyErr != nil {
+		return nil, &TransportError{operation: "read response body", cause: raw.bodyErr}
+	}
+	return composeEvaluationResult(modelID, request.Questions, raw)
 }
 
 // Question is the closed set of supported evaluation question variants.

@@ -13,8 +13,7 @@ import (
 
 const defaultBaseURL = "https://ai-gateway.vercel.sh/v4/ai"
 
-// Client is an evaluation-only Vercel AI Gateway client. Its evaluation method
-// is introduced with the completed transport and response contract.
+// Client is an evaluation-only Vercel AI Gateway client.
 type Client struct {
 	config clientConfig
 }

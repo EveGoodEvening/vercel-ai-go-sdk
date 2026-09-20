@@ -17,6 +17,7 @@ func compilePublicContract() {
 	var _ gateway.Option
 	var _ gateway.TokenSource = tokenSource{}
 	var _ func(...gateway.Option) (*gateway.Client, error) = gateway.NewClient
+	var _ func(*gateway.Client, context.Context, string, gateway.EvaluationRequest) (*gateway.EvaluationResult, error) = (*gateway.Client).Evaluate
 	var _ func(string) gateway.Option = gateway.WithAPIKey
 	var _ func(string) gateway.Option = gateway.WithOIDCToken
 	var _ func(gateway.TokenSource) gateway.Option = gateway.WithOIDCTokenSource
