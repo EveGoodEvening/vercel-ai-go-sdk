@@ -7,10 +7,12 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/EveGoodEvening/vercel-ai-gateway-go-sdk/internal/httpx"
 	"github.com/EveGoodEvening/vercel-ai-gateway-go-sdk/internal/testserver"
@@ -115,6 +117,93 @@ func TestExecuteEvaluationRequestExactWireRequest(t *testing.T) {
 	}
 	if !reflect.DeepEqual(callerHeaders, http.Header{"X-Custom": {"first", "second"}}) {
 		t.Fatalf("caller headers mutated: %#v", callerHeaders)
+	}
+}
+
+func TestEvaluateDoesNotFollowRedirectsOrRetryThem(t *testing.T) {
+	clearCredentialEnvironment(t)
+	for _, status := range []int{
+		http.StatusMovedPermanently,
+		http.StatusFound,
+		http.StatusSeeOther,
+		http.StatusTemporaryRedirect,
+		http.StatusPermanentRedirect,
+	} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var destinationRequests int
+			var destinationAuthorization string
+			destination := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				destinationRequests++
+				destinationAuthorization = request.Header.Get(headerAuthorization)
+				writer.WriteHeader(http.StatusOK)
+			}))
+			defer destination.Close()
+
+			var originRequests int
+			origin := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				originRequests++
+				writer.Header().Set("Location", destination.URL+"/redirected")
+				writer.WriteHeader(status)
+				_, _ = writer.Write([]byte(`{"error":{"message":"redirect"}}`))
+			}))
+			defer origin.Close()
+
+			jar, err := cookiejar.New(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			transport := &http.Transport{}
+			defer transport.CloseIdleConnections()
+			callerRedirectCalls := 0
+			callerClient := &http.Client{
+				Transport: transport,
+				Jar:       jar,
+				Timeout:   5 * time.Second,
+				CheckRedirect: func(*http.Request, []*http.Request) error {
+					callerRedirectCalls++
+					return nil
+				},
+			}
+			var sleeps int
+			client, err := NewClient(
+				WithAPIKey("secret"),
+				WithBaseURL(origin.URL),
+				WithHTTPClient(callerClient),
+				WithRetryPolicy(RetryPolicy{MaxAttempts: 2}),
+				withRetryHooks(retryHooks{
+					now:    time.Now,
+					jitter: func() float64 { return 0 },
+					sleep: func(context.Context, time.Duration) error {
+						sleeps++
+						return nil
+					},
+				}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.Evaluate(context.Background(), "provider/model", validRequest())
+			var responseErr *ResponseError
+			if !errors.As(err, &responseErr) {
+				t.Fatalf("error = %T %v; want *ResponseError", err, err)
+			}
+			if responseErr.StatusCode() != status || responseErr.Retryable() {
+				t.Fatalf("status=%d retryable=%t; want status=%d retryable=false", responseErr.StatusCode(), responseErr.Retryable(), status)
+			}
+			if originRequests != 1 || destinationRequests != 0 || destinationAuthorization != "" {
+				t.Fatalf("origin requests=%d destination requests=%d destination Authorization=%q", originRequests, destinationRequests, destinationAuthorization)
+			}
+			if sleeps != 0 {
+				t.Fatalf("retry sleeps=%d; want 0", sleeps)
+			}
+			if callerRedirectCalls != 0 {
+				t.Fatalf("caller CheckRedirect calls=%d; want 0", callerRedirectCalls)
+			}
+			if callerClient.Transport != transport || callerClient.Jar != jar || callerClient.Timeout != 5*time.Second || callerClient.CheckRedirect == nil {
+				t.Fatal("caller-supplied http.Client was mutated")
+			}
+		})
 	}
 }
 

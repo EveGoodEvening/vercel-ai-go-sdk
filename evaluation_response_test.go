@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -64,6 +65,134 @@ func TestComposeEvaluationResultPresenceSemantics(t *testing.T) {
 		if boundedErr != nil || *bounded.Rounding.ProbabilityDecimals != decimals || *bounded.Rounding.ScoreDecimals != decimals {
 			t.Fatalf("rounding boundary %d: %#v %v", decimals, bounded, boundedErr)
 		}
+	}
+}
+
+func TestComposeEvaluationResultIntegralMetadataNumberSpellings(t *testing.T) {
+	for _, test := range []struct {
+		name                string
+		probabilityDecimals string
+		inputTokens         string
+		wantDecimals        int
+		wantTokens          int64
+	}{
+		{"integer", "2", "2", 2, 2},
+		{"decimal", "2.0", "1000.0", 2, 1000},
+		{"exponent", "2e0", "1e3", 2, 1000},
+		{"upper boundaries", "15e0", "9.223372036854775807e18", 15, math.MaxInt64},
+		{"huge positive exponent zero", "0e999999999999999999999999999999999999", "-0.000E+999999999999999999999999999999999999", 0, 0},
+		{"huge negative exponent zero", "-0e-999999999999999999999999999999999999", "0.000e-999999999999999999999999999999999999", 0, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			body := []byte(`{"answers":{},"rounding":{"probabilityDecimals":` + test.probabilityDecimals + `},"usage":{"inputTokens":` + test.inputTokens + `}}`)
+			result, err := composeEvaluationResult("model", map[string]Question{}, rawEvaluationResponse{statusCode: 200, body: body})
+			if err != nil {
+				t.Fatalf("integral number rejected: %v", err)
+			}
+			if *result.Rounding.ProbabilityDecimals != test.wantDecimals || *result.Usage.InputTokens != test.wantTokens {
+				t.Fatalf("got decimals/tokens %d/%d, want %d/%d", *result.Rounding.ProbabilityDecimals, *result.Usage.InputTokens, test.wantDecimals, test.wantTokens)
+			}
+		})
+	}
+
+	for _, test := range []struct{ name, field, value, path, reason string }{
+		{"rounding fractional", "rounding", `{"probabilityDecimals":2.5}`, `$["rounding"]["probabilityDecimals"]`, "must be an integer"},
+		{"rounding negative", "rounding", `{"probabilityDecimals":-1.0}`, `$["rounding"]["probabilityDecimals"]`, "must be between 0 and 15"},
+		{"rounding out of range", "rounding", `{"probabilityDecimals":1.6e1}`, `$["rounding"]["probabilityDecimals"]`, "must be between 0 and 15"},
+		{"usage fractional", "usage", `{"inputTokens":1e-1}`, `$["usage"]["inputTokens"]`, "must be an integer"},
+		{"usage negative", "usage", `{"inputTokens":-1.0}`, `$["usage"]["inputTokens"]`, "must be an integer"},
+		{"usage overflow", "usage", `{"inputTokens":9223372036854775808.0}`, `$["usage"]["inputTokens"]`, "must be an integer"},
+		{"usage exponent overflow", "usage", `{"inputTokens":1e10000}`, `$["usage"]["inputTokens"]`, "must be an integer"},
+		{"usage exponent safety bound", "usage", `{"inputTokens":1e10001}`, `$["usage"]["inputTokens"]`, "must be an integer"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			body := []byte(`{"answers":{},"` + test.field + `":` + test.value + `}`)
+			_, err := composeEvaluationResult("model", map[string]Question{}, rawEvaluationResponse{statusCode: 200, body: body})
+			var validation *ResponseValidationError
+			if !errors.As(err, &validation) || validation.Path() != test.path || validation.Reason() != test.reason {
+				t.Fatalf("got %v, want path/reason %q/%q", err, test.path, test.reason)
+			}
+		})
+	}
+}
+
+func TestComposeEvaluationResultBalancedExponentMetadata(t *testing.T) {
+	rounding := "1" + strings.Repeat("0", 10001) + "e-10001"
+	usage := "0." + strings.Repeat("0", 10000) + "1e10001"
+	body := []byte(`{"answers":{},"rounding":{"probabilityDecimals":` + rounding + `},"usage":{"inputTokens":` + usage + `}}`)
+
+	result, err := composeEvaluationResult("model", map[string]Question{}, rawEvaluationResponse{statusCode: 200, body: body})
+	if err != nil {
+		t.Fatalf("balanced exponent metadata rejected: %v", err)
+	}
+	if got := *result.Rounding.ProbabilityDecimals; got != 1 {
+		t.Fatalf("probability decimals = %d, want 1", got)
+	}
+	if got := *result.Usage.InputTokens; got != 1 {
+		t.Fatalf("input tokens = %d, want 1", got)
+	}
+}
+
+func TestExactJSONIntegerBalancedExponentInt64Edges(t *testing.T) {
+	zeros := strings.Repeat("0", 10001)
+	for _, test := range []struct {
+		name     string
+		spelling string
+		want     int64
+	}{
+		{"maximum", "9223372036854775807" + zeros + "e-10001", math.MaxInt64},
+		{"minimum", "-9223372036854775808" + zeros + "e-10001", math.MinInt64},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			integer, ok := exactJSONInteger(json.Number(test.spelling))
+			if !ok || !integer.IsInt64() || integer.Int64() != test.want {
+				t.Fatalf("exactJSONInteger() = %v, %t; want %d, true", integer, ok, test.want)
+			}
+		})
+	}
+
+	for _, spelling := range []string{
+		"9223372036854775808" + zeros + "e-10001",
+		"-9223372036854775809" + zeros + "e-10001",
+		"1" + zeros + "e-10002",
+	} {
+		if integer, ok := exactJSONInteger(json.Number(spelling)); ok {
+			t.Fatalf("exactJSONInteger() = %v, true; want rejection", integer)
+		}
+	}
+}
+
+func TestExactJSONIntegerRejectsMalformedZeroSpellings(t *testing.T) {
+	for _, spelling := range []string{
+		"",
+		"-",
+		"+0",
+		"00",
+		"-00",
+		".0",
+		"0.",
+		"0.e1",
+		"0e",
+		"0e+",
+		"0e-",
+		"0e1.0",
+		"0x0",
+		"zero",
+	} {
+		t.Run(spelling, func(t *testing.T) {
+			if integer, ok := exactJSONInteger(json.Number(spelling)); ok {
+				t.Fatalf("exactJSONInteger(%q) = %v, true; want rejection", spelling, integer)
+			}
+			for _, metadata := range []string{
+				`"rounding":{"probabilityDecimals":` + spelling + `}`,
+				`"usage":{"inputTokens":` + spelling + `}`,
+			} {
+				body := []byte(`{"answers":{},` + metadata + `}`)
+				if _, err := composeEvaluationResult("model", map[string]Question{}, rawEvaluationResponse{statusCode: 200, body: body}); err == nil {
+					t.Fatalf("metadata accepted malformed number %q", spelling)
+				}
+			}
+		})
 	}
 }
 

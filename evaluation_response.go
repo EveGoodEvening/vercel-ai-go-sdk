@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"math/big"
 	"net/http"
 	"sort"
 	"strconv"
@@ -437,14 +438,14 @@ func optionalDecimal(object map[string]*responseNode, key, path string) (*int, *
 	if node.kind != '#' {
 		return nil, &responseFieldFailure{fieldPath, "must be an integer"}
 	}
-	integer, err := node.num.Int64()
-	if err != nil {
+	integer, ok := exactJSONInteger(node.num)
+	if !ok {
 		return nil, &responseFieldFailure{fieldPath, "must be an integer"}
 	}
-	if integer < 0 || integer > 15 {
+	if integer.Sign() < 0 || !integer.IsInt64() || integer.Int64() > 15 {
 		return nil, &responseFieldFailure{fieldPath, "must be between 0 and 15"}
 	}
-	value := int(integer)
+	value := int(integer.Int64())
 	return &value, nil
 }
 
@@ -485,14 +486,128 @@ func optionalCount(object map[string]*responseNode, key, path string) (*int64, *
 	if node.kind != '#' {
 		return nil, &responseFieldFailure{fieldPath, "must be an integer"}
 	}
-	integer, err := node.num.Int64()
-	if err != nil {
+	integer, ok := exactJSONInteger(node.num)
+	if !ok || integer.Sign() < 0 || !integer.IsInt64() {
 		return nil, &responseFieldFailure{fieldPath, "must be an integer"}
 	}
-	if integer < 0 {
-		return nil, &responseFieldFailure{fieldPath, "must be an integer"}
+	value := integer.Int64()
+	return &value, nil
+}
+
+func exactJSONInteger(number json.Number) (*big.Int, bool) {
+	text := number.String()
+	index := 0
+	negative := false
+	if index < len(text) && text[index] == '-' {
+		negative = true
+		index++
 	}
-	return &integer, nil
+	if index == len(text) {
+		return nil, false
+	}
+
+	digits := make([]byte, 0, 32)
+	if text[index] == '0' {
+		digits = append(digits, '0')
+		index++
+		if index < len(text) && text[index] >= '0' && text[index] <= '9' {
+			return nil, false
+		}
+	} else if text[index] >= '1' && text[index] <= '9' {
+		for index < len(text) && text[index] >= '0' && text[index] <= '9' {
+			digits = append(digits, text[index])
+			index++
+		}
+	} else {
+		return nil, false
+	}
+
+	fractionDigits := 0
+	if index < len(text) && text[index] == '.' {
+		index++
+		fractionStart := index
+		for index < len(text) && text[index] >= '0' && text[index] <= '9' {
+			digits = append(digits, text[index])
+			fractionDigits++
+			index++
+		}
+		if index == fractionStart {
+			return nil, false
+		}
+	}
+
+	exponentNegative := false
+	exponentMagnitude := 0
+	if index < len(text) && (text[index] == 'e' || text[index] == 'E') {
+		index++
+		if index < len(text) && (text[index] == '+' || text[index] == '-') {
+			exponentNegative = text[index] == '-'
+			index++
+		}
+		exponentStart := index
+		exponentLimit := len(text) + 20
+		for index < len(text) && text[index] >= '0' && text[index] <= '9' {
+			if exponentMagnitude < exponentLimit {
+				exponentMagnitude = exponentMagnitude*10 + int(text[index]-'0')
+				if exponentMagnitude > exponentLimit {
+					exponentMagnitude = exponentLimit
+				}
+			}
+			index++
+		}
+		if index == exponentStart {
+			return nil, false
+		}
+	}
+	if index != len(text) {
+		return nil, false
+	}
+
+	firstNonzero := 0
+	for firstNonzero < len(digits) && digits[firstNonzero] == '0' {
+		firstNonzero++
+	}
+	if firstNonzero == len(digits) {
+		return new(big.Int), true
+	}
+
+	effectiveShift := exponentMagnitude - fractionDigits
+	if exponentNegative {
+		effectiveShift = -exponentMagnitude - fractionDigits
+	}
+	trailingZeros := 0
+	for i := len(digits) - 1; i >= firstNonzero && digits[i] == '0'; i-- {
+		trailingZeros++
+	}
+	if effectiveShift < 0 && -effectiveShift > trailingZeros {
+		return nil, false
+	}
+
+	resultDigits := len(digits) - firstNonzero + effectiveShift
+	if resultDigits <= 0 || resultDigits > 19 {
+		return nil, false
+	}
+	limit := uint64(math.MaxInt64)
+	if negative {
+		limit++
+	}
+	var magnitude uint64
+	for i := range resultDigits {
+		digit := byte(0)
+		if source := firstNonzero + i; source < len(digits) {
+			digit = digits[source] - '0'
+		}
+		if magnitude > (limit-uint64(digit))/10 {
+			return nil, false
+		}
+		magnitude = magnitude*10 + uint64(digit)
+	}
+
+	integer := new(big.Int).SetUint64(magnitude)
+	if negative {
+		integer.Neg(integer)
+	}
+	return integer, true
 }
 
 func decodeWarnings(node *responseNode) ([]Warning, *responseFieldFailure) {

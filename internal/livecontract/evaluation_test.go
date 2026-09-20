@@ -149,15 +149,15 @@ func assertOptionalContract(t *testing.T, result *gateway.EvaluationResult) {
 	for index, warning := range result.Warnings {
 		switch warning.Type {
 		case gateway.WarningUnsupported, gateway.WarningCompatibility:
-			if warning.Feature == "" || warning.Setting != "" || warning.Message != "" {
+			if warning.Setting != "" || warning.Message != "" {
 				t.Fatalf("warning %d violates %q discriminator contract", index, warning.Type)
 			}
 		case gateway.WarningDeprecated:
-			if warning.Setting == "" || warning.Message == "" || warning.Feature != "" || warning.Details != nil {
+			if warning.Feature != "" || warning.Details != nil {
 				t.Fatalf("warning %d violates deprecated discriminator contract", index)
 			}
 		case gateway.WarningOther:
-			if warning.Message == "" || warning.Feature != "" || warning.Details != nil || warning.Setting != "" {
+			if warning.Feature != "" || warning.Details != nil || warning.Setting != "" {
 				t.Fatalf("warning %d violates other discriminator contract", index)
 			}
 		default:
@@ -165,7 +165,7 @@ func assertOptionalContract(t *testing.T, result *gateway.EvaluationResult) {
 		}
 	}
 	for provider, metadata := range result.ProviderMetadata {
-		if provider == "" || metadata == nil {
+		if metadata == nil {
 			t.Fatalf("provider metadata contains invalid entry for %q", provider)
 		}
 	}

@@ -28,7 +28,15 @@ func (client *Client) executeEvaluationRequest(ctx context.Context, modelID stri
 	}
 	request.Header = client.config.buildHeaders(authorization, authMethod, modelID)
 
-	response, err := client.config.httpClient.Do(request)
+	httpClient := &http.Client{
+		Transport: client.config.httpClient.Transport,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Jar:     client.config.httpClient.Jar,
+		Timeout: client.config.httpClient.Timeout,
+	}
+	response, err := httpClient.Do(request)
 	if err != nil {
 		return rawEvaluationResponse{}, &TransportError{operation: "send request", cause: err}
 	}
