@@ -40,6 +40,7 @@ type clientConfig struct {
 	headers         http.Header
 	retryPolicy     RetryPolicy
 	retryHooks      retryHooks
+	credential      resolvedCredential
 }
 
 // Option configures a Client during NewClient. Options are applied in order and
@@ -104,6 +105,9 @@ func NewClient(opts ...Option) (*Client, error) {
 		if err := option(&config); err != nil {
 			return nil, err
 		}
+	}
+	if err := resolveCredential(&config); err != nil {
+		return nil, err
 	}
 
 	return &Client{config: config}, nil
@@ -191,10 +195,13 @@ func WithTeam(teamIDOrSlug string) Option {
 	}
 }
 
-// WithHeaders clones caller-supplied headers. Protected-header ownership is
-// enforced when authentication and request header construction are introduced.
+// WithHeaders clones caller-supplied headers and rejects names owned by the
+// Gateway protocol, regardless of their casing or values.
 func WithHeaders(headers http.Header) Option {
 	return func(config *clientConfig) error {
+		if containsProtectedHeader(headers) {
+			return newConfigurationError("WithHeaders", "contains protected header")
+		}
 		if headers == nil {
 			config.headers = nil
 		} else {
