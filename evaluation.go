@@ -28,21 +28,30 @@ func (client *Client) Evaluate(ctx context.Context, modelID string, request Eval
 	if err != nil {
 		return nil, &TransportError{operation: "encode request", cause: err}
 	}
-	raw, err := client.executeEvaluationRequest(ctx, modelID, payload)
-	if err != nil {
-		return nil, err
-	}
-	if raw.statusCode != http.StatusOK {
+	for attempt := 1; ; attempt++ {
+		raw, err := client.executeEvaluationRequest(ctx, modelID, payload)
+		if err != nil {
+			return nil, err
+		}
+		if raw.statusCode == http.StatusOK {
+			if raw.bodyErr != nil {
+				return nil, &TransportError{operation: "read response body", cause: raw.bodyErr}
+			}
+			return composeEvaluationResult(modelID, request.Questions, raw)
+		}
+
 		now := time.Now()
 		if client.config.retryHooks.now != nil {
 			now = client.config.retryHooks.now()
 		}
-		return nil, composeResponseError(raw, now)
+		responseErr := composeResponseError(raw, now)
+		if !client.canRetry(ctx, attempt, responseErr) {
+			return nil, responseErr
+		}
+		if err := client.waitForRetry(ctx, attempt, responseErr); err != nil {
+			return nil, err
+		}
 	}
-	if raw.bodyErr != nil {
-		return nil, &TransportError{operation: "read response body", cause: raw.bodyErr}
-	}
-	return composeEvaluationResult(modelID, request.Questions, raw)
 }
 
 // Question is the closed set of supported evaluation question variants.

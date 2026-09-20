@@ -52,10 +52,12 @@ type TokenSource interface {
 }
 
 // RetryPolicy configures bounded retries. MaxAttempts counts the initial
-// request; zero and one both mean one attempt. Values from two through ten opt
-// in to retries, which may duplicate billable evaluation work. When retries are
-// enabled, zero InitialDelay, MaxDelay, and Multiplier resolve to 100ms, 2s,
-// and 2. Jitter is a symmetric fraction in [0,1].
+// request; zero and one both mean one attempt, while values 2 through 10 opt
+// in to retries that may duplicate billable evaluation work. For enabled
+// retries, zero InitialDelay, MaxDelay, and Multiplier default to 100ms, 2s,
+// and 2. Explicit delays use time.Duration and must be 1ms..1m and 1ms..5m,
+// respectively, with MaxDelay at least InitialDelay. Multiplier must be 1..10.
+// Jitter is a symmetric fraction in [0,1], with zero disabling jitter.
 type RetryPolicy struct {
 	MaxAttempts  int
 	InitialDelay time.Duration
