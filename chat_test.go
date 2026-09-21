@@ -511,6 +511,7 @@ func TestCreateChatCompletionDoesNotLeakAcrossSurfaces(t *testing.T) {
 }
 
 func TestChatGatewaySearchMinimumExactJSON(t *testing.T) {
+	var nilSubpageTargets ChatExaSubpageTargetStrings
 	tests := []struct {
 		name string
 		tool ChatServerTool
@@ -521,6 +522,7 @@ func TestChatGatewaySearchMinimumExactJSON(t *testing.T) {
 		{"perplexity string", ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString("q")}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":"q"},"type":"vercel:perplexity_search"}]}`},
 		{"perplexity strings", ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryStrings{"q1", "q2"}}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":["q1","q2"]},"type":"vercel:perplexity_search"}]}`},
 		{"tako", ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q"}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":"q"},"type":"vercel:tako_search"}]}`},
+		{"exa nil subpage target slice pointer", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: &nilSubpageTargets}}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"contents":{"subpage_target":[]},"query":"q"},"type":"vercel:exa_search"}]}`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -593,25 +595,28 @@ func TestChatGatewaySearchAllOptionsAndPresence(t *testing.T) {
 	if err := json.Unmarshal(body, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	tools := decoded["tools"].([]any)
-	if len(tools) != 5 {
-		t.Fatalf("tools=%#v", tools)
+	var wantTools any
+	if err := json.Unmarshal([]byte(`[
+		{"config":{"category":"financial report","contents":{"extras":{"image_links":0,"links":0},"highlights":{"max_characters":0,"query":""},"livecrawl_timeout":0,"max_age_hours":0,"subpage_target":[],"subpages":0,"text":{"exclude_sections":[],"include_html_tags":false,"include_sections":[],"max_characters":0,"verbosity":"full"}},"end_published_date":"","exclude_domains":[],"include_domains":[],"num_results":0,"query":"exa","start_published_date":"","type":"instant","user_location":""},"type":"vercel:exa_search"},
+		{"config":{"contents":{"highlights":false,"subpage_target":"","text":false},"query":"unions"},"type":"vercel:exa_search"},
+		{"config":{"excerpts":{"max_chars_per_result":0,"max_chars_total":0},"fetch_policy":{"max_age_seconds":0},"max_results":0,"mode":"agentic","objective":"parallel","search_queries":[],"source_policy":{"after_date":"","exclude_domains":[],"include_domains":[]}},"type":"vercel:parallel_search"},
+		{"config":{"country":"","last_updated_after_filter":"","last_updated_before_filter":"","max_results":0,"max_tokens":0,"max_tokens_per_page":0,"query":["p"],"search_after_date":"","search_before_date":"","search_domain_filter":[],"search_language_filter":[],"search_recency_filter":"year"},"type":"vercel:perplexity_search"},
+		{"config":{"country_code":"","effort":"instant","include_related":0,"locale":"","location":{"latitude":0,"longitude":0},"output_settings":{"force_refresh":false,"image_dark_mode":false},"query":"tako","sources":{"data":{"content_format":"json_records","count":0,"include_contents":false,"max_rows":0,"mode":"url","node_ids":["node"],"strict":true},"web":{"article_content_max_chars":0,"category":"sports","count":0,"exclude_domains":[],"highlights":false,"include_contents":false,"include_domains":[],"published_after":"","published_before":"","snippet_max_chars":0}},"timezone":""},"type":"vercel:tako_search"}
+	]`), &wantTools); err != nil {
+		t.Fatal(err)
 	}
-	for i, item := range tools {
-		m := item.(map[string]any)
-		if m["config"] == nil {
-			t.Fatalf("tool %d missing config", i)
-		}
-		if _, ok := m["config"].(map[string]any); !ok {
-			t.Fatalf("tool %d config=%#v", i, m["config"])
-		}
+	if !reflect.DeepEqual(decoded["tools"], wantTools) {
+		got, _ := json.Marshal(decoded["tools"])
+		want, _ := json.Marshal(wantTools)
+		t.Fatalf("tools\n got: %s\nwant: %s", got, want)
 	}
-	encoded := string(body)
-	for _, fragment := range []string{`"num_results":0`, `"include_html_tags":false`, `"include_sections":[]`, `"text":false`, `"highlights":false`, `"search_queries":[]`, `"max_results":0`, `"search_domain_filter":[]`, `"latitude":0`, `"include_contents":false`, `"image_dark_mode":false`, `"include_related":0`} {
-		if !strings.Contains(encoded, fragment) {
-			t.Errorf("missing explicit presence %s in %s", fragment, encoded)
-		}
-	}
+}
+
+func TestChatGatewaySearchEnumValidation(t *testing.T) {
+	client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"choices":[]}`)), Request: r}, nil
+	})}))
+	request := ChatServerToolsRequest{Request: validChatRequest()}
 	documentedExaType := ChatExaSearchAuto
 	documentedExaCategory := ChatExaCategoryCompany
 	documentedExaVerbosity := ChatExaVerbosityCompact
@@ -685,6 +690,65 @@ func TestChatGatewaySearchAllOptionsAndPresence(t *testing.T) {
 		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
 			t.Fatalf("tako category %q: %v", value, err)
 		}
+	}
+}
+
+func TestChatGatewaySearchPointerUnionVariantsMatchValues(t *testing.T) {
+	var body []byte
+	client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		body, _ = io.ReadAll(r.Body)
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"choices":[]}`)), Request: r}, nil
+	})}))
+	encodeTools := func(t *testing.T, tools []ChatServerTool) any {
+		t.Helper()
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: validChatRequest(), ServerTools: tools}); err != nil {
+			t.Fatal(err)
+		}
+		var decoded map[string]any
+		if err := json.Unmarshal(body, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		return decoded["tools"]
+	}
+
+	exaTool := ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "exa"}}
+	parallelTool := ChatParallelSearchTool{Config: ChatParallelSearchConfig{Objective: "parallel"}}
+	perplexityTool := ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString("perplexity")}}
+	takoTool := ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "tako"}}
+	textEnabled := ChatExaTextEnabled(false)
+	textOptions := ChatExaTextOptions{}
+	highlightsEnabled := ChatExaHighlightsEnabled(false)
+	highlightsOptions := ChatExaHighlightsOptions{}
+	subpageString := ChatExaSubpageTargetString("")
+	subpageStrings := ChatExaSubpageTargetStrings{}
+	queryString := ChatPerplexityQueryString("query")
+	queryStrings := ChatPerplexityQueryStrings{"query"}
+	tests := []struct {
+		name    string
+		value   ChatServerTool
+		pointer ChatServerTool
+	}{
+		{"exa tool", exaTool, &exaTool},
+		{"parallel tool", parallelTool, &parallelTool},
+		{"perplexity tool", perplexityTool, &perplexityTool},
+		{"tako tool", takoTool, &takoTool},
+		{"exa text enabled", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: textEnabled}}}, ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: &textEnabled}}}},
+		{"exa text options", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: textOptions}}}, ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: &textOptions}}}},
+		{"exa highlights enabled", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Highlights: highlightsEnabled}}}, ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Highlights: &highlightsEnabled}}}},
+		{"exa highlights options", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Highlights: highlightsOptions}}}, ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Highlights: &highlightsOptions}}}},
+		{"exa subpage string", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: subpageString}}}, ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: &subpageString}}}},
+		{"exa subpage strings", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: subpageStrings}}}, ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: &subpageStrings}}}},
+		{"perplexity query string", ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: queryString}}, ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: &queryString}}},
+		{"perplexity query strings", ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: queryStrings}}, ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: &queryStrings}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			want := encodeTools(t, []ChatServerTool{test.value})
+			got := encodeTools(t, []ChatServerTool{test.pointer})
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("pointer tools = %#v, value tools = %#v", got, want)
+			}
+		})
 	}
 }
 

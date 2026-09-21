@@ -141,11 +141,19 @@ func encodeChatServerTool(tool ChatServerTool) (string, map[string]any) {
 	switch tool := tool.(type) {
 	case ChatExaSearchTool:
 		return "exa_search", encodeChatExaSearchConfig(tool.Config)
+	case *ChatExaSearchTool:
+		return "exa_search", encodeChatExaSearchConfig(tool.Config)
 	case ChatParallelSearchTool:
+		return "parallel_search", encodeChatParallelSearchConfig(tool.Config)
+	case *ChatParallelSearchTool:
 		return "parallel_search", encodeChatParallelSearchConfig(tool.Config)
 	case ChatPerplexitySearchTool:
 		return "perplexity_search", encodeChatPerplexitySearchConfig(tool.Config)
+	case *ChatPerplexitySearchTool:
+		return "perplexity_search", encodeChatPerplexitySearchConfig(tool.Config)
 	case ChatTakoSearchTool:
+		return "tako_search", encodeChatTakoSearchConfig(tool.Config)
+	case *ChatTakoSearchTool:
 		return "tako_search", encodeChatTakoSearchConfig(tool.Config)
 	default:
 		return "", nil
@@ -167,23 +175,22 @@ func encodeChatExaSearchConfig(c ChatExaSearchConfig) map[string]any {
 		switch value := c.Contents.Text.(type) {
 		case ChatExaTextEnabled:
 			contents["text"] = bool(value)
+		case *ChatExaTextEnabled:
+			contents["text"] = bool(*value)
 		case ChatExaTextOptions:
-			options := map[string]any{}
-			putPointer(options, "max_characters", value.MaxCharacters)
-			putPointer(options, "include_html_tags", value.IncludeHTMLTags)
-			putStringEnum(options, "verbosity", value.Verbosity)
-			putSlicePointer(options, "include_sections", value.IncludeSections)
-			putSlicePointer(options, "exclude_sections", value.ExcludeSections)
-			contents["text"] = options
+			contents["text"] = encodeChatExaTextOptions(value)
+		case *ChatExaTextOptions:
+			contents["text"] = encodeChatExaTextOptions(*value)
 		}
 		switch value := c.Contents.Highlights.(type) {
 		case ChatExaHighlightsEnabled:
 			contents["highlights"] = bool(value)
+		case *ChatExaHighlightsEnabled:
+			contents["highlights"] = bool(*value)
 		case ChatExaHighlightsOptions:
-			options := map[string]any{}
-			putPointer(options, "query", value.Query)
-			putPointer(options, "max_characters", value.MaxCharacters)
-			contents["highlights"] = options
+			contents["highlights"] = encodeChatExaHighlightsOptions(value)
+		case *ChatExaHighlightsOptions:
+			contents["highlights"] = encodeChatExaHighlightsOptions(*value)
 		}
 		putPointer(contents, "max_age_hours", c.Contents.MaxAgeHours)
 		putPointer(contents, "livecrawl_timeout", c.Contents.LivecrawlTimeout)
@@ -191,8 +198,16 @@ func encodeChatExaSearchConfig(c ChatExaSearchConfig) map[string]any {
 		switch value := c.Contents.SubpageTarget.(type) {
 		case ChatExaSubpageTargetString:
 			contents["subpage_target"] = string(value)
+		case *ChatExaSubpageTargetString:
+			contents["subpage_target"] = string(*value)
 		case ChatExaSubpageTargetStrings:
 			contents["subpage_target"] = []string(value)
+		case *ChatExaSubpageTargetStrings:
+			if *value == nil {
+				contents["subpage_target"] = []string{}
+			} else {
+				contents["subpage_target"] = []string(*value)
+			}
 		}
 		if c.Contents.Extras != nil {
 			extras := map[string]any{}
@@ -203,6 +218,23 @@ func encodeChatExaSearchConfig(c ChatExaSearchConfig) map[string]any {
 		out["contents"] = contents
 	}
 	return out
+}
+
+func encodeChatExaTextOptions(value ChatExaTextOptions) map[string]any {
+	options := map[string]any{}
+	putPointer(options, "max_characters", value.MaxCharacters)
+	putPointer(options, "include_html_tags", value.IncludeHTMLTags)
+	putStringEnum(options, "verbosity", value.Verbosity)
+	putSlicePointer(options, "include_sections", value.IncludeSections)
+	putSlicePointer(options, "exclude_sections", value.ExcludeSections)
+	return options
+}
+
+func encodeChatExaHighlightsOptions(value ChatExaHighlightsOptions) map[string]any {
+	options := map[string]any{}
+	putPointer(options, "query", value.Query)
+	putPointer(options, "max_characters", value.MaxCharacters)
+	return options
 }
 
 func encodeChatParallelSearchConfig(c ChatParallelSearchConfig) map[string]any {
@@ -236,8 +268,12 @@ func encodeChatPerplexitySearchConfig(c ChatPerplexitySearchConfig) map[string]a
 	switch query := c.Query.(type) {
 	case ChatPerplexityQueryString:
 		out["query"] = string(query)
+	case *ChatPerplexityQueryString:
+		out["query"] = string(*query)
 	case ChatPerplexityQueryStrings:
 		out["query"] = []string(query)
+	case *ChatPerplexityQueryStrings:
+		out["query"] = []string(*query)
 	}
 	putPointer(out, "max_results", c.MaxResults)
 	putPointer(out, "max_tokens_per_page", c.MaxTokensPerPage)

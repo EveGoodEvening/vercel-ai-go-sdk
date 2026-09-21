@@ -3,6 +3,8 @@ package gateway_test
 import (
 	"context"
 	"net/http"
+	"reflect"
+	"testing"
 	"time"
 
 	gateway "github.com/EveGoodEvening/vercel-ai-go-sdk"
@@ -62,8 +64,7 @@ func compilePublicContract() {
 	frequencyPenalty := -0.1
 	presencePenalty := 0.1
 	sort := "price"
-	// Positional construction locks the complete field order and proves that adding
-	// server tools did not change ChatCompletionRequest's source contract.
+	// Keep an external unkeyed literal as a source-compatibility compile check.
 	_ = gateway.ChatCompletionRequest{"provider/model", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 	_ = gateway.ChatCompletionRequest{
 		Model: "provider/model",
@@ -218,4 +219,44 @@ func compilePublicContract() {
 	var responseValidationError *gateway.ResponseValidationError
 	_, _, _, _, _, _ = responseValidationError.Error(), responseValidationError.Unwrap(), responseValidationError.StatusCode(), responseValidationError.Path(), responseValidationError.Reason(), responseValidationError.RequestID()
 	_, _, _ = responseValidationError.ResponseID(), responseValidationError.BodyTruncated(), responseValidationError.RawResponseBody()
+}
+
+func TestExternalContractChatCompletionRequestFields(t *testing.T) {
+	want := []struct {
+		name string
+		typ  reflect.Type
+	}{
+		{"Model", reflect.TypeOf("")},
+		{"Messages", reflect.TypeOf([]gateway.ChatMessage(nil))},
+		{"Temperature", reflect.TypeOf((*float64)(nil))},
+		{"MaxTokens", reflect.TypeOf((*int)(nil))},
+		{"TopP", reflect.TypeOf((*float64)(nil))},
+		{"FrequencyPenalty", reflect.TypeOf((*float64)(nil))},
+		{"PresencePenalty", reflect.TypeOf((*float64)(nil))},
+		{"Stop", reflect.TypeOf((*gateway.ChatStop)(nil)).Elem()},
+		{"SafetyIdentifier", reflect.TypeOf((*string)(nil))},
+		{"Tools", reflect.TypeOf([]gateway.ChatTool(nil))},
+		{"ToolChoice", reflect.TypeOf((*gateway.ChatToolChoice)(nil)).Elem()},
+		{"ResponseFormat", reflect.TypeOf((*gateway.ChatResponseFormat)(nil)).Elem()},
+		{"Models", reflect.TypeOf([]string(nil))},
+		{"ProviderOptions", reflect.TypeOf((*gateway.ChatProviderOptions)(nil))},
+		{"Provider", reflect.TypeOf((*gateway.ChatProvider)(nil))},
+	}
+
+	typ := reflect.TypeOf(gateway.ChatCompletionRequest{})
+	got := make([]reflect.StructField, 0, typ.NumField())
+	for i := range typ.NumField() {
+		field := typ.Field(i)
+		if field.IsExported() {
+			got = append(got, field)
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("ChatCompletionRequest exported field count = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i].Name != want[i].name || got[i].Type != want[i].typ {
+			t.Fatalf("ChatCompletionRequest exported field %d = %s %s, want %s %s", i, got[i].Name, got[i].Type, want[i].name, want[i].typ)
+		}
+	}
 }

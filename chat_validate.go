@@ -262,7 +262,19 @@ func validateChatServerTool(tool ChatServerTool, path string) (string, *Validati
 			return "", err
 		}
 		config = encodeChatExaSearchConfig(tool.Config)
+	case *ChatExaSearchTool:
+		identifier = "exa_search"
+		if err := validateChatExaSearchConfig(tool.Config, configPath); err != nil {
+			return "", err
+		}
+		config = encodeChatExaSearchConfig(tool.Config)
 	case ChatParallelSearchTool:
+		identifier = "parallel_search"
+		if err := validateChatParallelSearchConfig(tool.Config, configPath); err != nil {
+			return "", err
+		}
+		config = encodeChatParallelSearchConfig(tool.Config)
+	case *ChatParallelSearchTool:
 		identifier = "parallel_search"
 		if err := validateChatParallelSearchConfig(tool.Config, configPath); err != nil {
 			return "", err
@@ -274,7 +286,19 @@ func validateChatServerTool(tool ChatServerTool, path string) (string, *Validati
 			return "", err
 		}
 		config = encodeChatPerplexitySearchConfig(tool.Config)
+	case *ChatPerplexitySearchTool:
+		identifier = "perplexity_search"
+		if err := validateChatPerplexitySearchConfig(tool.Config, configPath); err != nil {
+			return "", err
+		}
+		config = encodeChatPerplexitySearchConfig(tool.Config)
 	case ChatTakoSearchTool:
+		identifier = "tako_search"
+		if err := validateChatTakoSearchConfig(tool.Config, configPath); err != nil {
+			return "", err
+		}
+		config = encodeChatTakoSearchConfig(tool.Config)
+	case *ChatTakoSearchTool:
 		identifier = "tako_search"
 		if err := validateChatTakoSearchConfig(tool.Config, configPath); err != nil {
 			return "", err
@@ -309,19 +333,14 @@ func validateChatExaSearchConfig(c ChatExaSearchConfig, path string) *Validation
 		}
 	} else {
 		switch value := c.Contents.Text.(type) {
-		case ChatExaTextEnabled:
+		case ChatExaTextEnabled, *ChatExaTextEnabled:
 		case ChatExaTextOptions:
-			if value.Verbosity != nil && !oneOf(string(*value.Verbosity), "compact", "standard", "full") {
-				return validationError(memberPath(memberPath(contentsPath, "text"), "verbosity"), "must be compact, standard, or full")
+			if err := validateChatExaTextOptions(value, contentsPath); err != nil {
+				return err
 			}
-			for name, sections := range map[string]*[]ChatExaSection{"include_sections": value.IncludeSections, "exclude_sections": value.ExcludeSections} {
-				if sections != nil {
-					for i, section := range *sections {
-						if !oneOf(string(section), "header", "navigation", "banner", "body", "sidebar", "footer", "metadata") {
-							return validationError(indexPath(memberPath(memberPath(contentsPath, "text"), name), i), "unsupported section")
-						}
-					}
-				}
+		case *ChatExaTextOptions:
+			if err := validateChatExaTextOptions(*value, contentsPath); err != nil {
+				return err
 			}
 		default:
 			return validationError(memberPath(contentsPath, "text"), "text type is unsupported")
@@ -333,7 +352,7 @@ func validateChatExaSearchConfig(c ChatExaSearchConfig, path string) *Validation
 		}
 	} else {
 		switch c.Contents.Highlights.(type) {
-		case ChatExaHighlightsEnabled, ChatExaHighlightsOptions:
+		case ChatExaHighlightsEnabled, *ChatExaHighlightsEnabled, ChatExaHighlightsOptions, *ChatExaHighlightsOptions:
 		default:
 			return validationError(memberPath(contentsPath, "highlights"), "highlights type is unsupported")
 		}
@@ -344,9 +363,25 @@ func validateChatExaSearchConfig(c ChatExaSearchConfig, path string) *Validation
 		}
 	} else {
 		switch c.Contents.SubpageTarget.(type) {
-		case ChatExaSubpageTargetString, ChatExaSubpageTargetStrings:
+		case ChatExaSubpageTargetString, *ChatExaSubpageTargetString, ChatExaSubpageTargetStrings, *ChatExaSubpageTargetStrings:
 		default:
 			return validationError(memberPath(contentsPath, "subpage_target"), "subpage target type is unsupported")
+		}
+	}
+	return nil
+}
+
+func validateChatExaTextOptions(value ChatExaTextOptions, contentsPath string) *ValidationError {
+	if value.Verbosity != nil && !oneOf(string(*value.Verbosity), "compact", "standard", "full") {
+		return validationError(memberPath(memberPath(contentsPath, "text"), "verbosity"), "must be compact, standard, or full")
+	}
+	for name, sections := range map[string]*[]ChatExaSection{"include_sections": value.IncludeSections, "exclude_sections": value.ExcludeSections} {
+		if sections != nil {
+			for i, section := range *sections {
+				if !oneOf(string(section), "header", "navigation", "banner", "body", "sidebar", "footer", "metadata") {
+					return validationError(indexPath(memberPath(memberPath(contentsPath, "text"), name), i), "unsupported section")
+				}
+			}
 		}
 	}
 	return nil
@@ -372,8 +407,16 @@ func validateChatPerplexitySearchConfig(c ChatPerplexitySearchConfig, path strin
 		if query == "" {
 			return validationError(queryPath, "must be nonempty")
 		}
+	case *ChatPerplexityQueryString:
+		if *query == "" {
+			return validationError(queryPath, "must be nonempty")
+		}
 	case ChatPerplexityQueryStrings:
 		if len(query) == 0 {
+			return validationError(queryPath, "must contain at least one item")
+		}
+	case *ChatPerplexityQueryStrings:
+		if len(*query) == 0 {
 			return validationError(queryPath, "must contain at least one item")
 		}
 	default:
