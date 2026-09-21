@@ -7,7 +7,13 @@
 | Public generation | **NOT RUN** | Buffered and streaming Responses; buffered and streaming Chat |
 | Provider evaluation | **NOT RUN** | `Evaluate` with boolean, choice, and score questions |
 
-No owner-authorized paid run or sanitized hosted result is recorded. This is the sole live-evidence record; all result fields below remain **PENDING LIVE RUN**. Hermetic tests, successful compilation, and credential-gate failures are not hosted evidence.
+No owner-authorized paid live-contract run or sanitized hosted result is recorded; the protected public-generation and provider-evaluation records below remain **PENDING LIVE RUN**. Hermetic tests, successful compilation, credential-gate failures, and the separate narrow search probes below are not hosted evidence and do not clear either live-contract gate.
+
+### Narrow Responses search evidence
+
+Owner-authorized public Gateway probes on 2026-09-21 structurally corroborated only fixed low-context `{"type":"web_search","search_context_size":"low"}` with `openai/gpt-5.4-mini` and fieldless `{"type":"x_search"}` with `spacexai/grok-4.6`, including the corresponding observed raw search-call discriminators. This supports exact request serialization only. It does not establish configurable `x_search` options; `web_search_preview` or any other web-search form or option; wider model compatibility; direct-xAI compatibility; typed buffered search outputs, citations, or annotations; typed stream events or lifecycle semantics; optional Chat live corroboration; provider-evaluation behavior; or any other owner-authorized paid-live gate.
+
+The durable repository evidence retains only sanitized structural facts. A non-publishable internal orchestration artifact is excluded because it contains exact prompt inputs; this record does not reproduce or paraphrase them. No credentials, authorization data, prompts, generated prose, full bodies, headers, identifiers, or raw payloads are retained here.
 
 ## Pinned contracts
 
@@ -43,7 +49,8 @@ env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK \
   -run '^TestGatewayEvaluationContract$' -count=1
 ```
 
-The [protected workflow](../.github/workflows/live-contract.yml) uses separate jobs and the API-key path. See [release readiness](releasing.md) for hosted-environment requirements. These text/evaluation probes do not establish Chat server-search, Responses built-in search, or native `x_search` support.
+The [protected workflow](../.github/workflows/live-contract.yml) uses separate jobs and the API-key path. See [release readiness](releasing.md) for hosted-environment requirements. These text/evaluation probes do not establish Chat server-search support or any Responses search support beyond the two exact request declarations recorded above; the narrow search probes do not substitute for these protected live jobs.
+
 
 ## Sanitized public generation record
 

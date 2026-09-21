@@ -33,10 +33,15 @@
 // identifiers may be sensitive and must be sanitized before logging or storage.
 // Typed request declarations for the Exa, Parallel, Perplexity, and Tako Chat
 // Gateway server-search tools are available only through the opt-in server-tools
-// methods. Outputs retain the existing typed and raw Chat boundaries, with no
-// automatic tool execution. Public /v1/evaluate, Responses built-in search,
-// typed Chat search outputs or metadata, Gateway-native x_search, and unlisted
-// modalities remain unsupported. Hermetic fixtures are not live-service
-// evidence; the separately gated public-generation and provider-evaluation live
-// runs remain NOT RUN.
+// methods. Responses opt-in built-in-tools methods support only fixed
+// low-context {"type":"web_search","search_context_size":"low"} and fieldless
+// {"type":"x_search"} request declarations. The SDK does not type their search
+// outputs, citations, annotations, usage, or lifecycle events; buffered and
+// streaming raw-preservation boundaries are unchanged. Configurable x_search,
+// web_search_preview and other web-search forms or options, wider model
+// compatibility, direct-xAI support, public /v1/evaluate, typed Chat search
+// outputs or metadata, and unlisted modalities remain unsupported. The narrow
+// dated search probes do not satisfy the separately gated public-generation or
+// provider-evaluation live runs, which remain NOT RUN.
+
 package gateway
