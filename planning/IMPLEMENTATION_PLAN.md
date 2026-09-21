@@ -1729,9 +1729,9 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 
 **Owned paths (exact five):** `responses_tools.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`, `planning/IMPLEMENTATION_PLAN.md`.
 
-**Draft commit boundary:** `feat: add gateway x search request`. **Serialized accounting commit boundary:** `docs: record gateway x search implementation`.
+**Draft commit boundary:** `feat: add responses x search request`. **Serialized accounting commit boundary:** `docs: record gateway x search implementation`.
 
-**Green draft commit:** `79137a6` (`feat: add gateway x search request`) changed exactly `responses_tools.go`, `responses_wire.go`, `responses_validate.go`, and `responses_test.go`. The four changed Go files were formatted with `gofmt`.
+**Green draft commit:** `79137a6` (`feat: add responses x search request`) changed exactly `responses_tools.go`, `responses_wire.go`, `responses_validate.go`, and `responses_test.go`. The four changed Go files were formatted with `gofmt`.
 
 **Exported API decision:** extend the sealed `ResponseBuiltInTool` union without changing `ResponsesBuiltInToolsRequest` or either method:
 
@@ -1757,6 +1757,7 @@ All three commands above passed against green draft `79137a6` with `AI_GATEWAY_A
 
 **Review/accounting gate:**
 
+- [x] `agent://chunk27-review-3` found that the tracker misstated draft `79137a6`'s subject; the recorded draft boundary and green-draft accounting now use Git's exact subject, `feat: add responses x search request`. The changed-path inventory, implementation claims, statuses, and remaining blockers are unchanged; Chunk 27 still requires a clean rereview.
 - [ ] Independent evidence/API review maps the sole emitted `type:"x_search"` member to the sanitized Gateway probe, confirms `ResponseXSearchTool` is fieldless, and rejects every direct-xAI option, inferred validation rule, result/event contract, and generic extension point.
 - [ ] After the clean rereview, commit to `planning/IMPLEMENTATION_PLAN.md` the draft and review-fix hashes, exact changed paths, focused verification, and clean rereview result. That serialized record permits Chunk 27A to begin; Chunk 27 remains intentionally incomplete until Chunk 30 closure.
 - [ ] Rollback ownership is the fieldless `ResponseXSearchTool`, its encoder/validator branches, focused tests, Chunk 27A's external contract/audit, and the matching `x_search` portions of Chunks 28–29. These paths form the atomic `x_search` rollback group defined in Chunk 30; removing that group must leave Chunk 26/26A `web_search` support, audit, documentation, and accounting intact.
