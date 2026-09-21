@@ -1665,13 +1665,23 @@ The test-only fix received two fresh CLEAN independent final rereviews; neither 
 
 **Depends on:** Chunk 26 implementation, focused verification, committed accounting, and clean code/API rereview are recorded while Chunk 26 remains intentionally incomplete.
 
+**Current status:** `[-]` the draft external compile contract and strict consumer audit are implemented and their implementation-time verification is green at `4dced7c`. Chunk 26A remains incomplete; independent external-contract review of the expected/export equality and temporary-consumer exercise is the next gate.
+
 **Owned paths (exact three):** `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `planning/IMPLEMENTATION_PLAN.md`.
 
 **Draft commit boundary:** `test: audit responses web search exports`. **Serialized accounting commit boundary:** `docs: record responses web search audit`.
 
-- [ ] Extend the external compile contract for `ResponsesBuiltInToolsRequest`, sealed `ResponseBuiltInTool`, `ResponseWebSearchTool`, and both `CreateResponseWithBuiltInTools` and `StreamResponseWithBuiltInTools` method signatures while compile-locking the unchanged legacy request/result/event contracts.
-- [ ] Update the strict bidirectional expected-export inventory and external temporary-consumer compile exercise for the wrapper, web-search tool, and both methods. Continue rejecting missing expected declarations, unexpected exports, aliases, configurable search knobs, and inferred typed output/event APIs.
-- [ ] Run the focused external contract test and `./scripts/verify-local-consumer.sh` with all credentials and live-cost acknowledgements unset; independently review the expected/export equality and consumer exercise, then cleanly rereview every fix.
+**Recorded green draft (`4dced7c`):** commit `4dced7c` (`test: lock web search external contract`) changed exactly `contract_external_test.go` and `scripts/verify-local-consumer.sh`. `gofmt` completed on `contract_external_test.go`. Both exact credential-scrubbed verification commands passed:
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'TestExternalContract' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK ./scripts/verify-local-consumer.sh
+```
+
+- [x] Extend the external compile contract for `ResponsesBuiltInToolsRequest`, sealed `ResponseBuiltInTool`, `ResponseWebSearchTool`, and both `CreateResponseWithBuiltInTools` and `StreamResponseWithBuiltInTools` method signatures while compile-locking the unchanged legacy request/result/event contracts.
+- [x] Update the strict bidirectional expected-export inventory and external temporary-consumer compile exercise for the wrapper, web-search tool, and both methods. Continue rejecting missing expected declarations, unexpected exports, aliases, configurable search knobs, and inferred typed output/event APIs.
+- [x] Run the focused external contract test and `./scripts/verify-local-consumer.sh` with all credentials and live-cost acknowledgements unset.
+- [ ] Independently review the expected/export equality and consumer exercise, then cleanly rereview every fix.
 - [ ] Before Chunk 27 starts, commit to the tracker the draft/review-fix hashes, exact changed paths, focused command results, and clean rereview result. Chunk 26A belongs to the atomic `web_search` rollback group with Chunk 26 and the surviving `web_search` claims/accounting; it is never committed as rolled back separately from that API surface.
 
 ### Chunk 27 — Gateway-native SpaceXAI `x_search` request declaration
