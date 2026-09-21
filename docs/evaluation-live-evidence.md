@@ -6,14 +6,26 @@
 | --- | --- | --- |
 | Public generation | **NOT RUN** | Buffered and streaming Responses; buffered and streaming Chat |
 | Provider evaluation | **NOT RUN** | `Evaluate` with boolean, choice, and score questions |
+| Configurable Gateway `x_search` options | **IMPLEMENTED / NOT RUN** | Dedicated fail-closed prerequisite gate plus bounded structural option matrix |
 
-No owner-authorized paid live-contract run or sanitized hosted result is recorded; the protected public-generation and provider-evaluation records below remain **PENDING LIVE RUN**. Hermetic tests, successful compilation, credential-gate failures, and the separate narrow search probes below are not hosted evidence and do not clear either live-contract gate.
+No owner-authorized public-generation or provider-evaluation paid live-contract run or sanitized hosted result is recorded; those protected records remain **PENDING LIVE RUN**. The owner has separately authorized the dedicated configurable Gateway `x_search` evidence run and accepted its bounded cost, but that selector is **NOT RUN** and no option field is cleared. Hermetic tests, successful compilation, credential-gate failures, and search probe/harness implementation are not live results and do not clear any live-contract gate.
 
 ### Narrow Responses search evidence
 
 Owner-authorized public Gateway probes on 2026-09-21 structurally corroborated only fixed low-context `{"type":"web_search","search_context_size":"low"}` with `openai/gpt-5.4-mini` and fieldless `{"type":"x_search"}` with `spacexai/grok-4.6`, including the corresponding observed raw search-call discriminators. This supports exact request serialization only. It does not establish configurable `x_search` options; `web_search_preview` or any other web-search form or option; wider model compatibility; direct-xAI compatibility; typed buffered search outputs, citations, or annotations; typed stream events or lifecycle semantics; optional Chat live corroboration; provider-evaluation behavior; or any other owner-authorized paid-live gate.
 
 The durable repository evidence retains only sanitized structural facts. A non-publishable internal orchestration artifact is excluded because it contains exact prompt inputs; this record does not reproduce or paraphrase them. No credentials, authorization data, prompts, generated prose, full bodies, headers, identifiers, or raw payloads are retained here.
+### Configurable Gateway `x_search` option evidence gate
+
+The dedicated Gate A harness is implemented but **NOT RUN**. Owner authorization and cost acceptance are recorded without retaining any credential or credential value. It is a third, separate live-evidence path: it does not run in, replace, or clear either the general `public-generation` or `provider-evaluation` job.
+
+The paid selector is exactly `^TestGatewayXSearchOptionsContract$`. It sends serial, buffered requests with `-count=1` to `POST https://ai-gateway.vercel.sh/v1/responses` using only `spacexai/grok-4.6`. It makes no retry and performs no fallback. Its static eight-case matrix contains a fieldless control; one combined canonical request with all six candidate fields present; explicit empty-list and explicit-false forms; `from_date` alone; `to_date` alone; and grouped wrong-type attribution cases for handle lists, dates, and booleans. Only if the combined canonical case fails may six one-field valid diagnostics run. The hard-coded ceiling is 14 requests.
+
+Execution fails closed unless exactly one nonblank `AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` is present, the dedicated acknowledgement is exactly `AI_GATEWAY_X_SEARCH_LIVE_COST_ACK=I_ACCEPT_LIVE_X_SEARCH_COSTS`, and both `AI_GATEWAY_PUBLIC_LIVE_COST_ACK` and `AI_GATEWAY_LIVE_COST_ACK` are absent. The credential-free selector `^TestGatewayXSearchOptionsPrerequisiteMismatchesZeroDispatch$` covers missing or wrong dedicated acknowledgement, either forbidden general acknowledgement, zero credentials, and multiple credentials; each mismatch must fail before client/request construction and record zero `RoundTrip` calls.
+
+Retained output is allowlisted to the case label; structural option class set/count; HTTP status; safe top-level object/status classification; safe output discriminator/status sets; and sanitized error category/code. Missing values map to `absent` and unknown/raw provider values map to `other` rather than being copied. The harness and retained output must exclude credentials; prompts and queries; handle and date literals; request/response bodies and headers; request/response or provider IDs; generated prose; tool arguments/results; provider metadata; usage; raw events; and raw errors.
+
+Gate A remains blocked pending prerequisite verification, the owner-authorized paid selector, sanitation review, and independent evidence review. Results may clear only the exact request fields and exact presence forms actually observed. A successful combined case must not silently clear an unisolated field, omitted/null behavior, an untested value class, validation rule, cross-field interaction, other model, fallback route, typed output/event contract, or direct-xAI behavior.
 
 ## Pinned contracts
 
@@ -49,7 +61,18 @@ env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK \
   -run '^TestGatewayEvaluationContract$' -count=1
 ```
 
-The [protected workflow](../.github/workflows/live-contract.yml) uses separate jobs and the API-key path. See [release readiness](releasing.md) for hosted-environment requirements. These text/evaluation probes do not establish Chat server-search support or any Responses search support beyond the two exact request declarations recorded above; the narrow search probes do not substitute for these protected live jobs.
+Configurable Gateway `x_search` options (**authorized, cost accepted, NOT RUN**):
+
+```sh
+env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_LIVE_COST_ACK \
+  AI_GATEWAY_X_SEARCH_LIVE_COST_ACK=I_ACCEPT_LIVE_X_SEARCH_COSTS \
+  go test -tags=livecontract ./internal/livecontract \
+  -run '^TestGatewayXSearchOptionsContract$' -count=1
+```
+
+The orchestrator selects the already-present protected credential only at execution time. Never place a credential in documentation, arguments, logs, retained evidence, or repository files. Before the paid selector, run the credential-free `^TestGatewayXSearchOptionsPrerequisiteMismatchesZeroDispatch$` selector with all credential and acknowledgement variables absent; it is verification of fail-closed dispatch behavior, not paid evidence.
+
+The [protected workflow](../.github/workflows/live-contract.yml) retains separate public-generation and provider-evaluation jobs and the API-key path. See [release readiness](releasing.md) for hosted-environment requirements. Those text/evaluation probes do not establish Chat server-search support or any Responses search support beyond the two exact request declarations recorded above; neither the narrow search probes nor the dedicated configurable-options gate substitutes for either protected general live job.
 
 
 ## Sanitized public generation record
@@ -83,6 +106,23 @@ Complete only from actual runs of [evaluation_test.go](../internal/livecontract/
 | Response metadata | **PENDING LIVE RUN** | Model-match, non-nil headers/body, body byte length |
 | Protocol drift | **PENDING LIVE RUN** | Sanitized structural differences; `none observed` only after success |
 
+## Sanitized configurable `x_search` option record
+
+Complete only from the dedicated paid selector after the prerequisite selector passes.
+
+| Field | Result | Retain only |
+| --- | --- | --- |
+| Authorization / cost acceptance | **RECORDED; NOT RUN** | Boolean authorization and acceptance state; never a credential value |
+| Route | **PINNED; NOT RUN** | Exact endpoint and model already stated above |
+| Prerequisite gate | **PENDING VERIFICATION** | Pass/fail and zero `RoundTrip` count only |
+| Paid bounded matrix | **PENDING LIVE RUN** | Case label, structural option classes/counts, and request-count-versus-cap |
+| HTTP / top-level shape | **PENDING LIVE RUN** | HTTP status and safe top-level object/status classification |
+| Output shape | **PENDING LIVE RUN** | Structural discriminator/status sets only |
+| Error shape | **PENDING LIVE RUN** | Fixed sanitized category/code; unknown/raw values collapse to safe categories |
+| Cleared request surface | **NONE** | Only exact fields and presence forms proven by reviewed results |
+
+Do not add an execution date, operator/run reference, literal option values, or any excluded content to this record.
+
 Stop release-candidate promotion on protocol drift. Never infer missing observations or reconstruct them from fixtures.
 
 ## Sanitization review
@@ -95,3 +135,4 @@ Apply to this record and every retained CI artifact:
 - [ ] Model evidence records only pinned-model match; no unexpected model value is retained.
 - [ ] Each result is attributable to its exact authorized command and isolated job, without the opposite acknowledgement.
 - [ ] An independent reviewer checked the retained evidence; fixtures and skipped/failed gates are not recorded as live success.
+- [ ] Configurable `x_search` evidence contains only its explicit structural allowlist; unknown/raw values were categorized rather than copied, and no prompt/query/handle/date literal, body, header, ID, generated content, provider metadata, usage, or raw error was retained.

@@ -96,3 +96,45 @@ jobs:
 
       - name: Run paid provider evaluation contract
         run: env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -tags=livecontract ./internal/livecontract -run '^TestGatewayEvaluationContract$' -count=1
+
+  x-search-options:
+    name: Authorized Gateway x_search options evidence
+    runs-on: ubuntu-latest
+    environment: live-evaluation
+    env:
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+      AI_GATEWAY_X_SEARCH_LIVE_COST_ACK: I_ACCEPT_LIVE_X_SEARCH_COSTS
+      GOTOOLCHAIN: local
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install pinned primary Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.1
+          check-latest: false
+          cache: false
+
+      - name: Require isolated x_search options authorization
+        shell: bash
+        run: |
+          if [[ ! ${AI_GATEWAY_API_KEY:-} =~ [^[:space:]] ]]; then
+            echo 'AI_GATEWAY_API_KEY is not configured in the protected live-evaluation environment.' >&2
+            exit 1
+          fi
+          if [[ -v VERCEL_OIDC_TOKEN ]]; then
+            echo 'Exactly one credential is required; VERCEL_OIDC_TOKEN must be unset.' >&2
+            exit 1
+          fi
+          if [[ ${AI_GATEWAY_X_SEARCH_LIVE_COST_ACK:-} != I_ACCEPT_LIVE_X_SEARCH_COSTS ]]; then
+            echo 'The exact x_search options acknowledgement is required.' >&2
+            exit 1
+          fi
+          if [[ -v AI_GATEWAY_LIVE_COST_ACK || -v AI_GATEWAY_PUBLIC_LIVE_COST_ACK ]]; then
+            echo 'Both general live acknowledgements must be unset.' >&2
+            exit 1
+          fi
+
+      - name: Run paid Gateway x_search options evidence contract
+        run: env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -tags=livecontract ./internal/livecontract -run '^TestGatewayXSearchOptionsContract$' -count=1
