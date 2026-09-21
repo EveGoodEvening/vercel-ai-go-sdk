@@ -35,14 +35,18 @@
 // Gateway server-search tools are available only through the opt-in server-tools
 // methods. Responses opt-in built-in-tools methods support fixed low-context
 // {"type":"web_search","search_context_size":"low"}, fieldless
-// {"type":"x_search"}, and ResponseXSearchOptionsTool's six configurable
-// x_search fields in only the cleared singleton, neutral, and maximal forms for
-// spacexai/grok-4.6. Simultaneous non-empty allowed and excluded handle lists
-// are rejected locally; arbitrary subsets remain unresolved. Search outputs,
-// citations, annotations, usage, and lifecycle events remain raw. Other web-
-// search forms or options, wider model compatibility, semantic or limit claims,
-// date semantics, wrong-kind behavior, direct-xAI support, and public
-// /v1/evaluate remain unsupported. These probes do not satisfy the separately
-// gated public-generation or provider-evaluation live runs, which remain NOT RUN.
+// {"type":"x_search"}, and ResponseXSearchOptionsTool's allowed_x_handles,
+// excluded_x_handles, from_date, to_date, enable_image_understanding, and
+// enable_video_understanding fields for spacexai/grok-4.6. Cleared shapes are
+// a single field, the neutral shape with both empty handle lists and both flags
+// explicitly false, and either maximal shape with one non-empty handle list,
+// both dates, and both flags true. Simultaneous non-empty handle lists are
+// rejected locally; arbitrary subsets remain unresolved. Buffered search
+// results are available only through ResponseResult.RawJSON(), and streaming
+// search events remain RawResponseEvent values. Other web-search forms or
+// options, wider model compatibility, semantic or limit claims, date semantics,
+// wrong-kind behavior, direct-xAI support, and public /v1/evaluate remain
+// unsupported. These probes do not satisfy the separately gated public-
+// generation or provider-evaluation live runs, which remain NOT RUN.
 
 package gateway
