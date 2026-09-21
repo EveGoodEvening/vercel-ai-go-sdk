@@ -22,6 +22,8 @@ func compilePublicContract() {
 	var _ func(*gateway.Client, context.Context, string, gateway.EvaluationRequest) (*gateway.EvaluationResult, error) = (*gateway.Client).Evaluate
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponse
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseStream, error) = (*gateway.Client).StreamResponse
+	var _ func(*gateway.Client, context.Context, gateway.ResponsesBuiltInToolsRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponseWithBuiltInTools
+	var _ func(*gateway.Client, context.Context, gateway.ResponsesBuiltInToolsRequest) (*gateway.ResponseStream, error) = (*gateway.Client).StreamResponseWithBuiltInTools
 	var _ func(string) gateway.Option = gateway.WithAPIKey
 	var _ func(*gateway.Client, context.Context, gateway.ChatCompletionRequest) (*gateway.ChatCompletionResult, error) = (*gateway.Client).CreateChatCompletion
 	var _ func(*gateway.Client, context.Context, gateway.ChatCompletionRequest) (*gateway.ChatCompletionStream, error) = (*gateway.Client).StreamChatCompletion
@@ -54,6 +56,13 @@ func compilePublicContract() {
 		Metadata: map[string]string{"key": "value"}, Caching: new("auto"), CacheAnchorItems: new(1), CacheTTL: new("5m"), PromptCacheKey: new("cache"),
 	}
 	_ = gateway.ResponsesRequest{Model: "provider/model", Input: gateway.ResponseTextInput("hello"), ToolChoice: gateway.ResponseToolChoiceAuto, Text: &gateway.ResponseText{Format: gateway.ResponseTextFormatText}}
+	var builtInTool gateway.ResponseBuiltInTool = gateway.ResponseWebSearchTool{}
+	_ = gateway.ResponsesBuiltInToolsRequest{
+		Request: gateway.ResponsesRequest{Model: "provider/model", Input: gateway.ResponseTextInput("hello")},
+		Tools:   []gateway.ResponseBuiltInTool{builtInTool},
+	}
+	// Keep an external unkeyed literal as an exact wrapper-field compile check.
+	_ = gateway.ResponsesBuiltInToolsRequest{gateway.ResponsesRequest{}, []gateway.ResponseBuiltInTool{gateway.ResponseWebSearchTool{}}}
 	_ = []gateway.ResponseToolChoiceMode{gateway.ResponseToolChoiceAuto, gateway.ResponseToolChoiceRequired, gateway.ResponseToolChoiceNone}
 	description = "description"
 	strict = true
@@ -219,6 +228,33 @@ func compilePublicContract() {
 	var responseValidationError *gateway.ResponseValidationError
 	_, _, _, _, _, _ = responseValidationError.Error(), responseValidationError.Unwrap(), responseValidationError.StatusCode(), responseValidationError.Path(), responseValidationError.Reason(), responseValidationError.RequestID()
 	_, _, _ = responseValidationError.ResponseID(), responseValidationError.BodyTruncated(), responseValidationError.RawResponseBody()
+}
+
+func TestExternalContractResponsesBuiltInToolsRequestFields(t *testing.T) {
+	want := []struct {
+		name string
+		typ  reflect.Type
+	}{
+		{"Request", reflect.TypeOf(gateway.ResponsesRequest{})},
+		{"Tools", reflect.TypeOf([]gateway.ResponseBuiltInTool(nil))},
+	}
+
+	typ := reflect.TypeOf(gateway.ResponsesBuiltInToolsRequest{})
+	if typ.NumField() != len(want) {
+		t.Fatalf("ResponsesBuiltInToolsRequest field count = %d, want %d", typ.NumField(), len(want))
+	}
+	for i := range want {
+		field := typ.Field(i)
+		if !field.IsExported() || field.Name != want[i].name || field.Type != want[i].typ {
+			t.Fatalf("ResponsesBuiltInToolsRequest field %d = %s %s, want exported %s %s", i, field.Name, field.Type, want[i].name, want[i].typ)
+		}
+	}
+}
+
+func TestExternalContractResponseWebSearchToolIsFieldless(t *testing.T) {
+	if got := reflect.TypeOf(gateway.ResponseWebSearchTool{}).NumField(); got != 0 {
+		t.Fatalf("ResponseWebSearchTool field count = %d, want 0", got)
+	}
 }
 
 func TestExternalContractChatCompletionRequestFields(t *testing.T) {

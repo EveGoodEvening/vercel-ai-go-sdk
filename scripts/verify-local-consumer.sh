@@ -84,6 +84,17 @@ func compileResponses(client *gateway.Client) {
 	var choice gateway.ResponseToolChoice = gateway.ResponseToolChoiceNone
 	var format gateway.ResponseTextFormat = gateway.ResponseTextFormatJSONObject
 	_, _, _, _ = input, item, choice, format
+	builtInTool := gateway.ResponseBuiltInTool(gateway.ResponseWebSearchTool{})
+	builtInRequest := gateway.ResponsesBuiltInToolsRequest{
+		Request: request,
+		Tools:   []gateway.ResponseBuiltInTool{builtInTool},
+	}
+	builtInResult, _ := client.CreateResponseWithBuiltInTools(context.Background(), builtInRequest)
+	_ = builtInResult.RawJSON()
+	builtInStream, _ := client.StreamResponseWithBuiltInTools(context.Background(), builtInRequest)
+	if builtInStream != nil {
+		_, _, _, _ = builtInStream.Next(), builtInStream.Event(), builtInStream.Err(), builtInStream.Close()
+	}
 	result, _ := client.CreateResponse(context.Background(), request)
 	_ = result.RawJSON()
 	stream, _ := client.StreamResponse(context.Background(), request)
@@ -231,7 +242,7 @@ var allowedTypes = names(
 	"Client", "Option", "TokenSource", "RetryPolicy",
 	"ConfigurationError", "ValidationError", "TransportError", "ResponseError", "ResponseValidationError",
 	"EvaluationRequest", "Question", "BooleanQuestion", "ChoiceQuestion", "ScoreQuestion", "OptionalJSON", "BooleanCriteria", "EvaluationResult", "Rounding", "Usage", "WarningType", "Warning", "ResponseMetadata", "Answer", "BooleanAnswer", "ChoiceAnswer", "ScoreAnswer",
-	"ResponsesRequest", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
+	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
 	"ChatCompletionRequest", "ChatServerToolsRequest", "ChatServerTool", "ChatExaSearchTool", "ChatParallelSearchTool", "ChatPerplexitySearchTool", "ChatTakoSearchTool",
 	"ChatExaSearchType", "ChatExaCategory", "ChatExaVerbosity", "ChatExaSection", "ChatExaText", "ChatExaTextEnabled", "ChatExaTextOptions", "ChatExaHighlights", "ChatExaHighlightsEnabled", "ChatExaHighlightsOptions", "ChatExaExtras", "ChatExaSubpageTarget", "ChatExaSubpageTargetString", "ChatExaSubpageTargetStrings", "ChatExaContents", "ChatExaSearchConfig",
 	"ChatParallelMode", "ChatParallelSourcePolicy", "ChatParallelExcerpts", "ChatParallelFetchPolicy", "ChatParallelSearchConfig",
@@ -242,7 +253,7 @@ var allowedTypes = names(
 
 var allowedFunctions = names("NewClient", "WithAPIKey", "WithOIDCToken", "WithOIDCTokenSource", "WithBaseURL", "WithPublicBaseURL", "WithHTTPClient", "WithTeam", "WithHeaders", "WithRetryPolicy")
 var allowedMethods = names(
-	"Client.Evaluate", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
+	"Client.Evaluate", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
 	"ResponseResult.RawJSON", "RawResponseEvent.RawJSON", "ResponseStream.Next", "ResponseStream.Event", "ResponseStream.Err", "ResponseStream.Close",
 	"ChatCompletionResult.RawJSON", "ChatCompletionChunk.RawJSON", "ChatCompletionStream.Next", "ChatCompletionStream.Event", "ChatCompletionStream.Err", "ChatCompletionStream.Close",
 	"ConfigurationError.Error", "ConfigurationError.Option", "ConfigurationError.Reason",
