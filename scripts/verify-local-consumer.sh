@@ -253,6 +253,7 @@ var allowedTypes = names(
 
 var allowedFunctions = names("NewClient", "WithAPIKey", "WithOIDCToken", "WithOIDCTokenSource", "WithBaseURL", "WithPublicBaseURL", "WithHTTPClient", "WithTeam", "WithHeaders", "WithRetryPolicy")
 var allowedMethods = names(
+	"TokenSource.Token",
 	"Client.Evaluate", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
 	"ResponseResult.RawJSON", "RawResponseEvent.RawJSON", "ResponseStream.Next", "ResponseStream.Event", "ResponseStream.Err", "ResponseStream.Close",
 	"ChatCompletionResult.RawJSON", "ChatCompletionChunk.RawJSON", "ChatCompletionStream.Next", "ChatCompletionStream.Event", "ChatCompletionStream.Err", "ChatCompletionStream.Close",
@@ -324,6 +325,23 @@ func receiverName(expression ast.Expr) string {
 	}
 }
 
+func inspectInterfaceMethods(interfaceName string, interfaceType *ast.InterfaceType, allowed, seen map[string]bool) {
+	for _, field := range interfaceType.Methods.List {
+		if len(field.Names) == 0 {
+			if name := receiverName(field.Type); ast.IsExported(name) {
+				fmt.Fprintf(os.Stderr, "unexpected exported interface embedding found: %s.%s\n", interfaceName, name)
+				os.Exit(1)
+			}
+			continue
+		}
+		for _, name := range field.Names {
+			if ast.IsExported(name.Name) {
+				requireAllowed("method", interfaceName+"."+name.Name, allowed, seen)
+			}
+		}
+	}
+}
+
 func main() {
 	entries, err := os.ReadDir(os.Args[1])
 	if err != nil {
@@ -355,6 +373,9 @@ func main() {
 							os.Exit(1)
 						}
 						requireAllowed("type", spec.Name.Name, allowedTypes, seenTypes)
+						if interfaceType, ok := spec.Type.(*ast.InterfaceType); ok {
+							inspectInterfaceMethods(spec.Name.Name, interfaceType, allowedMethods, seenMethods)
+						}
 					case *ast.ValueSpec:
 						for _, name := range spec.Names {
 							if ast.IsExported(name.Name) {

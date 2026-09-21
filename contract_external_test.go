@@ -230,6 +230,64 @@ func compilePublicContract() {
 	_, _, _ = responseValidationError.ResponseID(), responseValidationError.BodyTruncated(), responseValidationError.RawResponseBody()
 }
 
+func TestExternalContractResponseBuiltInToolMethods(t *testing.T) {
+	typ := reflect.TypeOf((*gateway.ResponseBuiltInTool)(nil)).Elem()
+	if typ.Kind() != reflect.Interface {
+		t.Fatalf("ResponseBuiltInTool kind = %s, want interface", typ.Kind())
+	}
+	if typ.NumMethod() != 1 {
+		t.Fatalf("ResponseBuiltInTool method count = %d, want 1", typ.NumMethod())
+	}
+	method := typ.Method(0)
+	if method.Name != "responseBuiltInTool" || method.IsExported() {
+		t.Fatalf("ResponseBuiltInTool method = %q (exported=%t), want unexported responseBuiltInTool", method.Name, method.IsExported())
+	}
+	if method.Type.NumIn() != 0 || method.Type.NumOut() != 0 {
+		t.Fatalf("ResponseBuiltInTool.%s signature = %s, want func()", method.Name, method.Type)
+	}
+}
+
+func TestExternalContractResponsesRequestFields(t *testing.T) {
+	want := []struct {
+		name string
+		typ  reflect.Type
+	}{
+		{"Model", reflect.TypeOf("")},
+		{"Input", reflect.TypeOf((*gateway.ResponseInput)(nil)).Elem()},
+		{"MaxOutputTokens", reflect.TypeOf((*int)(nil))},
+		{"Temperature", reflect.TypeOf((*float64)(nil))},
+		{"TopP", reflect.TypeOf((*float64)(nil))},
+		{"PresencePenalty", reflect.TypeOf((*float64)(nil))},
+		{"FrequencyPenalty", reflect.TypeOf((*float64)(nil))},
+		{"Instructions", reflect.TypeOf((*string)(nil))},
+		{"Tools", reflect.TypeOf([]gateway.ResponseTool(nil))},
+		{"ToolChoice", reflect.TypeOf((*gateway.ResponseToolChoice)(nil)).Elem()},
+		{"ParallelToolCalls", reflect.TypeOf((*bool)(nil))},
+		{"AllowedTools", reflect.TypeOf([]string(nil))},
+		{"Reasoning", reflect.TypeOf((*gateway.ResponseReasoning)(nil))},
+		{"Text", reflect.TypeOf((*gateway.ResponseText)(nil))},
+		{"Truncation", reflect.TypeOf((*string)(nil))},
+		{"PreviousResponseID", reflect.TypeOf((*string)(nil))},
+		{"Store", reflect.TypeOf((*bool)(nil))},
+		{"Metadata", reflect.TypeOf(map[string]string(nil))},
+		{"Caching", reflect.TypeOf((*string)(nil))},
+		{"CacheAnchorItems", reflect.TypeOf((*int)(nil))},
+		{"CacheTTL", reflect.TypeOf((*string)(nil))},
+		{"PromptCacheKey", reflect.TypeOf((*string)(nil))},
+	}
+
+	typ := reflect.TypeOf(gateway.ResponsesRequest{})
+	if typ.NumField() != len(want) {
+		t.Fatalf("ResponsesRequest field count = %d, want %d", typ.NumField(), len(want))
+	}
+	for i := range want {
+		field := typ.Field(i)
+		if !field.IsExported() || field.Name != want[i].name || field.Type != want[i].typ {
+			t.Fatalf("ResponsesRequest field %d = %s %s, want exported %s %s", i, field.Name, field.Type, want[i].name, want[i].typ)
+		}
+	}
+}
+
 func TestExternalContractResponsesBuiltInToolsRequestFields(t *testing.T) {
 	want := []struct {
 		name string
