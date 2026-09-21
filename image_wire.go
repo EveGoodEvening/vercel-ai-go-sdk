@@ -55,30 +55,36 @@ func decodeImageResult(modelID string, raw rawProviderResponse) (*ImageResult, e
 		return invalid(&imageFailure{memberPath("$", "images"), "must contain at most 16 images", nil})
 	}
 	images := make([][]byte, len(encoded))
+	decodedLengths := make([]int, len(encoded))
 	total := 0
 	for i, s := range encoded {
-		p := indexPath(memberPath("$", "images"), i)
-		maxEnc := base64.StdEncoding.EncodedLen(maxImageDecodedBytes)
-		if len(s) > maxEnc {
-			return invalid(&imageFailure{p, "decoded image exceeds 16777216 bytes", nil})
+		path := indexPath(memberPath("$", "images"), i)
+		if len(s) > base64.StdEncoding.EncodedLen(maxImageDecodedBytes) {
+			return invalid(&imageFailure{path, "decoded image exceeds 16777216 bytes", nil})
 		}
-		if !strictPaddedBase64(s) {
-			return invalid(&imageFailure{p, "must be strict standard padded base64", nil})
+		decodedLength, ok := strictBase64DecodedLen(s)
+		if !ok {
+			return invalid(&imageFailure{path, "must be strict standard padded base64", nil})
 		}
+		if decodedLength > maxImageDecodedBytes {
+			return invalid(&imageFailure{path, "decoded image exceeds 16777216 bytes", nil})
+		}
+		if total > maxImageAggregateDecodedBytes-decodedLength {
+			return invalid(&imageFailure{path, "aggregate decoded images exceed 67108864 bytes", nil})
+		}
+		total += decodedLength
+		decodedLengths[i] = decodedLength
+	}
+	for i, s := range encoded {
+		path := indexPath(memberPath("$", "images"), i)
+		decodedLength := decodedLengths[i]
 		var decoded bytes.Buffer
-		decoded.Grow(base64.StdEncoding.DecodedLen(len(s)))
-		dec := base64.NewDecoder(base64.StdEncoding.Strict(), strings.NewReader(s))
-		written, e := io.Copy(&decoded, io.LimitReader(dec, int64(maxImageDecodedBytes)+1))
-		if e != nil {
-			return invalid(&imageFailure{p, "must be strict standard padded base64", e})
+		decoded.Grow(decodedLength)
+		decoder := base64.NewDecoder(base64.StdEncoding.Strict(), strings.NewReader(s))
+		written, decodeErr := io.Copy(&decoded, io.LimitReader(decoder, int64(decodedLength)+1))
+		if decodeErr != nil || written != int64(decodedLength) {
+			return invalid(&imageFailure{path, "must be strict standard padded base64", decodeErr})
 		}
-		if written > maxImageDecodedBytes {
-			return invalid(&imageFailure{p, "decoded image exceeds 16777216 bytes", nil})
-		}
-		if total > maxImageAggregateDecodedBytes-int(written) {
-			return invalid(&imageFailure{p, "aggregate decoded images exceed 67108864 bytes", nil})
-		}
-		total += int(written)
 		images[i] = decoded.Bytes()
 	}
 	var retryable *bool
@@ -109,9 +115,9 @@ func decodeImageResult(modelID string, raw rawProviderResponse) (*ImageResult, e
 	}
 	return &ImageResult{Images: images, Retryable: retryable, Warnings: warnings, ProviderMetadata: metadata, Response: ResponseMetadata{ModelID: modelID, Headers: nonNilHeaderClone(raw.headers), Body: retained}, Usage: usage}, nil
 }
-func strictPaddedBase64(value string) bool {
+func strictBase64DecodedLen(value string) (int, bool) {
 	if len(value)%4 != 0 {
-		return false
+		return 0, false
 	}
 	padding := 0
 	if len(value) > 0 && value[len(value)-1] == '=' {
@@ -120,18 +126,21 @@ func strictPaddedBase64(value string) bool {
 			padding++
 		}
 	}
-	for i := 0; i < len(value)-padding; i++ {
-		c := value[i]
-		if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '+' || c == '/') {
-			return false
+	for i := range len(value) - padding {
+		character := value[i]
+		if !((character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') || character == '+' || character == '/') {
+			return 0, false
 		}
 	}
 	for i := len(value) - padding; i < len(value); i++ {
 		if value[i] != '=' {
-			return false
+			return 0, false
 		}
 	}
-	return padding <= 2
+	if padding > 2 {
+		return 0, false
+	}
+	return len(value)/4*3 - padding, true
 }
 func decodeImageUsage(raw json.RawMessage) (*ImageUsage, *imageFailure) {
 	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {

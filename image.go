@@ -59,6 +59,15 @@ type ImageUsage struct {
 
 // GenerateImage validates and submits exactly one Image Model V4 request. It never retries.
 func (client *Client) GenerateImage(ctx context.Context, modelID string, request ImageRequest) (*ImageResult, error) {
+	if ctx == nil {
+		return nil, validationError(memberPath("$", "context"), "must not be nil")
+	}
+	if _, err := preflightImageRequest(modelID, request); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, &TransportError{operation: "send request", cause: err}
+	}
 	request = cloneImageRequest(request)
 	raw, err := client.executeProviderRequest(ctx, providerRouteImage, modelID, func() ([]byte, error) {
 		return prepareImageRequest(modelID, request)

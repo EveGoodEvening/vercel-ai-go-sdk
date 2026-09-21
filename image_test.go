@@ -7,8 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"reflect"
+	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -131,6 +134,146 @@ func TestImageOutputBoundaries(t *testing.T) {
 	body, _ = json.Marshal(map[string]any{"images": []string{base64.StdEncoding.EncodeToString(too)}})
 	if _, e = decodeImageResult("p/m", rawProviderResponse{body: body}); e == nil {
 		t.Fatal("accepted oversized image")
+	}
+}
+
+func TestImageRequestPreflightExactBoundary(t *testing.T) {
+	dataLength := (maxRequestBodyBytes/4)*3 - 300
+	request := ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: make([]byte, dataLength)}}}
+	empty := ""
+	request.Prompt = &empty
+	length, err := preflightImageRequest("p/m", request)
+	if err != nil {
+		t.Fatalf("base request preflight: %v", err)
+	}
+	filler := strings.Repeat("x", maxRequestBodyBytes-length)
+	request.Prompt = &filler
+	body, err := prepareImageRequest("p/m", request)
+	if err != nil || len(body) != maxRequestBodyBytes {
+		t.Fatalf("exact boundary len=%d preflight=%d err=%v", len(body), length, err)
+	}
+	filler += "x"
+	request.Prompt = &filler
+	_, err = prepareImageRequest("p/m", request)
+	var validationErr *ValidationError
+	if !errors.As(err, &validationErr) || validationErr.Path() != "$" || validationErr.Reason() != "encoded request exceeds 16777216 bytes" {
+		t.Fatalf("limit+1 err=%T %v", err, err)
+	}
+}
+
+func TestImageRequestPreflightAggregateAndArithmetic(t *testing.T) {
+	chunk := bytes.Repeat([]byte{'x'}, 4<<20)
+	input := func() ImageInput { return ImageBytes{MediaType: "image/png", Data: chunk} }
+	mask := input()
+	request := ImageRequest{Count: 1, Files: []ImageInput{input(), input(), input()}, Mask: &mask}
+	_, err := preflightImageRequest("p/m", request)
+	var validationErr *ValidationError
+	if !errors.As(err, &validationErr) || validationErr.Path() != "$" {
+		t.Fatalf("aggregate err=%T %v", err, err)
+	}
+	if _, ok := checkedBase64EncodedLen(math.MaxInt); ok {
+		t.Fatal("overflowing base64 length accepted")
+	}
+	if _, ok := checkedImageLengthAdd(math.MaxInt, 1); ok {
+		t.Fatal("overflowing aggregate accepted")
+	}
+	for _, value := range []string{"plain", "<>&", "\x00\n\t", "\u2028", string([]byte{0xff})} {
+		encoded, marshalErr := json.Marshal(value)
+		if marshalErr != nil || jsonQuotedLength(value) != len(encoded) {
+			t.Fatalf("quoted length %q=%d want %d err=%v", value, jsonQuotedLength(value), len(encoded), marshalErr)
+		}
+	}
+}
+
+func TestGenerateImageRejectsBeforeCloneCredentialsOrNetwork(t *testing.T) {
+	large := bytes.Repeat([]byte{'x'}, 13<<20)
+	var network atomic.Int32
+	source := &testTokenSource{token: "token"}
+	client, err := NewClient(WithOIDCTokenSource(source), WithBaseURL("https://unit.test/v4/ai"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		network.Add(1)
+		return nil, errors.New("must not send")
+	})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	cases := []struct {
+		name           string
+		ctx            context.Context
+		request        ImageRequest
+		validationPath string
+		transport      bool
+	}{
+		{"nil context", nil, ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: large}}}, `$["context"]`, false},
+		{"count", context.Background(), ImageRequest{Count: 0, Files: []ImageInput{ImageBytes{Data: large}}}, `$["count"]`, false},
+		{"canceled", canceled, ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: large[:12<<20]}}}, "", true},
+		{"oversized", context.Background(), ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: large}}}, "$", false},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			beforeCredentials, beforeNetwork := source.called, network.Load()
+			var before, after runtime.MemStats
+			runtime.GC()
+			runtime.ReadMemStats(&before)
+			_, callErr := client.GenerateImage(test.ctx, "p/m", test.request)
+			runtime.ReadMemStats(&after)
+			if test.transport {
+				var transportErr *TransportError
+				if !errors.As(callErr, &transportErr) || !errors.Is(callErr, context.Canceled) {
+					t.Fatalf("err=%T %v", callErr, callErr)
+				}
+			} else {
+				var validationErr *ValidationError
+				if !errors.As(callErr, &validationErr) || validationErr.Path() != test.validationPath {
+					t.Fatalf("err=%T %v", callErr, callErr)
+				}
+			}
+			if source.called != beforeCredentials || network.Load() != beforeNetwork {
+				t.Fatalf("credentials=%d network=%d", source.called, network.Load())
+			}
+			if allocated := after.TotalAlloc - before.TotalAlloc; allocated >= uint64(len(large)) {
+				t.Fatalf("allocated %d bytes before rejection", allocated)
+			}
+		})
+	}
+}
+
+func TestImageResponseDecodedLengthAndStrictPreflight(t *testing.T) {
+	lengths := map[string]int{"": 0, "YQ==": 1, "YWI=": 2, "YWJj": 3}
+	for encoded, want := range lengths {
+		got, ok := strictBase64DecodedLen(encoded)
+		if !ok || got != want {
+			t.Fatalf("%q length=%d ok=%v want=%d", encoded, got, ok, want)
+		}
+	}
+	for _, encoded := range []string{"YQ=", "YQ===", "=Q==", "YQ==\n", "YQ-_"} {
+		if _, ok := strictBase64DecodedLen(encoded); ok {
+			t.Fatalf("accepted non-strict %q", encoded)
+		}
+	}
+	oversized := strings.Repeat("A", base64.StdEncoding.EncodedLen(maxImageDecodedBytes)+4)
+	_, err := decodeImageResult("p/m", rawProviderResponse{body: []byte(`{"images":["` + oversized + `"]}`)})
+	var responseErr *ResponseValidationError
+	if !errors.As(err, &responseErr) || responseErr.Path() != `$["images"][0]` {
+		t.Fatalf("err=%T %v", err, err)
+	}
+}
+
+func TestImageResponseAggregatePreflight(t *testing.T) {
+	encoded := strings.Repeat("A", base64.StdEncoding.EncodedLen(4<<20))
+	images := make([]string, 16)
+	for i := range images {
+		images[i] = encoded
+	}
+	body, err := json.Marshal(map[string]any{"images": images})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = decodeImageResult("p/m", rawProviderResponse{body: body})
+	var responseErr *ResponseValidationError
+	if !errors.As(err, &responseErr) || responseErr.Path() != `$["images"][15]` || responseErr.Reason() != "aggregate decoded images exceed 67108864 bytes" {
+		t.Fatalf("err=%T %v", err, err)
 	}
 }
 func TestGenerateImageOneAttemptAndNon200(t *testing.T) {
