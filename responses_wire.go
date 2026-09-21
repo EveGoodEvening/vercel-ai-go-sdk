@@ -3,9 +3,17 @@ package gateway
 import "encoding/json"
 
 func encodeResponsesRequest(request ResponsesRequest) ([]byte, error) {
+	return encodeResponsesRequestWithBuiltInTools(request, nil, false)
+}
+
+func encodeResponsesBuiltInToolsRequest(request ResponsesBuiltInToolsRequest, stream bool) ([]byte, error) {
+	return encodeResponsesRequestWithBuiltInTools(request.Request, request.Tools, stream)
+}
+
+func encodeResponsesRequestWithBuiltInTools(request ResponsesRequest, builtInTools []ResponseBuiltInTool, stream bool) ([]byte, error) {
 	wire := make(map[string]any, 24)
 	wire["model"] = request.Model
-	wire["stream"] = false
+	wire["stream"] = stream
 	switch input := request.Input.(type) {
 	case ResponseTextInput:
 		wire["input"] = string(input)
@@ -46,9 +54,9 @@ func encodeResponsesRequest(request ResponsesRequest) ([]byte, error) {
 	if request.Instructions != nil {
 		put("instructions", *request.Instructions)
 	}
-	if request.Tools != nil {
-		tools := make([]any, len(request.Tools))
-		for i, t := range request.Tools {
+	if request.Tools != nil || builtInTools != nil {
+		tools := make([]any, 0, len(request.Tools)+len(builtInTools))
+		for _, t := range request.Tools {
 			v := map[string]any{"type": "function", "name": t.Name, "parameters": normalizeJSONValue(t.Parameters)}
 			if t.Description != nil {
 				v["description"] = *t.Description
@@ -56,7 +64,13 @@ func encodeResponsesRequest(request ResponsesRequest) ([]byte, error) {
 			if t.Strict != nil {
 				v["strict"] = *t.Strict
 			}
-			tools[i] = v
+			tools = append(tools, v)
+		}
+		for _, tool := range builtInTools {
+			switch tool.(type) {
+			case ResponseWebSearchTool:
+				tools = append(tools, map[string]any{"type": "web_search", "search_context_size": "low"})
+			}
 		}
 		put("tools", tools)
 	}

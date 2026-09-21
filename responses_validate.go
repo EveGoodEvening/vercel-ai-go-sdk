@@ -208,6 +208,27 @@ func validateResponsesRequest(r ResponsesRequest) *ValidationError {
 	return nil
 }
 
+func validateResponsesBuiltInToolsRequest(r ResponsesBuiltInToolsRequest) *ValidationError {
+	if err := validateResponsesRequest(r.Request); err != nil {
+		return err
+	}
+	if len(r.Request.Tools)+len(r.Tools) > maxResponseMembers {
+		return validationError(memberPath("$", "tools"), "must contain at most 10000 items")
+	}
+	for i, tool := range r.Tools {
+		path := indexPath(memberPath("$", "tools"), len(r.Request.Tools)+i)
+		if nilValue(tool) {
+			return validationError(path, "must be a non-nil built-in tool")
+		}
+		switch tool.(type) {
+		case ResponseWebSearchTool:
+		default:
+			return validationError(path, "built-in tool type is unsupported")
+		}
+	}
+	return nil
+}
+
 func validModelID(s string) bool { i := strings.IndexByte(s, '/'); return i > 0 && i < len(s)-1 }
 func nilValue(v any) bool {
 	if v == nil {

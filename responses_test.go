@@ -448,3 +448,185 @@ func TestCreateResponseUsesPublicBaseWithoutChangingEvaluate(t *testing.T) {
 		t.Fatalf("provider URL=%q", got)
 	}
 }
+
+type unsupportedResponseBuiltInTool struct{}
+
+func (unsupportedResponseBuiltInTool) responseBuiltInTool() {}
+
+func TestResponsesBuiltInWebSearchExactWireAndRawBoundaries(t *testing.T) {
+	function := ResponseTool{Name: "lookup", Parameters: map[string]any{"type": "object"}}
+	request := ResponsesBuiltInToolsRequest{
+		Request: ResponsesRequest{Model: "openai/gpt-5.4-mini", Input: ResponseTextInput("news"), Tools: []ResponseTool{function}},
+		Tools:   []ResponseBuiltInTool{ResponseWebSearchTool{}, ResponseWebSearchTool{}},
+	}
+	buffered, err := encodeResponsesBuiltInToolsRequest(request, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantBuffered := `{"input":"news","model":"openai/gpt-5.4-mini","stream":false,"tools":[{"name":"lookup","parameters":{"type":"object"},"type":"function"},{"search_context_size":"low","type":"web_search"},{"search_context_size":"low","type":"web_search"}]}`
+	if string(buffered) != wantBuffered {
+		t.Fatalf("buffered wire\n got: %s\nwant: %s", buffered, wantBuffered)
+	}
+	streaming, err := encodeResponsesBuiltInToolsRequest(request, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(streaming) != strings.Replace(wantBuffered, `"stream":false`, `"stream":true`, 1) {
+		t.Fatalf("streaming wire = %s", streaming)
+	}
+
+	minimal, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{ResponseWebSearchTool{}}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(minimal), `{"input":"hello","model":"provider/model","stream":false,"tools":[{"search_context_size":"low","type":"web_search"}]}`; got != want {
+		t.Fatalf("minimal wire\n got: %s\nwant: %s", got, want)
+	}
+	omitted, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest()}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(omitted), `{"input":"hello","model":"provider/model","stream":false}`; got != want {
+		t.Fatalf("omitted tools wire = %s, want %s", got, want)
+	}
+
+	rawResult := []byte(` {"output":[{"type":"web_search_call","future":{"opaque":true}}]} `)
+	fixture := testserver.New(testserver.Response{Status: http.StatusOK, Body: rawResult})
+	defer fixture.Close()
+	client, err := NewClient(WithAPIKey("key"), WithPublicBaseURL(fixture.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := client.CreateResponseWithBuiltInTools(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(result.RawJSON(), rawResult) {
+		t.Fatalf("raw result = %q", result.RawJSON())
+	}
+	if got := string(fixture.Requests()[0].Body); got != wantBuffered {
+		t.Fatalf("sent buffered wire = %s", got)
+	}
+
+	rawEvent := []byte(`{"type":"response.web_search_call.future","opaque":[1,true]}`)
+	var streamBody []byte
+	streamClient, err := NewClient(WithAPIKey("key"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		streamBody, _ = io.ReadAll(req.Body)
+		body := "event: future\nid: search-1\ndata: " + string(rawEvent) + "\n\n"
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := streamClient.StreamResponseWithBuiltInTools(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+	if !stream.Next() {
+		t.Fatalf("stream next failed: %v", stream.Err())
+	}
+	event, ok := stream.Event().(RawResponseEvent)
+	if !ok || event.Type != "response.web_search_call.future" || event.Event != "future" || event.ID != "search-1" || !bytes.Equal(event.RawJSON(), rawEvent) {
+		t.Fatalf("raw event = %#v / %q", stream.Event(), event.RawJSON())
+	}
+	if got, want := string(streamBody), strings.Replace(wantBuffered, `"stream":false`, `"stream":true`, 1); got != want {
+		t.Fatalf("sent streaming wire\n got: %s\nwant: %s", got, want)
+	}
+}
+
+func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
+	clearCredentialEnvironment(t)
+	source := &transportTokenSource{token: "token"}
+	calls := 0
+	client, err := NewClient(WithOIDCTokenSource(source), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		return nil, errors.New("must not send")
+	})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var typedNil *ResponseWebSearchTool
+	tooManyFunctions := make([]ResponseTool, maxResponseMembers)
+	for i := range tooManyFunctions {
+		tooManyFunctions[i] = ResponseTool{Name: "f", Parameters: map[string]any{}}
+	}
+	cases := []struct {
+		name string
+		req  ResponsesBuiltInToolsRequest
+		path string
+	}{
+		{"invalid base request", ResponsesBuiltInToolsRequest{}, `$["model"]`},
+		{"nil tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{nil}}, `$["tools"][0]`},
+		{"typed nil tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{typedNil}}, `$["tools"][0]`},
+		{"unsupported tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{unsupportedResponseBuiltInTool{}}}, `$["tools"][0]`},
+		{"combined tool limit", ResponsesBuiltInToolsRequest{Request: ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Tools: tooManyFunctions}, Tools: []ResponseBuiltInTool{ResponseWebSearchTool{}}}, `$["tools"]`},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			for _, call := range []func() error{
+				func() error {
+					_, err := client.CreateResponseWithBuiltInTools(context.Background(), test.req)
+					return err
+				},
+				func() error {
+					_, err := client.StreamResponseWithBuiltInTools(context.Background(), test.req)
+					return err
+				},
+			} {
+				err := call()
+				var validation *ValidationError
+				if !errors.As(err, &validation) || validation.Path() != test.path {
+					t.Fatalf("error = %T %v, want ValidationError at %s", err, err, test.path)
+				}
+			}
+		})
+	}
+	for _, call := range []func() error{
+		func() error {
+			_, err := client.CreateResponseWithBuiltInTools(nil, ResponsesBuiltInToolsRequest{Request: validResponsesRequest()})
+			return err
+		},
+		func() error {
+			_, err := client.StreamResponseWithBuiltInTools(nil, ResponsesBuiltInToolsRequest{Request: validResponsesRequest()})
+			return err
+		},
+	} {
+		var validation *ValidationError
+		if err := call(); !errors.As(err, &validation) || validation.Path() != `$["context"]` {
+			t.Fatalf("nil context error = %T %v", err, err)
+		}
+	}
+	if calls != 0 || source.callCount() != 0 {
+		t.Fatalf("network calls=%d credential calls=%d", calls, source.callCount())
+	}
+}
+
+func TestResponsesBuiltInPublicContractAndLegacyCompatibility(t *testing.T) {
+	var _ ResponseBuiltInTool = ResponseWebSearchTool{}
+	_ = ResponsesBuiltInToolsRequest{ResponsesRequest{}, []ResponseBuiltInTool{ResponseWebSearchTool{}}}
+	var create func(*Client, context.Context, ResponsesBuiltInToolsRequest) (*ResponseResult, error) = (*Client).CreateResponseWithBuiltInTools
+	var stream func(*Client, context.Context, ResponsesBuiltInToolsRequest) (*ResponseStream, error) = (*Client).StreamResponseWithBuiltInTools
+	_ = create
+	_ = stream
+	var _ func(*ResponseResult) []byte = (*ResponseResult).RawJSON
+	var _ func(RawResponseEvent) []byte = RawResponseEvent.RawJSON
+
+	typeOfRequest := reflect.TypeOf(ResponsesRequest{})
+	wantFields := []string{"Model", "Input", "MaxOutputTokens", "Temperature", "TopP", "PresencePenalty", "FrequencyPenalty", "Instructions", "Tools", "ToolChoice", "ParallelToolCalls", "AllowedTools", "Reasoning", "Text", "Truncation", "PreviousResponseID", "Store", "Metadata", "Caching", "CacheAnchorItems", "CacheTTL", "PromptCacheKey"}
+	if typeOfRequest.NumField() != len(wantFields) {
+		t.Fatalf("ResponsesRequest fields = %d, want %d", typeOfRequest.NumField(), len(wantFields))
+	}
+	for i, name := range wantFields {
+		if got := typeOfRequest.Field(i).Name; got != name {
+			t.Fatalf("ResponsesRequest field %d = %s, want %s", i, got, name)
+		}
+	}
+	legacy, err := encodeResponsesRequest(validResponsesRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(legacy), `{"input":"hello","model":"provider/model","stream":false}`; got != want {
+		t.Fatalf("legacy request = %s, want %s", got, want)
+	}
+}
