@@ -1665,7 +1665,7 @@ The test-only fix received two fresh CLEAN independent final rereviews; neither 
 
 **Depends on:** Chunk 26 implementation, focused verification, committed accounting, and clean code/API rereview are recorded while Chunk 26 remains intentionally incomplete.
 
-**Current status:** `[-]` the draft external compile contract and strict consumer audit are implemented and their implementation-time verification is green at `4dced7c`. Chunk 26A remains incomplete; independent external-contract review of the expected/export equality and temporary-consumer exercise is the next gate.
+**Current status:** `[-]` the draft external compile contract and strict consumer audit are implemented, all three confirmed independent-review findings are fixed at `b902f48`, and the post-fix verification is green. Chunk 26A remains incomplete pending a clean independent rereview of the strengthened sealed-interface, legacy-request, and interface-member audit contracts.
 
 **Owned paths (exact three):** `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `planning/IMPLEMENTATION_PLAN.md`.
 
@@ -1678,8 +1678,15 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK ./scripts/verify-local-consumer.sh
 ```
 
-- [x] Extend the external compile contract for `ResponsesBuiltInToolsRequest`, sealed `ResponseBuiltInTool`, `ResponseWebSearchTool`, and both `CreateResponseWithBuiltInTools` and `StreamResponseWithBuiltInTools` method signatures while compile-locking the unchanged legacy request/result/event contracts.
-- [x] Update the strict bidirectional expected-export inventory and external temporary-consumer compile exercise for the wrapper, web-search tool, and both methods. Continue rejecting missing expected declarations, unexpected exports, aliases, configurable search knobs, and inferred typed output/event APIs.
+**Recorded independent-review findings and green fix (`b902f48`):** the review confirmed three gaps: the external contract proved concrete assignability but did not lock `ResponseBuiltInTool` as an exactly single-method sealed interface; it did not lock the unchanged exported field order, names, and types of legacy `ResponsesRequest`; and the strict AST audit did not inspect exported methods declared inside exported interfaces. Commit `b902f48` fixed all three and changed exactly `contract_external_test.go` and `scripts/verify-local-consumer.sh`. The strengthened contract now reflection-locks `ResponseBuiltInTool` to the sole unexported zero-argument/zero-result `responseBuiltInTool` marker, reflection-locks the complete legacy `ResponsesRequest` field inventory/order/names/export status/types, and makes the strict expected/export audit inventory exported interface members (including the expected `TokenSource.Token`) while rejecting any exported member added to `ResponseBuiltInTool`. `gofmt` completed on `contract_external_test.go`. Both exact credential-scrubbed post-fix verification commands passed:
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'TestExternalContract' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK ./scripts/verify-local-consumer.sh
+```
+
+- [x] Extend the external compile contract for `ResponsesBuiltInToolsRequest`, sealed `ResponseBuiltInTool`, `ResponseWebSearchTool`, and both `CreateResponseWithBuiltInTools` and `StreamResponseWithBuiltInTools` method signatures while compile-locking unchanged legacy request/result/event contracts. Reflection-lock the sealed interface's exact sole unexported zero-argument/zero-result marker, the wrapper's exact fields, the fieldless tool, and the complete legacy `ResponsesRequest` exported field order/names/types.
+- [x] Update the strict bidirectional expected-export inventory and external temporary-consumer compile exercise for the wrapper, web-search tool, and both methods. Inventory exported interface members as well as top-level declarations, retain the expected `TokenSource.Token` member, and reject any exported `ResponseBuiltInTool` member, missing expected declaration, unexpected export, alias, configurable search knob, or inferred typed output/event API.
 - [x] Run the focused external contract test and `./scripts/verify-local-consumer.sh` with all credentials and live-cost acknowledgements unset.
 - [ ] Independently review the expected/export equality and consumer exercise, then cleanly rereview every fix.
 - [ ] Before Chunk 27 starts, commit to the tracker the draft/review-fix hashes, exact changed paths, focused command results, and clean rereview result. Chunk 26A belongs to the atomic `web_search` rollback group with Chunk 26 and the surviving `web_search` claims/accounting; it is never committed as rolled back separately from that API surface.
