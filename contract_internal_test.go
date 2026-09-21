@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -162,19 +163,30 @@ func TestModalityTransportExactRoutesAndHeaders(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.route, func(t *testing.T) {
 			var request *http.Request
-			client, err := NewClient(WithAPIKey("secret"), WithBaseURL("https://example.test/v4/ai"), WithTeam("team"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(got *http.Request) (*http.Response, error) {
+			var requestBody []byte
+			callerHeaders := http.Header{"X-Caller-Multi": {"first", "second", "third"}}
+			client, err := NewClient(WithAPIKey("secret"), WithBaseURL("https://example.test/v4/ai"), WithTeam("team"), WithHeaders(callerHeaders), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(got *http.Request) (*http.Response, error) {
 				request = got
+				body, readErr := io.ReadAll(got.Body)
+				if readErr != nil {
+					t.Fatalf("read outbound request body: %v", readErr)
+				}
+				requestBody = body
 				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("{}")), ContentLength: 2}, nil
 			})}))
 			if err != nil {
 				t.Fatal(err)
 			}
-			outcome, err := client.executeProviderRequest(context.Background(), test.route, "provider/model", func() ([]byte, error) { return []byte(`{"input":1}`), nil }, 32)
+			preparedPayload := []byte(`{"input":1,"nested":{"exact":true}}`)
+			outcome, err := client.executeProviderRequest(context.Background(), test.route, "provider/model", func() ([]byte, error) { return preparedPayload, nil }, 32)
 			if err != nil || string(outcome.body) != "{}" {
 				t.Fatalf("outcome=%#v err=%v", outcome, err)
 			}
 			if request.URL.String() != "https://example.test/v4/ai"+test.route || request.Method != http.MethodPost {
 				t.Fatalf("request = %s %s", request.Method, request.URL)
+			}
+			if string(requestBody) != string(preparedPayload) {
+				t.Fatalf("outbound payload = %q, want exact prepared payload %q", requestBody, preparedPayload)
 			}
 			for name, want := range map[string]string{
 				headerAuthorization: "Bearer secret", headerContentType: "application/json", headerGatewayProtocolVersion: gatewayProtocolVersion,
@@ -183,6 +195,9 @@ func TestModalityTransportExactRoutesAndHeaders(t *testing.T) {
 				if got := request.Header.Get(name); got != want {
 					t.Fatalf("%s=%q want %q", name, got, want)
 				}
+			}
+			if got := request.Header.Values("X-Caller-Multi"); !reflect.DeepEqual(got, []string{"first", "second", "third"}) {
+				t.Fatalf("X-Caller-Multi = %#v, want ordered caller values", got)
 			}
 			if request.Header.Get(headerEvaluationModelSpecificationVersion) != "" {
 				t.Fatal("modality request included evaluation specification header")
@@ -206,6 +221,15 @@ func TestModalityTransportValidationBeforeCredentialAndOneAttempt(t *testing.T) 
 	_, err = client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return nil, want }, 32)
 	if err != want || source.callCount() != 0 || attempts != 0 {
 		t.Fatalf("err=%v credentials=%d attempts=%d", err, source.callCount(), attempts)
+	}
+	_, err = client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return make([]byte, maxRequestBodyBytes+1), nil }, 32)
+	var validationErr *ValidationError
+	if !errors.As(err, &validationErr) || validationErr.Path() != "$" || validationErr.Reason() != "encoded request exceeds 16777216 bytes" || source.callCount() != 0 || attempts != 0 {
+		t.Fatalf("oversized err=%T %v credentials=%d attempts=%d", err, err, source.callCount(), attempts)
+	}
+	_, err = client.executeProviderRequest(context.Background(), "/unsupported-model", "model", func() ([]byte, error) { return []byte("{}"), nil }, 32)
+	if !errors.As(err, &validationErr) || validationErr.Path() != `$["route"]` || validationErr.Reason() != "unsupported provider route" || source.callCount() != 0 || attempts != 0 {
+		t.Fatalf("unsupported route err=%T %v credentials=%d attempts=%d", err, err, source.callCount(), attempts)
 	}
 	outcome, err := client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return []byte("{}"), nil }, 32)
 	if err != nil || outcome.statusCode != http.StatusInternalServerError || attempts != 1 || source.callCount() != 1 {
@@ -322,11 +346,27 @@ func TestModalityTransportRefusesRedirectAndOwnsResponse(t *testing.T) {
 
 func TestModalityTransportSpecificationHeadersAreProtected(t *testing.T) {
 	clearCredentialEnvironment(t)
-	for name := range providerProtectedHeaderNames {
-		_, err := NewClient(WithAPIKey("secret"), WithHeaders(http.Header{strings.ToLower(name): nil}))
-		var configurationErr *ConfigurationError
-		if !errors.As(err, &configurationErr) || configurationErr.Option() != "WithHeaders" || configurationErr.Reason() != "contains protected header" {
-			t.Fatalf("header %q error = %T %v", name, err, err)
+	expected := map[string]struct{}{
+		"Ai-Embedding-Model-Specification-Version":     {},
+		"Ai-Reranking-Model-Specification-Version":     {},
+		"Ai-Image-Model-Specification-Version":         {},
+		"Ai-Speech-Model-Specification-Version":        {},
+		"Ai-Transcription-Model-Specification-Version": {},
+		"Ai-Language-Model-Specification-Version":      {},
+	}
+	if !reflect.DeepEqual(providerProtectedHeaderNames, expected) {
+		t.Fatalf("provider protected headers = %#v, want %#v", providerProtectedHeaderNames, expected)
+	}
+	values := [][]string{nil, {}, {""}, {"caller-value"}, {"first", "second"}}
+	for name := range expected {
+		for _, spelling := range []string{name, strings.ToLower(name), strings.ToUpper(name)} {
+			for _, value := range values {
+				_, err := NewClient(WithAPIKey("secret"), WithHeaders(http.Header{spelling: value}))
+				var configurationErr *ConfigurationError
+				if !errors.As(err, &configurationErr) || configurationErr.Option() != "WithHeaders" || configurationErr.Reason() != "contains protected header" {
+					t.Fatalf("header %q value %#v error = %T %v", spelling, value, err, err)
+				}
+			}
 		}
 	}
 }
