@@ -453,17 +453,19 @@ type unsupportedResponseBuiltInTool struct{}
 
 func (unsupportedResponseBuiltInTool) responseBuiltInTool() {}
 
-func TestResponsesBuiltInWebSearchExactWireAndRawBoundaries(t *testing.T) {
+func TestResponsesBuiltInXSearchExactWireAndRawBoundaries(t *testing.T) {
 	function := ResponseTool{Name: "lookup", Parameters: map[string]any{"type": "object"}}
 	request := ResponsesBuiltInToolsRequest{
-		Request: ResponsesRequest{Model: "openai/gpt-5.4-mini", Input: ResponseTextInput("news"), Tools: []ResponseTool{function}},
-		Tools:   []ResponseBuiltInTool{&ResponseWebSearchTool{}, ResponseWebSearchTool{}},
+		Request: ResponsesRequest{Model: "spacexai/grok-4.6", Input: ResponseTextInput("news"), Tools: []ResponseTool{function}},
+		Tools: []ResponseBuiltInTool{
+			&ResponseWebSearchTool{}, ResponseXSearchTool{}, &ResponseXSearchTool{}, ResponseWebSearchTool{}, ResponseXSearchTool{},
+		},
 	}
 	buffered, err := encodeResponsesBuiltInToolsRequest(request, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantBuffered := `{"input":"news","model":"openai/gpt-5.4-mini","stream":false,"tools":[{"name":"lookup","parameters":{"type":"object"},"type":"function"},{"search_context_size":"low","type":"web_search"},{"search_context_size":"low","type":"web_search"}]}`
+	wantBuffered := `{"input":"news","model":"spacexai/grok-4.6","stream":false,"tools":[{"name":"lookup","parameters":{"type":"object"},"type":"function"},{"search_context_size":"low","type":"web_search"},{"type":"x_search"},{"type":"x_search"},{"search_context_size":"low","type":"web_search"},{"type":"x_search"}]}`
 	if string(buffered) != wantBuffered {
 		t.Fatalf("buffered wire\n got: %s\nwant: %s", buffered, wantBuffered)
 	}
@@ -475,13 +477,20 @@ func TestResponsesBuiltInWebSearchExactWireAndRawBoundaries(t *testing.T) {
 		t.Fatalf("streaming wire = %s", streaming)
 	}
 
-	minimal, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{ResponseWebSearchTool{}}}, false)
+	minimal, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{ResponseXSearchTool{}}}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantMinimal := `{"input":"hello","model":"provider/model","stream":false,"tools":[{"search_context_size":"low","type":"web_search"}]}`
+	wantMinimal := `{"input":"hello","model":"provider/model","stream":false,"tools":[{"type":"x_search"}]}`
 	if got := string(minimal); got != wantMinimal {
 		t.Fatalf("minimal wire\n got: %s\nwant: %s", got, wantMinimal)
+	}
+	webSearch, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{ResponseWebSearchTool{}}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(webSearch), `{"input":"hello","model":"provider/model","stream":false,"tools":[{"search_context_size":"low","type":"web_search"}]}`; got != want {
+		t.Fatalf("web_search wire = %s, want %s", got, want)
 	}
 	omitted, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest()}, false)
 	if err != nil {
@@ -491,7 +500,7 @@ func TestResponsesBuiltInWebSearchExactWireAndRawBoundaries(t *testing.T) {
 		t.Fatalf("omitted tools wire = %s, want %s", got, want)
 	}
 
-	rawResult := []byte(` {"output":[{"type":"web_search_call","future":{"opaque":true}}]} `)
+	rawResult := []byte(` {"output":[{"type":"x_search_call","future":{"opaque":true}}]} `)
 	fixture := testserver.New(testserver.Response{Status: http.StatusOK, Body: rawResult})
 	defer fixture.Close()
 	client, err := NewClient(WithAPIKey("key"), WithPublicBaseURL(fixture.URL))
@@ -509,7 +518,7 @@ func TestResponsesBuiltInWebSearchExactWireAndRawBoundaries(t *testing.T) {
 		t.Fatalf("sent buffered wire = %s", got)
 	}
 
-	rawEvent := []byte(`{"type":"response.web_search_call.future","opaque":[1,true]}`)
+	rawEvent := []byte(`{"type":"response.x_search_call.future","opaque":[1,true]}`)
 	var streamBody []byte
 	streamClient, err := NewClient(WithAPIKey("key"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		streamBody, _ = io.ReadAll(req.Body)
@@ -528,7 +537,7 @@ func TestResponsesBuiltInWebSearchExactWireAndRawBoundaries(t *testing.T) {
 		t.Fatalf("stream next failed: %v", stream.Err())
 	}
 	event, ok := stream.Event().(RawResponseEvent)
-	if !ok || event.Type != "response.web_search_call.future" || event.Event != "future" || event.ID != "search-1" || !bytes.Equal(event.RawJSON(), rawEvent) {
+	if !ok || event.Type != "response.x_search_call.future" || event.Event != "future" || event.ID != "search-1" || !bytes.Equal(event.RawJSON(), rawEvent) {
 		t.Fatalf("raw event = %#v / %q", stream.Event(), event.RawJSON())
 	}
 	if got, want := string(streamBody), strings.Replace(wantBuffered, `"stream":false`, `"stream":true`, 1); got != want {
@@ -548,6 +557,7 @@ func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
 		t.Fatal(err)
 	}
 	var typedNil *ResponseWebSearchTool
+	var typedNilXSearch *ResponseXSearchTool
 	tooManyFunctions := make([]ResponseTool, maxResponseMembers)
 	for i := range tooManyFunctions {
 		tooManyFunctions[i] = ResponseTool{Name: "f", Parameters: map[string]any{}}
@@ -560,8 +570,9 @@ func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
 		{"invalid base request", ResponsesBuiltInToolsRequest{}, `$["model"]`},
 		{"nil tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{nil}}, `$["tools"][0]`},
 		{"typed nil tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{typedNil}}, `$["tools"][0]`},
+		{"typed nil x_search tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{typedNilXSearch}}, `$["tools"][0]`},
 		{"unsupported tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{unsupportedResponseBuiltInTool{}}}, `$["tools"][0]`},
-		{"combined tool limit", ResponsesBuiltInToolsRequest{Request: ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Tools: tooManyFunctions}, Tools: []ResponseBuiltInTool{ResponseWebSearchTool{}}}, `$["tools"]`},
+		{"combined tool limit", ResponsesBuiltInToolsRequest{Request: ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Tools: tooManyFunctions}, Tools: []ResponseBuiltInTool{ResponseXSearchTool{}}}, `$["tools"]`},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -602,14 +613,22 @@ func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
 		t.Fatalf("network calls=%d credential calls=%d", calls, source.callCount())
 	}
 }
-
 func TestResponsesBuiltInPublicContractAndLegacyCompatibility(t *testing.T) {
 	var _ ResponseBuiltInTool = ResponseWebSearchTool{}
-	_ = ResponsesBuiltInToolsRequest{ResponsesRequest{}, []ResponseBuiltInTool{ResponseWebSearchTool{}}}
+	var _ ResponseBuiltInTool = ResponseXSearchTool{}
+	var _ ResponseBuiltInTool = (*ResponseXSearchTool)(nil)
+	_ = ResponsesBuiltInToolsRequest{ResponsesRequest{}, []ResponseBuiltInTool{ResponseWebSearchTool{}, ResponseXSearchTool{}}}
 	var create func(*Client, context.Context, ResponsesBuiltInToolsRequest) (*ResponseResult, error) = (*Client).CreateResponseWithBuiltInTools
 	var stream func(*Client, context.Context, ResponsesBuiltInToolsRequest) (*ResponseStream, error) = (*Client).StreamResponseWithBuiltInTools
 	_ = create
 	_ = stream
+	if typ := reflect.TypeOf(ResponseXSearchTool{}); typ.NumField() != 0 || typ.Size() != 0 {
+		t.Fatalf("ResponseXSearchTool must remain fieldless, got %d fields and size %d", typ.NumField(), typ.Size())
+	}
+	wrapper := reflect.TypeOf(ResponsesBuiltInToolsRequest{})
+	if wrapper.NumField() != 2 || wrapper.Field(0).Name != "Request" || wrapper.Field(0).Type != reflect.TypeOf(ResponsesRequest{}) || wrapper.Field(1).Name != "Tools" || wrapper.Field(1).Type != reflect.TypeOf([]ResponseBuiltInTool(nil)) {
+		t.Fatalf("ResponsesBuiltInToolsRequest contract changed: %v", wrapper)
+	}
 	var _ func(*ResponseResult) []byte = (*ResponseResult).RawJSON
 	var _ func(RawResponseEvent) []byte = RawResponseEvent.RawJSON
 
