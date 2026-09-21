@@ -2169,7 +2169,7 @@ For stream provenance, the complete pinned discriminator set is nevertheless cla
 | Streaming transcription | 49 | `[!]` Chunk 48 approval/completion |
 | Realtime | 50 | `[!]` Chunk 48 approval/completion; no WebRTC/SDP |
 | Embeddings | 37 | `[x]` complete and accounted after implementation, documentation, focused verification, and four clean final rereviews; staged/experimental only, with no JavaScript-parity or broad release claim |
-| Reranking | 38 | `[-]` first dependency-ready unchecked and active item after the verified Chunk 37 tracker-only handoff |
+| Reranking | 38 | `[x]` complete and accounted after implementation, documentation, all exact verification, and three clean final rereviews; staged/experimental only, with no hosted-success or broad release claim |
 | Provider Evaluation | historical | `[x]` existing `/v4/ai/evaluation-model`; do not reimplement |
 | Public Evaluation | historical Chunk 14 | `[!]` exhaustive public decoder evidence |
 | Provider vision/file inline input | 39/44/47 | `[ ]` for Chunk 39 image inputs; `[!]` for language/video portions on the exact export decisions above; no upload service |
@@ -2191,7 +2191,7 @@ For stream provenance, the complete pinned discriminator set is nevertheless cla
 Independent review and clean rereview verified the frozen provenance, exports, signatures, variants, fields, limits, raw representations, helpers, ownership rules, ledger mappings, blockers, rollback rules, commands, and subjects with no unresolved finding. The landed predecessor plan commit is exactly `f289e31e24b0304c8c6108c71478bb81b280fcde` (`docs: approve gateway capability expansion plan`) with sole changed path `planning/IMPLEMENTATION_PLAN.md`. This post-review accounting handoff updates both durable status documents to point to “the first dependency-ready item in the authoritative Chunk 35–52 queue”, preserving every external live/release blocker, and closes Chunk 35 without claiming this accounting commit's own hash. Rollback removes only this continuation and its two status pointers.
 
 #### Chunk 36 — Shared provider transport and sealed options foundation
-**Status:** `[x]` — complete and accounted; Chunk 38 is the first dependency-ready unchecked and active item in the authoritative Chunk 35–52 queue after the verified Chunk 37 tracker-only handoff.
+**Status:** `[x]` — complete and accounted through Chunk 38; Chunk 39 is the first dependency-ready unchecked and active item in the authoritative Chunk 35–52 queue after the Chunk 38 tracker-only handoff.
 
 
 **Depends on:** 35. **Paths:** `client.go`, `headers.go`, `transport.go`, `provider_options.go`, `contract_internal_test.go`. **Subject:** `feat: add gateway modality transport foundation`. **Tracker:** `docs: record gateway modality foundation accounting`.
@@ -2302,6 +2302,19 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go doc -all .
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^(TestDocumentation|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
 ```
+
+**Chunk 38 accounting handoff.** Chunk 38 is complete and accounted after its reviewed amendment, implementation, separate documentation commit, all exact focused/API/consumer/documentation verification, and clean independent rereview. Its direct prerequisite handoff is `fac37ab4d531d6216d7b33a6d9f9ef7a7fb51b5d` (`docs: record gateway embeddings accounting`) with sole changed path `planning/IMPLEMENTATION_PLAN.md`. The exact landed Chunk 38 series is:
+
+- `27e5fa16cf2d631a4fc807ff49a0e2af2563e413` (`fix: correct gateway reranking accounting`) — sole changed path: `planning/IMPLEMENTATION_PLAN.md`.
+- `70eb6315d2c96c99d2c0e07ebe76295513cc84e7` (`feat: add gateway reranking`) — changed paths: `contract_external_test.go`, `rerank.go`, `rerank_test.go`, `rerank_validate.go`, `rerank_wire.go`, `scripts/verify-local-consumer.sh`.
+- `39ffe39d4aac6b6f609eb6d78f9563e59868595c` (`docs: describe experimental gateway reranking`) — changed paths: `CHANGELOG.md`, `README.md`, `doc.go`, `docs/client.md`.
+
+All six exact Chunk 38 commands above passed after the documentation commit, with `AI_GATEWAY_API_KEY`, `VERCEL_OIDC_TOKEN`, `AI_GATEWAY_LIVE_COST_ACK`, `AI_GATEWAY_PUBLIC_LIVE_COST_ACK`, and `AI_GATEWAY_X_SEARCH_LIVE_COST_ACK` unset and `GOPROXY=off`: the focused ordinary reranking plus hermetic-transport check, the identical focused race check, the external-contract check, the strict local-consumer check, `go doc -all .`, and the full documentation plus hermetic-transport check. The aggregate `git diff --check` also passed, and the worktree was clean. `gopls` was unavailable, so no LSP result is claimed.
+
+Implementation reviews `chunk38-review-1`, `chunk38-review-2`, and `chunk38-review-3` were clean for correctness/wire/JSON, security/resource/cancellation/copy, and API/external-consumer/test quality respectively. Documentation review `chunk38-documentation-2` was clean. Final independent rereviews `chunk38-final-review-1`, `chunk38-final-review-2`, and `chunk38-final-review-3` each returned **CLEAN** with no remaining actionable implementation, security, resource, cancellation, API/wire-contract, external-consumer, test-quality, documentation, privacy, maturity, integration, or tracker-accounting finding. No implementation review-fix commit or documentation-fix commit was needed because those reviews produced no actionable finding; no review phase was skipped.
+
+The intended tracker subject is `docs: record gateway reranking accounting`, and its sole changed path is `planning/IMPLEMENTATION_PLAN.md`; this accounting does not and cannot record the tracker commit's own future hash. Chunk 39 must verify and record that landed hash, exact subject, and sole plan path before implementation. Chunk 39 is now the first dependency-ready unchecked and active item. The existing Chunk 38 rollback boundary, retained language/WebSocket/live-evidence blockers, non-goals, and immutable post-publication handling remain unchanged.
+
 **Exact Chunk 39 commands:**
 ```sh
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^(Test(Image|GenerateImage)|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
