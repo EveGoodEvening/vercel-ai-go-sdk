@@ -1,14 +1,15 @@
 # Vercel AI Go SDK
 
-Experimental Go client for Vercel AI Gateway text generation and evaluation. Requires **Go 1.26+**; the package name is `gateway`.
+Experimental Go client for Vercel AI Gateway text generation, evaluation, and staged provider-protocol embeddings. Requires **Go 1.26+**; the package name is `gateway`.
 
 | API | Methods | Result support |
 | --- | --- | --- |
 | Public `/v1/responses` | `CreateResponse`, `StreamResponse`; opt-in `CreateResponseWithBuiltInTools`, `StreamResponseWithBuiltInTools` | Raw buffered JSON; typed text deltas and raw streaming events |
 | Public `/v1/chat/completions` | `CreateChatCompletion`, `StreamChatCompletion` | Typed buffered fields; streamed text deltas; raw JSON access |
 | Provider `/v4/ai/evaluation-model` | `Evaluate` | Validated boolean, choice, and score answers |
+| Provider `/v4/ai/embedding-model` | `Embed` | Strictly validated vectors, usage, warnings, provider metadata, and bounded response metadata |
 
-**Unreleased:** hermetic fixtures cover these APIs. The full credentialed hosted contract suites have **not run**; the only hosted generation evidence is narrow sanitized structural corroboration for the documented Responses search declarations on their exact routes, which does not establish general generation compatibility or configurable-option semantics. See [search evidence](docs/x-search.md#sanitized-structural-evidence), [live evidence](docs/evaluation-live-evidence.md), and [release readiness](docs/releasing.md). This is not a full port of the JavaScript AI SDK or a general OpenAI client.
+**Unreleased:** hermetic fixtures cover these APIs. The full credentialed hosted generation and evaluation contract suites have **not run**, and no hosted embedding success is claimed; the only hosted generation evidence is narrow sanitized structural corroboration for the documented Responses search declarations on their exact routes, which does not establish general generation compatibility or configurable-option semantics. See [search evidence](docs/x-search.md#sanitized-structural-evidence), [live evidence](docs/evaluation-live-evidence.md), and [release readiness](docs/releasing.md). This is not a full port of the JavaScript AI SDK or a general OpenAI client.
 
 ## Quick start
 
@@ -56,19 +57,20 @@ func main() {
 
 - [Generation](docs/generation.md): Responses, Chat, streaming, function tools, exact request-only Responses search, and separate Chat server search.
 - [Evaluation](docs/evaluation.md): shared state, keyed questions, typed answers, and response validation.
-- [Client configuration](docs/client.md): credentials, endpoints, retries, errors, cancellation, and privacy.
-- Runnable examples: [generation](examples/generate/main.go) and [evaluation](examples/evaluate/main.go).
+- [Client configuration](docs/client.md): credentials, endpoints, retries, errors, cancellation, privacy, and the staged provider-protocol embedding contract.
+- Runnable examples: [generation](examples/generate/main.go) and [evaluation](examples/evaluate/main.go); the client guide includes a loopback-only embedding snippet.
 - Maintainers: [contributing](CONTRIBUTING.md), [changelog](CHANGELOG.md), and [release policy](docs/releasing.md).
 
 ## Important boundaries
 
-- **Separate endpoints:** `WithPublicBaseURL` configures generation; `WithBaseURL` configures provider evaluation. Neither redirects the other. `Evaluate` does **not** call public `/v1/evaluate`.
-- **Retries are off by default.** Buffered calls can opt in; retries may duplicate billable work. Streams are not resumed or replayed. Always close a stream and check its final `Err()`.
+- **Separate endpoints:** `WithPublicBaseURL` configures public generation; `WithBaseURL` configures provider evaluation and staged provider-protocol embeddings. Neither redirects the other. `Evaluate` does **not** call public `/v1/evaluate`, and `Embed` does **not** call a public `/v1/embeddings` endpoint.
+- **Embedding is staged and exact-attempt.** `Embed` appends `/embedding-model` to `WithBaseURL`, accepts a dynamic `provider/model` ID and 1–4096 strings in one request, and performs no automatic batching or retries. See the [client guide](docs/client.md#provider-protocol-embeddings) for request/response limits, strict metadata behavior, cancellation, errors, and privacy.
+- **Retries are off by default.** Supported buffered generation and evaluation calls can opt in; retries may duplicate billable work. `Embed` never uses the retry policy. Streams are not resumed or replayed. Always close a stream and check its final `Err()`.
 - **Search declarations are request-only and server-executed.** Responses opt-in built-in-tools methods accept fixed low-context `ResponseWebSearchTool{}`, fieldless `ResponseXSearchTool{}`, and `ResponseXSearchOptionsTool` with six presence-preserving request fields: allowed/excluded X handles, from/to dates, and image/video understanding booleans. The exact evidenced routes are `openai/gpt-5.4-mini` and `spacexai/grok-4.6`; the catalog remains dynamic. Only simultaneous non-empty allowed/excluded handle lists receive option-specific local validation. Option semantics, wider-model behavior, fallback, typed search outputs, and typed lifecycle events remain unsupported. Chat separately accepts four `vercel:...` server tools through its opt-in methods. The SDK executes none of these tools automatically. See [search support](docs/x-search.md) for exact presence and output boundaries and [client configuration](docs/client.md) for shared authentication, retries, errors, and privacy behavior.
 
 Not implemented:
 
 - Public `/v1/evaluate`; `web_search_preview`, non-low or omitted web-search context, other current/preview forms, and undocumented search options; wider model compatibility, search-specific tool choice/`allowed_tools`, Gateway fallback behavior, configurable `x_search` semantics beyond supported request serialization, and typed search outputs/events.
-- The internal `/v4/ai/language-model` protocol and direct-provider clients are outside this SDK.
-- Embeddings, image/video generation, reranking, speech, transcription, realtime, batches, and management APIs (credits, spend, generation lookup, model discovery).
+- The internal `/v4/ai/language-model` protocol, public `/v1/embeddings`, and direct-provider clients are outside this SDK.
+- Image/video generation, reranking, speech, transcription, realtime, batches, and management APIs (credits, spend, generation lookup, model discovery). Provider-protocol embeddings are implemented experimentally; no universal model support, provider options, batching, caching, pricing, or fallback behavior is claimed.
 - Agents, orchestration, automatic function-tool execution, UI helpers, schema frameworks, and a global provider registry.
