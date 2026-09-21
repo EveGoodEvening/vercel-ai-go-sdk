@@ -62,11 +62,11 @@ func (client *Client) GenerateImage(ctx context.Context, modelID string, request
 	if ctx == nil {
 		return nil, validationError(memberPath("$", "context"), "must not be nil")
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, &TransportError{operation: "send request", cause: err}
-	}
 	if _, err := preflightImageRequest(modelID, request); err != nil {
 		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, &TransportError{operation: "send request", cause: err}
 	}
 	request = cloneImageRequest(request)
 	raw, err := client.executeProviderRequest(ctx, providerRouteImage, modelID, func() ([]byte, error) {

@@ -186,7 +186,8 @@ func TestImageRequestPreflightAggregateAndArithmetic(t *testing.T) {
 }
 
 func TestGenerateImageRejectsBeforeCloneCredentialsOrNetwork(t *testing.T) {
-	large := bytes.Repeat([]byte{'x'}, 13<<20)
+	validLarge := bytes.Repeat([]byte{'x'}, 8<<20)
+	oversized := bytes.Repeat([]byte{'x'}, 13<<20)
 	var network atomic.Int32
 	source := &testTokenSource{token: "token"}
 	client, err := NewClient(WithOIDCTokenSource(source), WithBaseURL("https://unit.test/v4/ai"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
@@ -204,11 +205,14 @@ func TestGenerateImageRejectsBeforeCloneCredentialsOrNetwork(t *testing.T) {
 		request        ImageRequest
 		validationPath string
 		transport      bool
+		cloneSize      int
 	}{
-		{"nil context", nil, ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: large}}}, `$["context"]`, false},
-		{"count", context.Background(), ImageRequest{Count: 0, Files: []ImageInput{ImageBytes{Data: large}}}, `$["count"]`, false},
-		{"canceled", canceled, ImageRequest{Count: 0, Files: []ImageInput{ImageBytes{Data: large}}}, "", true},
-		{"oversized", context.Background(), ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: large}}}, "$", false},
+		{"nil context", nil, ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: validLarge}}}, `$["context"]`, false, len(validLarge)},
+		{"invalid count", context.Background(), ImageRequest{Count: 0, Files: []ImageInput{ImageBytes{Data: validLarge}}}, `$["count"]`, false, len(validLarge)},
+		{"invalid canceled", canceled, ImageRequest{Count: 0, Files: []ImageInput{ImageBytes{Data: validLarge}}}, `$["count"]`, false, len(validLarge)},
+		{"oversized", context.Background(), ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: oversized}}}, "$", false, len(oversized)},
+		{"oversized canceled", canceled, ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: oversized}}}, "$", false, len(oversized)},
+		{"valid large canceled", canceled, ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: validLarge}}}, "", true, len(validLarge)},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -232,7 +236,7 @@ func TestGenerateImageRejectsBeforeCloneCredentialsOrNetwork(t *testing.T) {
 			if source.called != beforeCredentials || network.Load() != beforeNetwork {
 				t.Fatalf("credentials=%d network=%d", source.called, network.Load())
 			}
-			if allocated := after.TotalAlloc - before.TotalAlloc; allocated >= uint64(len(large)) {
+			if allocated := after.TotalAlloc - before.TotalAlloc; allocated >= uint64(test.cloneSize) {
 				t.Fatalf("allocated %d bytes before rejection", allocated)
 			}
 		})
