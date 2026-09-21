@@ -16,7 +16,7 @@ Experimental Go client for Vercel AI Gateway text generation and evaluation. Req
 go get github.com/EveGoodEvening/vercel-ai-go-sdk
 ```
 
-Set `AI_GATEWAY_API_KEY` (or `VERCEL_OIDC_TOKEN`) in your environment. Running this example sends a real request and may incur charges.
+Configure credentials explicitly with `gateway.WithAPIKey(...)`, or set `AI_GATEWAY_API_KEY` (or `VERCEL_OIDC_TOKEN`) in the environment. The example below uses environment discovery. Running it sends a real request and may incur charges.
 
 ```go
 package main
