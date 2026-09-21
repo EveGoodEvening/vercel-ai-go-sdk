@@ -12,7 +12,7 @@ This helper assumes a configured client and a live context. It asks three questi
 
 ```go
 func evaluateProposal(ctx context.Context, client *gateway.Client) error {
-	result, err := client.Evaluate(ctx, "typesafe-ai/jev-latest", gateway.EvaluationRequest{
+	result, err := client.Evaluate(ctx, "typesafe-ai/jev", gateway.EvaluationRequest{
 		State: map[string]any{
 			"requirements": []any{"clear", "testable", "bounded"},
 			"proposal":     "Cache successful lookups for five minutes.",

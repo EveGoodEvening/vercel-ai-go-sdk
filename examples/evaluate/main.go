@@ -17,7 +17,7 @@ import (
 	gateway "github.com/EveGoodEvening/vercel-ai-go-sdk"
 )
 
-const modelID = "typesafe-ai/jev-latest"
+const modelID = "typesafe-ai/jev"
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	liveModelID              = "typesafe-ai/jev-latest"
+	liveModelID              = "typesafe-ai/jev"
 	costAck                  = "I_ACCEPT_LIVE_EVALUATION_COSTS"
 	evaluationAckEnv         = "AI_GATEWAY_LIVE_COST_ACK"
 	evaluationOppositeAckEnv = "AI_GATEWAY_PUBLIC_LIVE_COST_ACK"

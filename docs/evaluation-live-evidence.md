@@ -21,7 +21,7 @@ The durable repository evidence retains only sanitized structural facts. A non-p
 | --- | --- | --- |
 | Responses | `openai/gpt-5-nano` | `POST https://ai-gateway.vercel.sh/v1/responses` |
 | Chat | `openai/gpt-5-nano` | `POST https://ai-gateway.vercel.sh/v1/chat/completions` |
-| Provider evaluation | `typesafe-ai/jev-latest` | `POST https://ai-gateway.vercel.sh/v4/ai/evaluation-model` |
+| Provider evaluation | `typesafe-ai/jev` | `POST https://ai-gateway.vercel.sh/v4/ai/evaluation-model` |
 
 Evaluation protocol baseline, recorded 2026-09-20: `ai@7.0.107`, `@ai-sdk/gateway@4.0.87`, `@ai-sdk/provider@4.0.17`, and `@ai-sdk/provider-utils@5.0.45`. These are evidence pins, not Go dependencies or a claim of JavaScript SDK parity.
 
