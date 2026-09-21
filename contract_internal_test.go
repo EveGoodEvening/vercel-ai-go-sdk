@@ -128,11 +128,21 @@ func TestRetryHooksRemainPrivateShape(t *testing.T) {
 }
 
 func TestProviderOptionsOmitNilAndEmpty(t *testing.T) {
-	if got := encodeProviderOptions(nil); got != nil {
-		t.Fatalf("nil options encoded as %#v", got)
+	if got, err := encodeProviderOptions(nil); got != nil || err != nil {
+		t.Fatalf("nil options encoded as %#v with error %v", got, err)
 	}
-	if got := encodeProviderOptions([]ProviderOption{}); got != nil {
-		t.Fatalf("empty options encoded as %#v", got)
+	if got, err := encodeProviderOptions([]ProviderOption{}); got != nil || err != nil {
+		t.Fatalf("empty options encoded as %#v with error %v", got, err)
+	}
+}
+
+func TestProviderOptionsRejectNilEntry(t *testing.T) {
+	got, err := encodeProviderOptions([]ProviderOption{nil})
+	if got != nil {
+		t.Fatalf("nil option entry encoded as %#v", got)
+	}
+	if err == nil || err.Path() != `$["providerOptions"][0]` || err.Reason() != "must be a non-nil provider option" {
+		t.Fatalf("unexpected nil option error: %T %v", err, err)
 	}
 }
 

@@ -9,17 +9,23 @@ type ProviderOption interface {
 // encodeProviderOptions returns nil for both nil and empty inputs so callers
 // omit providerOptions. Concrete option encodings are added alongside their
 // sealed implementations.
-func encodeProviderOptions(options []ProviderOption) map[string]any {
+func encodeProviderOptions(options []ProviderOption) (map[string]any, *ValidationError) {
 	if len(options) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	// No concrete ProviderOption exists in this release, so a nonempty slice
-	// cannot be constructed by an external caller. Keep this closed switch at
-	// the encoder boundary for future in-package implementations.
+	// Keep validation and the closed encoding switch at this boundary so each
+	// future sealed implementation can add its encoding without opening the API.
 	encoded := make(map[string]any)
-	for range options {
-		panic("gateway: unsupported provider option implementation")
+	for index, option := range options {
+		path := indexPath(memberPath("$", "providerOptions"), index)
+		if option == nil {
+			return nil, validationError(path, "must be a non-nil provider option")
+		}
+		switch option.(type) {
+		default:
+			return nil, validationError(path, "provider option type is unsupported")
+		}
 	}
-	return encoded
+	return encoded, nil
 }
