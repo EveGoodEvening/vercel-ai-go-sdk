@@ -210,9 +210,11 @@ func (s *ResponseStream) Close() error {
 		err := s.body.Close()
 		s.mu.Lock()
 		s.close = err
-		s.event = nil
 		s.mu.Unlock()
 	})
+	s.mu.Lock()
+	s.event = nil
+	s.mu.Unlock()
 	if s.stopCancel != nil {
 		s.stopCancel()
 	}

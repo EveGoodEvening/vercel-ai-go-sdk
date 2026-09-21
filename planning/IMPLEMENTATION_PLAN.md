@@ -804,7 +804,8 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 - [x] Review fix implemented and verified: SSE `id` state now persists as the last-event ID across subsequent dispatched events that omit `id`, with focused framing coverage.
 - [x] Review fix implemented and verified: a dispatched SSE event with no explicit `event` field now exposes the standard default event name `message`, with focused coverage.
 - [x] Review fix implemented and verified: every decoded event JSON object now requires a present, non-null, nonempty string `type` discriminator before typed-delta decoding or raw fallback, with focused coverage.
-- [ ] Clean independent re-review confirms all three review fixes and finds no remaining implementation issue.
+- [x] Review fix implemented and verified: explicit `Close` clears a previously exposed `Event` even when context cancellation won the shared `sync.Once`, with focused lifecycle and race coverage.
+- [ ] Clean independent re-review confirms all four review fixes and finds no remaining implementation issue.
 - [-] **Block every event interpretation beyond `response.output_text.delta`** until the exact first-party evidence gate above clears; raw bounded preservation is implemented, but final completion remains pending clean independent re-review closure.
 
 ### Evidence-gated continuation item — Responses built-in web search

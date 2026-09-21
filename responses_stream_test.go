@@ -92,6 +92,7 @@ func TestSSEFramingAndLimits(t *testing.T) {
 type countedBlockingBody struct {
 	readStarted chan struct{}
 	closed      chan struct{}
+	readRelease chan struct{}
 	once        sync.Once
 	mu          sync.Mutex
 	closeCount  int
@@ -112,6 +113,9 @@ func (body *countedBlockingBody) Read(buffer []byte) (int, error) {
 	}
 	body.once.Do(func() { close(body.readStarted) })
 	<-body.closed
+	if body.readRelease != nil {
+		<-body.readRelease
+	}
 	return 0, io.EOF
 }
 
@@ -395,5 +399,56 @@ func TestStreamResponseCloseAndCancellationUnblockRead(t *testing.T) {
 				t.Fatalf("repeated Close=%v closes=%d", err, body.closes())
 			}
 		})
+	}
+}
+
+func TestStreamResponseCloseClearsEventAfterCancellationOwnsBodyClose(t *testing.T) {
+	body := newCountedBlockingBody([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"first\"}\n\n"), true)
+	body.readRelease = make(chan struct{})
+	defer func() {
+		select {
+		case <-body.readRelease:
+		default:
+			close(body.readRelease)
+		}
+	}()
+	requests := 0
+	client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(streamHTTPClient(http.StatusOK, nil, body, &requests)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := client.StreamResponse(ctx, validResponsesRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stream.Next() || stream.Event() == nil {
+		t.Fatalf("first Next/event = true/%#v, error=%v", stream.Event(), stream.Err())
+	}
+
+	done := make(chan bool, 1)
+	go func() { done <- stream.Next() }()
+	waitForSignal(t, body.readStarted, "second Next never started reading")
+	cancel()
+	waitForSignal(t, body.closed, "context cancellation did not close the body")
+	if body.closes() != 1 {
+		t.Fatalf("context callback body closes = %d", body.closes())
+	}
+	if err := stream.Close(); err != nil || body.closes() != 1 {
+		t.Fatalf("Close error=%v body closes=%d", err, body.closes())
+	}
+	close(body.readRelease)
+
+	select {
+	case next := <-done:
+		if next {
+			t.Fatal("blocked Next returned true")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("blocked Next was not promptly unblocked")
+	}
+	stableErr := stream.Err()
+	if stream.Event() != nil || body.closes() != 1 || stream.Next() || stream.Err() != stableErr || stableErr != nil {
+		t.Fatalf("event=%#v closes=%d later Next=%v stable error=%v current error=%v", stream.Event(), body.closes(), stream.Next(), stableErr, stream.Err())
 	}
 }
