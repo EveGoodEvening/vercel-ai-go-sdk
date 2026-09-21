@@ -38,7 +38,7 @@ All requests use bearer authentication and JSON. Streams request `text/event-str
 
 **Default: one attempt.** Evaluation and generation can be billable and are not assumed idempotent.
 
-`WithRetryPolicy` affects buffered `Evaluate`, `CreateResponse`, `CreateChatCompletion`, and `CreateChatCompletionWithServerTools`. Streaming methods do not use the SDK retry loop and never resume or replay a stream.
+`WithRetryPolicy` affects buffered `Evaluate`, `CreateResponse`, `CreateResponseWithBuiltInTools`, `CreateChatCompletion`, and `CreateChatCompletionWithServerTools`. These buffered calls can be billable on every attempt. Streaming methods do not use the SDK retry loop and never resume or replay a stream.
 
 | `RetryPolicy` field | Meaning and accepted values |
 | --- | --- |

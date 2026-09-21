@@ -6,9 +6,9 @@
 | --- | --- | --- |
 | Public generation | **NOT RUN** | Buffered and streaming Responses; buffered and streaming Chat |
 | Provider evaluation | **NOT RUN** | `Evaluate` with boolean, choice, and score questions |
-| Configurable Gateway `x_search` options | **GATE A EVIDENCE COMPLETE; ACCOUNTING REVIEW NEXT** | Six singleton fields, exact neutral combination, allowed and excluded maximal five-field combinations, and local non-empty handle-list mutual exclusion cleared only in the tested forms |
+| Configurable Gateway `x_search` options | **GATE A, CHUNK 31, AND CHUNK 31A COMPLETE; CHUNK 32 DOCS IN PROGRESS** | Six singleton fields, exact neutral combination, allowed and excluded maximal five-field combinations, and local non-empty handle-list mutual exclusion cleared only in the tested forms |
 
-No owner-authorized public-generation or provider-evaluation paid live-contract run or sanitized hosted result is recorded; those protected records remain **PENDING LIVE RUN**. The separately authorized configurable Gateway `x_search` evidence chain is complete: the reviewed 14-call matrix, reviewed four-call interaction run, and reviewed focused two-call run all occurred on 2026-09-21. The focused run returned HTTP 200 completed responses for its fieldless control and the excluded maximal five-field case and passed in 132.84 seconds. Together, the runs support request acceptance only for the six singleton fields in their tested forms, the exact neutral combination, and both maximal five-field combinations, plus local validation rejecting simultaneous non-empty allowed and excluded handle lists. They do not establish semantic efficacy, typed outputs/events, or any unresolved boundary.
+No owner-authorized public-generation or provider-evaluation paid live-contract run or sanitized hosted result is recorded; those protected records remain **PENDING LIVE RUN**. The separately authorized configurable Gateway `x_search` evidence chain is complete: the reviewed 14-call matrix, reviewed four-call interaction run, and reviewed focused two-call run all occurred on 2026-09-21. The focused run returned HTTP 200 completed responses for its fieldless control and the excluded maximal five-field case and passed in 132.84 seconds. Together, the runs support request acceptance only for the six singleton fields in their tested forms, the exact neutral combination, and both maximal five-field combinations, plus local validation rejecting simultaneous non-empty handle lists. Gate A, Chunk 31 implementation, and Chunk 31A external audit/accounting are complete; Chunk 32 public documentation is in progress. Arbitrary subsets and every semantic and output boundary listed below remain unresolved.
 
 ### Narrow Responses search evidence
 
@@ -121,7 +121,7 @@ Complete only from actual runs of [evaluation_test.go](../internal/livecontract/
 
 ## Sanitized configurable `x_search` option record
 
-The third paid matrix run, four-call interaction run, and focused two-call run below are retained only through sanitized structural facts and independent adjudication. Gate A evidence is complete; tracker accounting review is next.
+The third paid matrix run, four-call interaction run, and focused two-call run below are retained only through sanitized structural facts and independent adjudication. Gate A, Chunk 31 implementation, and Chunk 31A external audit/accounting are complete; Chunk 32 public documentation is in progress.
 
 | Field | Result | Retain only |
 | --- | --- | --- |
@@ -136,10 +136,10 @@ The third paid matrix run, four-call interaction run, and focused two-call run b
 | Semantic/output claim | **NONE** | Structural discriminator observations do not establish option efficacy or typed outputs/events |
 | Four-call interaction run | **2026-09-21 — TEST FAILED AFTER ALL FIXED CASES** | Fieldless HTTP 200; allowed maximal five-field HTTP 200; non-empty handle-pair-only HTTP 400 safe rejection; excluded maximal execution failure/inconclusive |
 | Focused excluded-interaction run | **2026-09-21 — PASS; TWO CALLS COMPLETED** | Fieldless HTTP 200; excluded maximal five-field HTTP 200; 132.84 seconds wall-clock |
-| Evidence adjudication | **GATE A COMPLETE FOR EXACT PROVEN REQUEST FORMS** | Six singletons, neutral empty/false combination, both maximal five-field combinations, omission, and required local non-empty allow/exclude mutual exclusion only |
-| Next action | **Gate A review/accounting commit, then Chunk 31** | Do not rerun completed probes; preserve every unresolved semantic and boundary blocker |
+| Evidence adjudication | **GATE A COMPLETE FOR EXACT PROVEN REQUEST FORMS; CHUNK 31/31A COMPLETE** | Six singletons, neutral empty/false combination, both maximal five-field combinations, omission, and required local non-empty allow/exclude mutual exclusion only |
+| Next action | **Chunk 32 public documentation in progress** | Do not rerun completed probes; preserve every unresolved semantic and boundary blocker |
 
-The complete reviewed evidence supports request acceptance for the allowed and excluded maximal five-field combinations and requires local validation rejecting simultaneous non-empty `allowed_x_handles` and `excluded_x_handles`. It clears only typed request shapes representable by the planned Go API: handle lists as `[]string`, dates as strings, and booleans with explicit presence support. It does not claim server-side rejection of wrong JSON kinds; those kinds will be unrepresentable through the typed API. No evidence establishes list limits, handle syntax, duplicates, null, date grammar/order/inclusivity, empty date strings, semantic effects, other combinations, other models, typed outputs/events, or Gateway wrong-kind error behavior.
+The complete reviewed evidence supports request acceptance only for the six tested singleton forms, the exact neutral empty-list/explicit-false form, and the allowed and excluded maximal five-field combinations, and requires local validation rejecting simultaneous non-empty `allowed_x_handles` and `excluded_x_handles`. The implemented Go API represents handle lists as `[]string`, dates as strings, and booleans with explicit presence support. It does not claim server-side rejection of wrong JSON kinds; those kinds are unrepresentable through the typed API. No evidence establishes arbitrary subsets, list limits, handle syntax, duplicates, null, date grammar/order/inclusivity, empty date strings, semantic effects, other combinations, other models, typed outputs/events, or Gateway wrong-kind error behavior.
 
 No private input value, credential, body, header, ID, raw error, or generated content was retained or reconstructed. Do not add an operator/run reference, literal option value, or any excluded content to this record.
 

@@ -21,9 +21,9 @@ Supported Responses declarations use `ResponsesBuiltInToolsRequest` with `Create
 | --- | --- | --- |
 | `ResponseWebSearchTool{}` | `{"type":"web_search","search_context_size":"low"}` | `openai/gpt-5.4-mini` |
 | `ResponseXSearchTool{}` | `{"type":"x_search"}` | `spacexai/grok-4.6` |
-| `ResponseXSearchOptionsTool{...}` | `{"type":"x_search",...}` with only present supported option fields | `spacexai/grok-4.6` |
+| `ResponseXSearchOptionsTool{...}` | `{"type":"x_search",...}` with only present supported option fields | `spacexai/grok-4.6`; Gateway acceptance is evidenced only for the exact forms listed below |
 
-`ResponseXSearchTool` remains fieldless. Use `ResponseXSearchOptionsTool` only when options are required; it has exactly these six fields:
+`ResponseXSearchTool` remains fieldless. `ResponseXSearchOptionsTool` has exactly the following six fields. The presence behavior in this table describes SDK serialization, not Gateway acceptance for every subset or value combination:
 
 | Go field | Wire field | Presence behavior |
 | --- | --- | --- |
@@ -37,6 +37,7 @@ Supported Responses declarations use `ResponsesBuiltInToolsRequest` with `Create
 No option is encoded as `null`. Caller order and duplicate handles are preserved. Before credentials are resolved or a network request is sent, the SDK rejects only the option-specific case where both handle lists are non-empty. Generic request, collection, and string-size bounds still apply.
 
 The SDK does **not** impose a provider-specific 10- or 20-handle limit, validate handle syntax, remove duplicates, validate date grammar or ordering, define date inclusivity or empty-date meaning, or claim that an accepted option changes search results. It also does not define server behavior for wrong JSON kinds. These omissions are deliberate request-boundary limits, not statements about a provider's contract.
+Gateway acceptance is cleared only for six exact singleton shapes (one non-empty handle list, one date string, or one `true` understanding flag); the exact neutral four-field shape containing both empty handle lists and both explicit `false` flags; and the exact allowed-handle and excluded-handle maximal five-field shapes, each containing one non-empty handle list, both date strings, and both `true` flags. Arbitrary subsets and other combinations remain unresolved even though the SDK can serialize them.
 
 The model catalog is dynamic and the implementation intentionally has no closed model enum. The exact routes above do not establish universal OpenAI, SpaceXAI, or Gateway-model compatibility. There is no automatic Gateway fallback or cross-provider portability promise; an unsupported model/tool combination may fail server-side.
 
@@ -46,7 +47,7 @@ Ordinary Responses function tools may coexist with these declarations. Function 
 
 Support is request-only. Buffered responses remain `ResponseResult.RawJSON()`; streaming still types only `response.output_text.delta` as `ResponseOutputTextDeltaEvent` and preserves every other valid event object as `RawResponseEvent`. Raw bytes are defensive copies, not sanitized content.
 
-The structural evidence proves server-side acceptance of the documented request declarations only. It does **not** define typed search calls, results, actions, posts, source lists, citations, annotations or offsets, refusals, provider errors, usage, cost, unknown variants, retention behavior, or buffered field requiredness/nullability. It also does not define search lifecycle event names, payloads, ordering, deltas, completion/failure effects, or terminal semantics.
+The structural evidence proves server-side acceptance only for the exact request forms enumerated below. It does **not** define typed search calls, results, actions, posts, source lists, citations, annotations or offsets, refusals, provider errors, usage, cost, unknown variants, retention behavior, or buffered field requiredness/nullability. It also does not define search lifecycle event names, payloads, ordering, deltas, completion/failure effects, or terminal semantics.
 
 ## Sanitized structural evidence
 
@@ -55,14 +56,14 @@ Only non-sensitive structural facts are retained:
 | Tool | Endpoint | Model | Exercised declaration | HTTP/status structure | Observed output discriminator/status set |
 | --- | --- | --- | --- | --- | --- |
 | `web_search` | public Gateway Responses | `openai/gpt-5.4-mini` | fixed low-context declaration | HTTP 200; top-level response object; incomplete response under a low output-token cap | `web_search_call`, `message` |
-| `x_search` | public Gateway Responses | `spacexai/grok-4.6` | fieldless and supported configurable request declarations | HTTP 200; top-level response object; completed response | completed `x_search_call`; reasoning items; completed message |
+| `x_search` | public Gateway Responses | `spacexai/grok-4.6` | fieldless control; six singletons; exact neutral empty-lists/false-booleans four-field form; exact allowed and excluded maximal five-field forms | HTTP 200; top-level response object; completed response for those exact forms. Canonical all-six returned ambiguous HTTP 400; wrong-kind probes returned inconclusive HTTP 500 | completed `x_search_call`; reasoning items; completed message |
 
-This public evidence excludes credentials, authorization data, input text, generated prose, bodies, headers, identifiers, provider metadata, usage, cost, and raw payloads. It establishes request acceptance and structural output only, not option semantics or efficacy.
+This public evidence excludes credentials, authorization data, input text, generated prose, bodies, headers, identifiers, provider metadata, usage, cost, raw payloads, and the private values used by the probes. It establishes request acceptance and structural output only for the exact listed forms, not option semantics, efficacy, arbitrary subsets, or other combinations.
 
 ## Remaining blocked surfaces
 
 - For `web_search`, omitting `search_context_size`, any value other than exact `"low"`, `web_search_preview`, external-web-access flags, filters/domains, approximate location, and other current/preview forms are blocked.
-- For `x_search`, semantics beyond the six supported request fields remain blocked: limits/defaults beyond generic SDK bounds, handle/date interpretation, semantic efficacy, wrong-kind server behavior, and fields not listed above.
+- For `x_search`, arbitrary subsets and combinations outside the six singleton, exact neutral four-field, and exact allowed/excluded maximal five-field forms remain unresolved even though the SDK serializes present fields. Also blocked are limits/defaults beyond generic SDK bounds, handle/date interpretation, semantic efficacy, wrong-kind server behavior, canonical all-six acceptance, and fields not listed above.
 - Search-specific tool choice, `allowed_tools`, function/built-in precedence semantics beyond deterministic request ordering, Gateway fallback, routing behavior, and wider model/provider compatibility are blocked.
 - Typed buffered search output and typed search lifecycle events remain blocked as detailed above. Raw buffered and streaming fallback is the supported observation boundary.
 

@@ -83,17 +83,18 @@ The supported declarations are:
 
 - `ResponseWebSearchTool{}` emits `{"type":"web_search","search_context_size":"low"}`. Omitting `search_context_size`, choosing another size, and using `web_search_preview` or another current/preview form are unsupported.
 - Fieldless `ResponseXSearchTool{}` emits exactly `{"type":"x_search"}` and remains available unchanged.
-- `ResponseXSearchOptionsTool` emits `x_search` with any present `AllowedXHandles`, `ExcludedXHandles`, `FromDate`, `ToDate`, `EnableImageUnderstanding`, and `EnableVideoUnderstanding` request fields.
+- `ResponseXSearchOptionsTool` serializes `x_search` with any present `AllowedXHandles`, `ExcludedXHandles`, `FromDate`, `ToDate`, `EnableImageUnderstanding`, and `EnableVideoUnderstanding` request fields.
 
-For configurable X search, nil slices and pointers omit their wire members. Non-nil empty handle slices emit `[]`; non-nil booleans emit explicit `false` or `true`; non-nil date strings, including empty strings, are forwarded subject only to generic string-size bounds. No option emits `null`. The only option-specific local validation is rejection, before credentials or network access, when both handle lists are non-empty. The SDK does not impose a 10/20-item provider limit, validate handle syntax or duplicates, or define date grammar, ordering, inclusivity, empty-date meaning, or semantic efficacy.
+For configurable X search, nil slices and pointers omit their wire members. Non-nil empty handle slices emit `[]`; non-nil booleans emit explicit `false` or `true`; non-nil date strings, including empty strings, are forwarded subject only to generic string-size bounds. No option emits `null`. These are SDK serialization rules, not evidence that the Gateway accepts every representable subset or value combination. The only option-specific local validation is rejection, before credentials or network access, when both handle lists are non-empty. The SDK does not impose a 10/20-item provider limit, validate handle syntax or duplicates, or define date grammar, ordering, inclusivity, empty-date meaning, or semantic efficacy.
+
+Gateway acceptance is evidenced only for the six exact singleton forms; the exact neutral four-field form with both handle lists empty and both understanding flags explicitly `false`; and the exact allowed-handle and excluded-handle maximal five-field forms, each with one non-empty handle list, both dates, and both understanding flags `true`. Arbitrary subsets and other combinations remain unresolved even though the SDK serializes them.
 
 Ordinary function tools remain in `ResponsesRequest.Tools` and may coexist with built-in tools. The encoder emits function tools first, then built-in tools in caller order.
 
 ### Buffered search request
 
 ```go
-fromDate := "2099-01-01" // Illustrative only; the SDK does not validate date grammar.
-imageUnderstanding := false
+imageUnderstanding := true
 
 request := gateway.ResponsesBuiltInToolsRequest{
     Request: gateway.ResponsesRequest{
@@ -102,8 +103,6 @@ request := gateway.ResponsesBuiltInToolsRequest{
     },
     Tools: []gateway.ResponseBuiltInTool{
         gateway.ResponseXSearchOptionsTool{
-            AllowedXHandles:          []string{"example-account"},
-            FromDate:                 &fromDate,
             EnableImageUnderstanding: &imageUnderstanding,
         },
     },
@@ -116,11 +115,14 @@ if err != nil {
 fmt.Printf("response_bytes=%d\n", len(result.RawJSON()))
 ```
 
-This example prints only a structural byte count, not raw output or generated prose. `ResponseResult.RawJSON()` remains the complete buffered search-output boundary and is not sanitized. For fieldless X search, use `gateway.ResponseXSearchTool{}` instead. For fixed low-context web search, use `gateway.ResponseWebSearchTool{}` with the evidenced `openai/gpt-5.4-mini` route.
+This singleton-shape example uses an illustrative boolean value and prints only a structural byte count, not raw output or generated prose. It matches a cleared request shape but does not reproduce or disclose private evidence inputs. `ResponseResult.RawJSON()` remains the complete buffered search-output boundary and is not sanitized. For fieldless X search, use `gateway.ResponseXSearchTool{}` instead. For fixed low-context web search, use `gateway.ResponseWebSearchTool{}` with the evidenced `openai/gpt-5.4-mini` route.
 
 ### Streaming search request
 
 ```go
+fromDate := "2099-01-01" // Illustrative only; not an evidence value or validated grammar.
+toDate := "2099-01-31"   // Illustrative only; not an evidence value or validated grammar.
+imageUnderstanding := true
 videoUnderstanding := true
 
 request := gateway.ResponsesBuiltInToolsRequest{
@@ -130,7 +132,10 @@ request := gateway.ResponsesBuiltInToolsRequest{
     },
     Tools: []gateway.ResponseBuiltInTool{
         gateway.ResponseXSearchOptionsTool{
-            ExcludedXHandles:         []string{"example-muted-account"},
+            ExcludedXHandles:         []string{"example-muted-account"}, // Illustrative only.
+            FromDate:                 &fromDate,
+            ToDate:                   &toDate,
+            EnableImageUnderstanding: &imageUnderstanding,
             EnableVideoUnderstanding: &videoUnderstanding,
         },
     },
@@ -157,7 +162,7 @@ if err := stream.Err(); err != nil {
 fmt.Printf("text_delta_events=%d raw_events=%d\n", textDeltas, rawEvents)
 ```
 
-The same streaming method accepts fieldless `ResponseXSearchTool{}` and fixed low-context `ResponseWebSearchTool{}`. Only text deltas are typed; search-call and all other valid event objects fall back to `RawResponseEvent`. No search-specific event names, ordering, status, completion, error, citation, or terminal semantics are promised.
+This example uses the exact excluded maximal five-field shape, with illustrative values distinct from the private evidence inputs. The same streaming method also accepts fieldless `ResponseXSearchTool{}` and fixed low-context `ResponseWebSearchTool{}`. Only text deltas are typed; search-call and all other valid event objects fall back to `RawResponseEvent`. No search-specific event names, ordering, status, completion, error, citation, or terminal semantics are promised.
 
 Model compatibility is evidence-bounded:
 
@@ -165,9 +170,9 @@ Model compatibility is evidence-bounded:
 | --- | --- | --- |
 | fixed low-context `web_search` | `openai/gpt-5.4-mini` | Documented request fields and raw/typed fallback boundary |
 | fieldless `x_search` | `spacexai/grok-4.6` | Exact request declaration and raw/typed fallback boundary |
-| configurable `x_search` | `spacexai/grok-4.6` | Six request fields and presence behavior only; not their search semantics |
+| configurable `x_search` | `spacexai/grok-4.6` | Request acceptance only for six exact singletons, the exact neutral four-field form, and exact allowed/excluded maximal five-field forms; SDK presence serialization is broader, while option semantics and arbitrary subsets remain unresolved |
 
-The Gateway catalog is dynamic. These rows do not promise universal OpenAI, SpaceXAI, or cross-provider support; the SDK has no model allowlist, automatic fallback, or routing compatibility guarantee, so unsupported model/tool combinations may fail server-side. Search-specific tool choice and `allowed_tools`, wider-model behavior, option semantics, wrong-kind server behavior, and all typed search calls/results/actions/posts/sources/citations/annotations/refusals/provider errors/usage/cost remain blocked. This surface is not a direct-xAI client and imports no direct-xAI limits, defaults, validation, output, authentication, or compatibility contract.
+The Gateway catalog is dynamic. These rows do not promise universal OpenAI, SpaceXAI, or cross-provider support; the SDK has no model allowlist, automatic fallback, or routing compatibility guarantee, so unsupported model/tool combinations may fail server-side. Search-specific tool choice and `allowed_tools`, wider-model behavior, option semantics, arbitrary subsets and other untested combinations, canonical all-six acceptance, wrong-kind server behavior, and all typed search calls/results/actions/posts/sources/citations/annotations/refusals/provider errors/usage/cost remain blocked. This surface is not a direct-xAI client and imports no direct-xAI limits, defaults, validation, output, authentication, or compatibility contract.
 
 ## Chat Completions
 
