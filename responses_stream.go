@@ -104,6 +104,13 @@ func (client *Client) StreamResponse(ctx context.Context, request ResponsesReque
 	stream := &ResponseStream{ctx: ctx, body: resp.Body}
 	stream.parser = newSSEParser(resp.Body)
 	stream.stopCancel = context.AfterFunc(ctx, func() {
+		stream.mu.Lock()
+		if !stream.closed.Load() {
+			stream.closed.Store(true)
+			stream.event = nil
+			stream.err = &TransportError{operation: "read response stream", cause: ctx.Err()}
+		}
+		stream.mu.Unlock()
 		stream.once.Do(func() {
 			err := stream.body.Close()
 			stream.mu.Lock()
@@ -176,11 +183,28 @@ func (s *ResponseStream) Next() bool {
 		s.beforePublish()
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.closed.Load() {
+		s.mu.Unlock()
+		return false
+	}
+	if contextErr := s.ctx.Err(); contextErr != nil {
+		s.closed.Store(true)
+		s.event = nil
+		s.err = &TransportError{operation: "read response stream", cause: contextErr}
+		s.mu.Unlock()
+		s.once.Do(func() {
+			closeErr := s.body.Close()
+			s.mu.Lock()
+			s.close = closeErr
+			s.mu.Unlock()
+		})
+		if s.stopCancel != nil {
+			s.stopCancel()
+		}
 		return false
 	}
 	s.event = decoded
+	s.mu.Unlock()
 	return true
 }
 
