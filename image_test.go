@@ -207,7 +207,7 @@ func TestGenerateImageRejectsBeforeCloneCredentialsOrNetwork(t *testing.T) {
 	}{
 		{"nil context", nil, ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: large}}}, `$["context"]`, false},
 		{"count", context.Background(), ImageRequest{Count: 0, Files: []ImageInput{ImageBytes{Data: large}}}, `$["count"]`, false},
-		{"canceled", canceled, ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: large[:12<<20]}}}, "", true},
+		{"canceled", canceled, ImageRequest{Count: 0, Files: []ImageInput{ImageBytes{Data: large}}}, "", true},
 		{"oversized", context.Background(), ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: large}}}, "$", false},
 	}
 	for _, test := range cases {
