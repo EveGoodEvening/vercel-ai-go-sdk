@@ -40,7 +40,7 @@ Supported request areas are:
 - reasoning effort/summary and text, JSON-object, or JSON-schema output formats;
 - truncation, previous-response linkage, storage, metadata, and Gateway cache controls.
 
-For exhaustive fields and variants, see [Responses types](../responses.go). Function tools are serialized but never executed by the SDK. The opt-in built-in-tools methods additionally support only fixed low-context `web_search` and fieldless `x_search` request declarations; see [Responses server search](#request-only-responses-server-search) and [search support](x-search.md).
+For exhaustive fields and variants, see [Responses types](../responses.go). Function tools are serialized but never executed by the SDK. The opt-in built-in-tools methods additionally support fixed low-context `web_search`, fieldless `x_search`, and the six request-only configurable `x_search` fields; see [Responses server search](#request-only-responses-server-search) and [search support](x-search.md).
 
 ### Streaming
 
@@ -79,26 +79,33 @@ A clean, completely framed HTTP EOF is successful for Responses; no application 
 
 Responses search is an opt-in **request serialization** surface. Use `ResponsesBuiltInToolsRequest` with `CreateResponseWithBuiltInTools` or `StreamResponseWithBuiltInTools`; the existing `ResponsesRequest`, `CreateResponse`, and `StreamResponse` contracts are unchanged. Gateway/provider infrastructure executes the declared search tools server-side. The Go SDK neither executes tools nor turns search calls, results, sources, or lifecycle events into typed values.
 
-The only supported declarations are exact and fieldless:
+The supported declarations are:
 
 - `ResponseWebSearchTool{}` emits `{"type":"web_search","search_context_size":"low"}`. Omitting `search_context_size`, choosing another size, and using `web_search_preview` or another current/preview form are unsupported.
-- `ResponseXSearchTool{}` emits exactly `{"type":"x_search"}`. It has no configurable fields.
+- Fieldless `ResponseXSearchTool{}` emits exactly `{"type":"x_search"}` and remains available unchanged.
+- `ResponseXSearchOptionsTool` emits `x_search` with any present `AllowedXHandles`, `ExcludedXHandles`, `FromDate`, `ToDate`, `EnableImageUnderstanding`, and `EnableVideoUnderstanding` request fields.
+
+For configurable X search, nil slices and pointers omit their wire members. Non-nil empty handle slices emit `[]`; non-nil booleans emit explicit `false` or `true`; non-nil date strings, including empty strings, are forwarded subject only to generic string-size bounds. No option emits `null`. The only option-specific local validation is rejection, before credentials or network access, when both handle lists are non-empty. The SDK does not impose a 10/20-item provider limit, validate handle syntax or duplicates, or define date grammar, ordering, inclusivity, empty-date meaning, or semantic efficacy.
 
 Ordinary function tools remain in `ResponsesRequest.Tools` and may coexist with built-in tools. The encoder emits function tools first, then built-in tools in caller order.
 
 ### Buffered search request
 
 ```go
+fromDate := "2099-01-01" // Illustrative only; the SDK does not validate date grammar.
+imageUnderstanding := false
+
 request := gateway.ResponsesBuiltInToolsRequest{
     Request: gateway.ResponsesRequest{
-        Model: "openai/gpt-5.4-mini",
-        Input: gateway.ResponseTextInput("Find current public information."),
-        Tools: []gateway.ResponseTool{
-            {Name: "lookup_local", Parameters: map[string]any{"type": "object"}},
-        },
+        Model: "spacexai/grok-4.6",
+        Input: gateway.ResponseTextInput("Find public information about an example topic."),
     },
     Tools: []gateway.ResponseBuiltInTool{
-        gateway.ResponseWebSearchTool{},
+        gateway.ResponseXSearchOptionsTool{
+            AllowedXHandles:          []string{"example-account"},
+            FromDate:                 &fromDate,
+            EnableImageUnderstanding: &imageUnderstanding,
+        },
     },
 }
 
@@ -109,28 +116,23 @@ if err != nil {
 fmt.Printf("response_bytes=%d\n", len(result.RawJSON()))
 ```
 
-For fieldless X search, use the positively probed route and replace the built-in tool:
-
-```go
-request.Request.Model = "spacexai/grok-4.6"
-request.Tools = []gateway.ResponseBuiltInTool{gateway.ResponseXSearchTool{}}
-```
-
-`ResponseResult.RawJSON()` remains the complete buffered search-output boundary. Inspect only structural properties appropriate for your application; the bytes are not sanitized and may contain sensitive input, generated prose, tool data, sources, identifiers, usage, costs, or provider extensions.
+This example prints only a structural byte count, not raw output or generated prose. `ResponseResult.RawJSON()` remains the complete buffered search-output boundary and is not sanitized. For fieldless X search, use `gateway.ResponseXSearchTool{}` instead. For fixed low-context web search, use `gateway.ResponseWebSearchTool{}` with the evidenced `openai/gpt-5.4-mini` route.
 
 ### Streaming search request
 
 ```go
+videoUnderstanding := true
+
 request := gateway.ResponsesBuiltInToolsRequest{
     Request: gateway.ResponsesRequest{
         Model: "spacexai/grok-4.6",
-        Input: gateway.ResponseTextInput("Find current public information."),
-        Tools: []gateway.ResponseTool{
-            {Name: "lookup_local", Parameters: map[string]any{"type": "object"}},
-        },
+        Input: gateway.ResponseTextInput("Find public information about another example topic."),
     },
     Tools: []gateway.ResponseBuiltInTool{
-        gateway.ResponseXSearchTool{},
+        gateway.ResponseXSearchOptionsTool{
+            ExcludedXHandles:         []string{"example-muted-account"},
+            EnableVideoUnderstanding: &videoUnderstanding,
+        },
     },
 }
 
@@ -155,16 +157,17 @@ if err := stream.Err(); err != nil {
 fmt.Printf("text_delta_events=%d raw_events=%d\n", textDeltas, rawEvents)
 ```
 
-The same streaming method accepts `ResponseWebSearchTool{}` with `openai/gpt-5.4-mini`. Only text deltas are typed; search-call and all other valid event objects fall back to `RawResponseEvent`. No search-specific event names, ordering, status, completion, error, citation, or terminal semantics are promised.
+The same streaming method accepts fieldless `ResponseXSearchTool{}` and fixed low-context `ResponseWebSearchTool{}`. Only text deltas are typed; search-call and all other valid event objects fall back to `RawResponseEvent`. No search-specific event names, ordering, status, completion, error, citation, or terminal semantics are promised.
 
 Model compatibility is evidence-bounded:
 
-| Declaration | Exact evidenced route | Boundary |
+| Declaration | Exact evidenced route | Supported boundary |
 | --- | --- | --- |
-| fixed low-context `web_search` | `openai/gpt-5.4-mini` | Documented by Vercel and structurally corroborated through public Gateway Responses |
-| fieldless `x_search` | `spacexai/grok-4.6` | Positively probed through public Gateway Responses |
+| fixed low-context `web_search` | `openai/gpt-5.4-mini` | Documented request fields and raw/typed fallback boundary |
+| fieldless `x_search` | `spacexai/grok-4.6` | Exact request declaration and raw/typed fallback boundary |
+| configurable `x_search` | `spacexai/grok-4.6` | Six request fields and presence behavior only; not their search semantics |
 
-The Gateway catalog is dynamic. These rows do not promise universal OpenAI, SpaceXAI, or cross-provider support; the SDK has no model allowlist, automatic fallback, or routing compatibility guarantee, so unsupported model/tool combinations may fail server-side. Configurable `x_search` options, search-specific tool choice and `allowed_tools`, and all typed search calls/results/actions/posts/sources/citations/annotations/refusals/provider errors/usage/cost remain blocked. This surface is not a direct-xAI client and imports no direct-xAI option or output contract.
+The Gateway catalog is dynamic. These rows do not promise universal OpenAI, SpaceXAI, or cross-provider support; the SDK has no model allowlist, automatic fallback, or routing compatibility guarantee, so unsupported model/tool combinations may fail server-side. Search-specific tool choice and `allowed_tools`, wider-model behavior, option semantics, wrong-kind server behavior, and all typed search calls/results/actions/posts/sources/citations/annotations/refusals/provider errors/usage/cost remain blocked. This surface is not a direct-xAI client and imports no direct-xAI limits, defaults, validation, output, authentication, or compatibility contract.
 
 ## Chat Completions
 
