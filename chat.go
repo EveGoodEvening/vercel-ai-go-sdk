@@ -199,11 +199,11 @@ func (client *Client) CreateChatCompletion(ctx context.Context, request ChatComp
 			return nil, err
 		}
 		if raw.statusCode == http.StatusOK {
+			if raw.bodyTruncated {
+				return nil, &ResponseValidationError{cause: raw.bodyErr, statusCode: http.StatusOK, path: "$", reason: "response body exceeds 1 MiB", bodyTruncated: true, rawResponseBody: append([]byte(nil), raw.body...)}
+			}
 			if raw.bodyErr != nil {
 				return nil, &TransportError{operation: "read response body", cause: raw.bodyErr}
-			}
-			if raw.bodyTruncated {
-				return nil, &ResponseValidationError{statusCode: http.StatusOK, path: "$", reason: "response body exceeds 1 MiB", bodyTruncated: true, rawResponseBody: append([]byte(nil), raw.body...)}
 			}
 			return decodeChatCompletionResult(raw.body)
 		}

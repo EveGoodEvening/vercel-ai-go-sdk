@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/testserver"
 )
 
@@ -69,6 +68,7 @@ func TestChatRequestOmissionAndAlternateForms(t *testing.T) {
 		{"empty retained", ChatCompletionRequest{Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatPartsContent{}}}, Tools: []ChatTool{}, Models: []string{}}, `{"messages":[{"content":[],"role":"user"}],"model":"p/m","models":[],"stream":false,"tools":[]}`},
 		{"string stop auto text", ChatCompletionRequest{Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, Stop: ChatStopString("stop"), ToolChoice: ChatToolChoiceAuto, ResponseFormat: ChatResponseFormatText}, `{"messages":[{"content":"x","role":"user"}],"model":"p/m","response_format":{"type":"text"},"stop":"stop","stream":false,"tool_choice":"auto"}`},
 		{"legacy json", ChatCompletionRequest{Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, ResponseFormat: ChatLegacyJSONResponseFormat{Schema: map[string]any{"type": "object"}, Name: &name, Description: &description}}, `{"messages":[{"content":"x","role":"user"}],"model":"p/m","response_format":{"description":"legacy description","name":"legacy","schema":{"type":"object"},"type":"json"},"stream":false}`},
+		{"empty byok retained", ChatCompletionRequest{Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, ProviderOptions: &ChatProviderOptions{Gateway: ChatGatewayOptions{ProviderTimeouts: &ChatProviderTimeouts{BYOK: map[string]int{}}}}}, `{"messages":[{"content":"x","role":"user"}],"model":"p/m","providerOptions":{"gateway":{"providerTimeouts":{"byok":{}}}},"stream":false}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := encodeChatCompletionRequest(test.request)
@@ -176,6 +176,78 @@ func TestCreateChatCompletionValidationBeforeCredentialAndNetwork(t *testing.T) 
 	}
 }
 
+func TestChatRequestDocumentedObjectAndTimeoutValidation(t *testing.T) {
+	clearCredentialEnvironment(t)
+	source := &transportTokenSource{token: "token"}
+	calls := 0
+	client, err := NewClient(WithOIDCTokenSource(source), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		return nil, errors.New("must not send")
+	})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nilObject := map[string]any(nil)
+	tests := []struct {
+		name   string
+		mutate func(*ChatCompletionRequest)
+		path   string
+		reason string
+	}{
+		{"nil byok", func(r *ChatCompletionRequest) {
+			r.ProviderOptions = &ChatProviderOptions{Gateway: ChatGatewayOptions{ProviderTimeouts: &ChatProviderTimeouts{}}}
+		}, `$["providerOptions"]["gateway"]["providerTimeouts"]["byok"]`, "must be a non-null object"},
+		{"timeout below minimum", func(r *ChatCompletionRequest) {
+			r.ProviderOptions = &ChatProviderOptions{Gateway: ChatGatewayOptions{ProviderTimeouts: &ChatProviderTimeouts{BYOK: map[string]int{"p": 999}}}}
+		}, `$["providerOptions"]["gateway"]["providerTimeouts"]["byok"]["p"]`, "must be between 1000 and 789000 inclusive"},
+		{"timeout above maximum", func(r *ChatCompletionRequest) {
+			r.ProviderOptions = &ChatProviderOptions{Gateway: ChatGatewayOptions{ProviderTimeouts: &ChatProviderTimeouts{BYOK: map[string]int{"p": 789001}}}}
+		}, `$["providerOptions"]["gateway"]["providerTimeouts"]["byok"]["p"]`, "must be between 1000 and 789000 inclusive"},
+		{"tool null", func(r *ChatCompletionRequest) { r.Tools = []ChatTool{{Name: "f", Parameters: nilObject}} }, `$["tools"][0]["function"]["parameters"]`, "must be a non-null object"},
+		{"tool scalar", func(r *ChatCompletionRequest) { r.Tools = []ChatTool{{Name: "f", Parameters: "object"}} }, `$["tools"][0]["function"]["parameters"]`, "must be a non-null object"},
+		{"tool array", func(r *ChatCompletionRequest) { r.Tools = []ChatTool{{Name: "f", Parameters: []any{}}} }, `$["tools"][0]["function"]["parameters"]`, "must be a non-null object"},
+		{"schema null", func(r *ChatCompletionRequest) {
+			r.ResponseFormat = ChatJSONSchemaResponseFormat{Name: "f", Schema: nilObject}
+		}, `$["response_format"]["json_schema"]["schema"]`, "must be a non-null object"},
+		{"schema scalar", func(r *ChatCompletionRequest) {
+			r.ResponseFormat = ChatJSONSchemaResponseFormat{Name: "f", Schema: true}
+		}, `$["response_format"]["json_schema"]["schema"]`, "must be a non-null object"},
+		{"schema array", func(r *ChatCompletionRequest) {
+			r.ResponseFormat = ChatJSONSchemaResponseFormat{Name: "f", Schema: []any{}}
+		}, `$["response_format"]["json_schema"]["schema"]`, "must be a non-null object"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := validChatRequest()
+			test.mutate(&request)
+			_, err := client.CreateChatCompletion(context.Background(), request)
+			var validation *ValidationError
+			if !errors.As(err, &validation) || validation.Path() != test.path || validation.Reason() != test.reason {
+				t.Fatalf("error=%T %v path=%q reason=%q", err, err, validation.Path(), validation.Reason())
+			}
+		})
+	}
+	if calls != 0 || source.callCount() != 0 {
+		t.Fatalf("network=%d credential=%d", calls, source.callCount())
+	}
+
+	for _, timeout := range []int{1000, 789000} {
+		request := validChatRequest()
+		request.ProviderOptions = &ChatProviderOptions{Gateway: ChatGatewayOptions{ProviderTimeouts: &ChatProviderTimeouts{BYOK: map[string]int{"p": timeout}}}}
+		if err := validateChatCompletionRequest(request); err != nil {
+			t.Fatalf("boundary %d rejected: %v", timeout, err)
+		}
+	}
+	request := validChatRequest()
+	request.Tools = []ChatTool{{Name: "f", Parameters: map[string]any{"future": []any{map[string]any{"anything": true}}}}}
+	request.ResponseFormat = ChatJSONSchemaResponseFormat{Name: "f", Schema: map[string]any{"future": map[string]any{"anything": 1}}}
+	request.ProviderOptions = &ChatProviderOptions{Gateway: ChatGatewayOptions{ProviderTimeouts: &ChatProviderTimeouts{BYOK: map[string]int{}}}}
+	if err := validateChatCompletionRequest(request); err != nil {
+		t.Fatalf("bounded arbitrary objects rejected: %v", err)
+	}
+}
+
 func TestChatRequestResourceLimits(t *testing.T) {
 	tooDeep := any("leaf")
 	for range 65 {
@@ -254,15 +326,31 @@ func TestCreateChatCompletionSuccessBodyOverflowNon200AndRetry(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
+			if test.status == http.StatusOK {
+				validation, ok := err.(*ResponseValidationError)
+				if !ok {
+					t.Fatalf("error=%T %v", err, err)
+				}
+				if validation.StatusCode() != http.StatusOK || validation.Path() != "$" || validation.Reason() != "response body exceeds 1 MiB" || !validation.BodyTruncated() {
+					t.Fatalf("status=%d path=%q reason=%q truncated=%v", validation.StatusCode(), validation.Path(), validation.Reason(), validation.BodyTruncated())
+				}
+				raw := validation.RawResponseBody()
+				if len(raw) != 1<<20 || !bytes.Equal(raw, test.body[:1<<20]) {
+					t.Fatalf("raw length=%d", len(raw))
+				}
+				raw[0] ^= 0xff
+				if bytes.Equal(raw, validation.RawResponseBody()) {
+					t.Fatal("raw body is not defensive")
+				}
+				return
+			}
 			var responseErr *ResponseError
 			if errors.As(err, &responseErr) != test.wantResponse {
 				t.Fatalf("ResponseError=%v error=%T %v", errors.As(err, &responseErr), err, err)
 			}
-			if test.status == 200 && !errors.Is(err, httpx.ErrResponseBodyTooLarge) {
-				t.Fatalf("overflow=%v", err)
-			}
 		})
 	}
+
 	attempts := 0
 	client, err := NewClient(WithAPIKey("key"), WithRetryPolicy(RetryPolicy{MaxAttempts: 2, InitialDelay: time.Millisecond, MaxDelay: time.Millisecond, Multiplier: 1}), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
 		attempts++
@@ -282,6 +370,36 @@ func TestCreateChatCompletionSuccessBodyOverflowNon200AndRetry(t *testing.T) {
 	}
 	if attempts != 2 {
 		t.Fatalf("attempts=%d", attempts)
+	}
+}
+
+func TestCreateChatCompletionSuccessBodyReadAndCloseFailuresAreTransportErrors(t *testing.T) {
+	readCause := errors.New("read cause must stay private")
+	closeCause := errors.New("close cause must stay private")
+	for _, test := range []struct {
+		name  string
+		body  io.ReadCloser
+		cause error
+	}{
+		{"read", &faultBody{data: []byte(`{}`), readErr: readCause}, readCause},
+		{"close", &faultBody{data: []byte(`{}`), closeErr: closeCause}, closeCause},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client, err := NewClient(WithAPIKey("key"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: test.body, Request: request}, nil
+			})}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = client.CreateChatCompletion(context.Background(), validChatRequest())
+			transport, ok := err.(*TransportError)
+			if !ok || transport.Operation() != "read response body" || !errors.Is(err, test.cause) {
+				t.Fatalf("error=%T %v", err, err)
+			}
+			if got := err.Error(); got != "gateway transport error: read response body" || strings.Contains(got, test.cause.Error()) {
+				t.Fatalf("unsafe error text %q", got)
+			}
+		})
 	}
 }
 

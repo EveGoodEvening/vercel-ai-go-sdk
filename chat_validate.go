@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"reflect"
 	"sort"
 )
 
@@ -134,10 +135,8 @@ func validateChatCompletionRequest(r ChatCompletionRequest) *ValidationError {
 		if err := stringPointer(tool.Description, memberPath(path, "description")); err != nil {
 			return err
 		}
-		if tool.Parameters == nil {
-			return validationError(memberPath(path, "parameters"), "required")
-		}
-		if err := validateBoundedJSON(tool.Parameters, memberPath(path, "parameters")); err != nil {
+		parametersPath := memberPath(path, "parameters")
+		if err := validateChatJSONObject(tool.Parameters, parametersPath); err != nil {
 			return err
 		}
 	}
@@ -177,24 +176,28 @@ func validateChatCompletionRequest(r ChatCompletionRequest) *ValidationError {
 			return err
 		}
 		if g.ProviderTimeouts != nil {
+			byokPath := memberPath(memberPath(path, "providerTimeouts"), "byok")
+			if g.ProviderTimeouts.BYOK == nil {
+				return validationError(byokPath, "must be a non-null object")
+			}
 			keys := make([]string, 0, len(g.ProviderTimeouts.BYOK))
 			for key := range g.ProviderTimeouts.BYOK {
 				keys = append(keys, key)
 			}
 			sort.Strings(keys)
 			if len(keys) > maxResponseMembers {
-				return validationError(memberPath(memberPath(path, "providerTimeouts"), "byok"), "must contain at most 10000 members")
+				return validationError(byokPath, "must contain at most 10000 members")
 			}
 			for _, key := range keys {
-				p := memberPath(memberPath(memberPath(path, "providerTimeouts"), "byok"), key)
+				p := memberPath(byokPath, key)
 				if key == "" {
 					return validationError(p, "must be nonempty")
 				}
 				if err := stringBound(key, p); err != nil {
 					return err
 				}
-				if g.ProviderTimeouts.BYOK[key] < 0 {
-					return validationError(p, "must be non-negative")
+				if timeout := g.ProviderTimeouts.BYOK[key]; timeout < 1000 || timeout > 789000 {
+					return validationError(p, "must be between 1000 and 789000 inclusive")
 				}
 			}
 		}
@@ -273,10 +276,8 @@ func validateChatResponseFormat(format ChatResponseFormat) *ValidationError {
 		if err := stringPointer(format.Description, memberPath(jp, "description")); err != nil {
 			return err
 		}
-		if format.Schema == nil {
-			return validationError(memberPath(jp, "schema"), "required")
-		}
-		if err := validateBoundedJSON(format.Schema, memberPath(jp, "schema")); err != nil {
+		schemaPath := memberPath(jp, "schema")
+		if err := validateChatJSONObject(format.Schema, schemaPath); err != nil {
 			return err
 		}
 	case ChatLegacyJSONResponseFormat:
@@ -295,4 +296,18 @@ func validateChatResponseFormat(format ChatResponseFormat) *ValidationError {
 		return validationError(path, "response format type is unsupported")
 	}
 	return nil
+}
+
+func validateChatJSONObject(value any, path string) *ValidationError {
+	v := reflect.ValueOf(value)
+	for v.IsValid() && (v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer) {
+		if v.IsNil() {
+			return validationError(path, "must be a non-null object")
+		}
+		v = v.Elem()
+	}
+	if !v.IsValid() || v.Kind() != reflect.Map || v.IsNil() || v.Type().Key().Kind() != reflect.String {
+		return validationError(path, "must be a non-null object")
+	}
+	return validateBoundedJSON(value, path)
 }
