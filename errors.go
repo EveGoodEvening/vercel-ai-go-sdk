@@ -54,15 +54,11 @@ type ValidationError struct {
 	reason string
 }
 
-// Error returns a safe diagnostic that never contains request values.
+// Error returns a stable diagnostic that never contains request values or
+// caller-controlled validation metadata. Detailed state remains available
+// through Path and Reason.
 func (e *ValidationError) Error() string {
-	if e == nil {
-		return "gateway validation error"
-	}
-	if e.path == "" && e.reason == "" {
-		return "gateway validation error"
-	}
-	return fmt.Sprintf("gateway validation error: %s: %s", e.path, e.reason)
+	return "gateway validation error"
 }
 
 // Path returns the canonical request path, or an empty string when unavailable.

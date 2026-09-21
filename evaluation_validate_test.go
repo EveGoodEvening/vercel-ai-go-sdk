@@ -1,8 +1,12 @@
 package gateway
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"math"
+	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -83,4 +87,75 @@ func TestJSONValidationRootAndQuotedPaths(t *testing.T) {
 	requireValidationError(t, validateJSONInput(nil, "$"), "$", "required")
 	value := map[string]any{"quote\"slash\\control\x01": math.Inf(-1)}
 	requireValidationError(t, validateJSONValue(value, "$"), `$["quote\"slash\\control\x01"]`, "number must be finite")
+}
+
+func TestEvaluateValidationErrorFormattingRedactsOversizedKeys(t *testing.T) {
+	const marker = "evaluation-validation-secret-marker"
+	key := strings.Repeat(marker, 4096)
+
+	tests := []struct {
+		name    string
+		request EvaluationRequest
+		path    string
+	}{
+		{
+			name:    "question key",
+			request: EvaluationRequest{State: "state", Questions: map[string]Question{key: (*BooleanQuestion)(nil)}},
+			path:    `$["questions"]["` + key + `"]`,
+		},
+		{
+			name: "provider key",
+			request: EvaluationRequest{
+				State:           "state",
+				Questions:       map[string]Question{"q": BooleanQuestion{Instructions: "answer"}},
+				ProviderOptions: map[string]map[string]any{key: nil},
+			},
+			path: `$["providerOptions"]["` + key + `"]`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			requests := 0
+			client, err := NewClient(WithAPIKey("key"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				requests++
+				return nil, errors.New("request must not be sent")
+			})}))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.Evaluate(context.Background(), "provider/model", test.request)
+			var validation *ValidationError
+			if !errors.As(err, &validation) {
+				t.Fatalf("expected ValidationError, got %T: %v", err, err)
+			}
+			if requests != 0 {
+				t.Fatalf("validation sent %d requests", requests)
+			}
+			if validation.Path() != test.path {
+				t.Fatalf("Path() length = %d, want %d", len(validation.Path()), len(test.path))
+			}
+
+			formatted := map[string]struct {
+				got, want string
+			}{
+				"Error()": {validation.Error(), "gateway validation error"},
+				"%v":      {fmt.Sprintf("%v", validation), "gateway validation error"},
+				"%s":      {fmt.Sprintf("%s", validation), "gateway validation error"},
+				"wrapped": {fmt.Errorf("wrapped: %w", validation).Error(), "wrapped: gateway validation error"},
+			}
+			for surface, diagnostic := range formatted {
+				if diagnostic.got != diagnostic.want {
+					t.Fatalf("%s = %q, want %q", surface, diagnostic.got, diagnostic.want)
+				}
+				if strings.Contains(diagnostic.got, marker) {
+					t.Fatalf("%s disclosed caller-controlled key", surface)
+				}
+				if len(diagnostic.got) > 64 {
+					t.Fatalf("%s diagnostic length = %d, want at most 64", surface, len(diagnostic.got))
+				}
+			}
+		})
+	}
 }
