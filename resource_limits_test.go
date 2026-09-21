@@ -206,7 +206,139 @@ func TestCancellationUnblocksBufferedPublicBodyReads(t *testing.T) {
 	}
 }
 
+func TestPreCanceledPublicGenerationSkipsCredentialAndTransport(t *testing.T) {
+	tests := []struct {
+		name string
+		call func(*Client, context.Context) error
+	}{
+		{name: "CreateChatCompletion", call: func(client *Client, ctx context.Context) error {
+			_, err := client.CreateChatCompletion(ctx, validChatRequest())
+			return err
+		}},
+		{name: "CreateResponse", call: func(client *Client, ctx context.Context) error {
+			_, err := client.CreateResponse(ctx, validResponsesRequest())
+			return err
+		}},
+		{name: "StreamChatCompletion", call: func(client *Client, ctx context.Context) error {
+			_, err := client.StreamChatCompletion(ctx, validChatRequest())
+			return err
+		}},
+		{name: "StreamResponse", call: func(client *Client, ctx context.Context) error {
+			_, err := client.StreamResponse(ctx, validResponsesRequest())
+			return err
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clearCredentialEnvironment(t)
+			source := &transportTokenSource{token: "must-not-be-resolved"}
+			var requests atomic.Int32
+			client, err := NewClient(WithOIDCTokenSource(source), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				requests.Add(1)
+				return nil, errors.New("must not send")
+			})}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			err = test.call(client, ctx)
+			var transportErr *TransportError
+			if !errors.As(err, &transportErr) || transportErr.Operation() != "send request" || !errors.Is(err, context.Canceled) {
+				t.Fatalf("error = %T %v, want send-request TransportError wrapping context.Canceled", err, err)
+			}
+			if got := source.callCount(); got != 0 {
+				t.Fatalf("token source calls = %d, want 0", got)
+			}
+			if got := requests.Load(); got != 0 {
+				t.Fatalf("transport calls = %d, want 0", got)
+			}
+		})
+	}
+}
+
+func TestCancellationUnblocksStreamingNon200BodyReads(t *testing.T) {
+	prefix := []byte(`{"error":{"message":"safe message","type":"gateway_error","code":"blocked"},"requestId":"request-id","responseId":"response-id","generationId":"generation-id"}`)
+	tests := []struct {
+		name string
+		call func(*Client, context.Context) error
+	}{
+		{name: "StreamChatCompletion", call: func(client *Client, ctx context.Context) error {
+			_, err := client.StreamChatCompletion(ctx, validChatRequest())
+			return err
+		}},
+		{name: "StreamResponse", call: func(client *Client, ctx context.Context) error {
+			_, err := client.StreamResponse(ctx, validResponsesRequest())
+			return err
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body := newBlockedBufferedBodyWithPrefix(prefix)
+			var requests atomic.Int32
+			var retryWaits atomic.Int32
+			client, err := NewClient(
+				WithAPIKey("key"),
+				WithRetryPolicy(RetryPolicy{MaxAttempts: 3}),
+				withRetryHooks(retryHooks{now: time.Now, jitter: func() float64 { return 0 }, sleep: func(context.Context, time.Duration) error { retryWaits.Add(1); return nil }}),
+				WithHTTPClient(&http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+					requests.Add(1)
+					return &http.Response{StatusCode: http.StatusServiceUnavailable, Header: http.Header{"Retry-After": {"7"}, "X-Preserved": {"yes"}}, Body: body, Request: request}, nil
+				})}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			result := make(chan error, 1)
+			go func() { result <- test.call(client, ctx) }()
+			select {
+			case <-body.readStarted:
+			case <-time.After(time.Second):
+				t.Fatal("streaming error body read did not block")
+			}
+			cancel()
+			var callErr error
+			select {
+			case callErr = <-result:
+			case <-time.After(time.Second):
+				t.Fatal("cancellation did not unblock streaming error body read")
+			}
+			if !errors.Is(callErr, context.Canceled) {
+				t.Fatalf("error = %T %v, want context cancellation", callErr, callErr)
+			}
+			var responseErr *ResponseError
+			if !errors.As(callErr, &responseErr) {
+				t.Fatalf("error = %T, want ResponseError", callErr)
+			}
+			if responseErr.StatusCode() != http.StatusServiceUnavailable || responseErr.Message() != "safe message" || responseErr.Type() != "gateway_error" || responseErr.Code() != "blocked" || responseErr.RequestID() != "request-id" || responseErr.ResponseID() != "response-id" || responseErr.GenerationID() != "generation-id" {
+				t.Fatalf("response metadata was not preserved: %#v", responseErr)
+			}
+			if retryAfter, ok := responseErr.RetryAfter(); !ok || retryAfter != 7*time.Second {
+				t.Fatalf("Retry-After = %v, %v; want 7s, true", retryAfter, ok)
+			}
+			if raw := responseErr.RawResponseBody(); len(raw) > 1<<20 || !bytes.Equal(raw, prefix) || responseErr.BodyTruncated() {
+				t.Fatalf("raw diagnostic length/truncation = %d/%v", len(raw), responseErr.BodyTruncated())
+			}
+			if strings.Contains(callErr.Error(), "safe message") || strings.Contains(callErr.Error(), "request-id") {
+				t.Fatalf("formatted error exposed response diagnostics: %q", callErr)
+			}
+			if got := body.closeCalls.Load(); got != 1 {
+				t.Fatalf("body close calls = %d, want 1", got)
+			}
+			if got := requests.Load(); got != 1 {
+				t.Fatalf("requests = %d, want 1 (no retry or replay after response receipt)", got)
+			}
+			if got := retryWaits.Load(); got != 0 {
+				t.Fatalf("retry waits = %d, want 0", got)
+			}
+		})
+	}
+}
+
 type blockedBufferedBody struct {
+	prefix      []byte
+	offset      int
 	readStarted chan struct{}
 	unblock     chan struct{}
 	readOnce    sync.Once
@@ -218,7 +350,16 @@ func newBlockedBufferedBody() *blockedBufferedBody {
 	return &blockedBufferedBody{readStarted: make(chan struct{}), unblock: make(chan struct{})}
 }
 
-func (body *blockedBufferedBody) Read([]byte) (int, error) {
+func newBlockedBufferedBodyWithPrefix(prefix []byte) *blockedBufferedBody {
+	return &blockedBufferedBody{prefix: append([]byte(nil), prefix...), readStarted: make(chan struct{}), unblock: make(chan struct{})}
+}
+
+func (body *blockedBufferedBody) Read(dst []byte) (int, error) {
+	if body.offset < len(body.prefix) {
+		n := copy(dst, body.prefix[body.offset:])
+		body.offset += n
+		return n, nil
+	}
 	body.readOnce.Do(func() { close(body.readStarted) })
 	<-body.unblock
 	return 0, errors.New("body closed during read")

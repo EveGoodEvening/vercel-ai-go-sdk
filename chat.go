@@ -220,6 +220,10 @@ func (client *Client) CreateChatCompletion(ctx context.Context, request ChatComp
 }
 
 func (client *Client) executeChatCompletionRequest(ctx context.Context, payload []byte) (rawEvaluationResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return rawEvaluationResponse{}, &TransportError{operation: "send request", cause: err}
+	}
+
 	authorization, _, err := client.config.credential.authorization(ctx)
 	if err != nil {
 		return rawEvaluationResponse{}, err

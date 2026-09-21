@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"sync"
 	"time"
-
-	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 )
 
 const maxResponseStreamEvents = 10000
@@ -81,6 +79,10 @@ func (client *Client) StreamResponse(ctx context.Context, request ResponsesReque
 	if err != nil {
 		return nil, &TransportError{operation: "encode request", cause: err}
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, &TransportError{operation: "send request", cause: err}
+	}
+
 	authorization, _, err := client.config.credential.authorization(ctx)
 	if err != nil {
 		return nil, err
@@ -97,7 +99,7 @@ func (client *Client) StreamResponse(ctx context.Context, request ResponsesReque
 		return nil, &TransportError{operation: "send request", cause: err}
 	}
 	if resp.StatusCode != http.StatusOK {
-		capture := httpx.ReadAndClose(resp.Body)
+		capture := readAndCloseResponse(ctx, resp.Body)
 		now := time.Now()
 		if client.config.retryHooks.now != nil {
 			now = client.config.retryHooks.now()
