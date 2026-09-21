@@ -67,11 +67,15 @@ func encodeResponsesRequestWithBuiltInTools(request ResponsesRequest, builtInToo
 			tools = append(tools, v)
 		}
 		for _, tool := range builtInTools {
-			switch tool.(type) {
+			switch tool := tool.(type) {
 			case ResponseWebSearchTool, *ResponseWebSearchTool:
 				tools = append(tools, map[string]any{"type": "web_search", "search_context_size": "low"})
 			case ResponseXSearchTool, *ResponseXSearchTool:
 				tools = append(tools, map[string]any{"type": "x_search"})
+			case ResponseXSearchOptionsTool:
+				tools = append(tools, responseXSearchOptionsWire(tool))
+			case *ResponseXSearchOptionsTool:
+				tools = append(tools, responseXSearchOptionsWire(*tool))
 			}
 		}
 		put("tools", tools)
@@ -139,4 +143,28 @@ func encodeResponsesRequestWithBuiltInTools(request ResponsesRequest, builtInToo
 		put("prompt_cache_key", *request.PromptCacheKey)
 	}
 	return json.Marshal(wire)
+}
+
+func responseXSearchOptionsWire(tool ResponseXSearchOptionsTool) map[string]any {
+	wire := make(map[string]any, 7)
+	wire["type"] = "x_search"
+	if tool.AllowedXHandles != nil {
+		wire["allowed_x_handles"] = tool.AllowedXHandles
+	}
+	if tool.ExcludedXHandles != nil {
+		wire["excluded_x_handles"] = tool.ExcludedXHandles
+	}
+	if tool.FromDate != nil {
+		wire["from_date"] = *tool.FromDate
+	}
+	if tool.ToDate != nil {
+		wire["to_date"] = *tool.ToDate
+	}
+	if tool.EnableImageUnderstanding != nil {
+		wire["enable_image_understanding"] = *tool.EnableImageUnderstanding
+	}
+	if tool.EnableVideoUnderstanding != nil {
+		wire["enable_video_understanding"] = *tool.EnableVideoUnderstanding
+	}
+	return wire
 }

@@ -545,6 +545,106 @@ func TestResponsesBuiltInXSearchExactWireAndRawBoundaries(t *testing.T) {
 	}
 }
 
+func TestResponsesBuiltInXSearchOptionsExactWire(t *testing.T) {
+	from, to := "2026-01-02", "2026-03-04"
+	falseValue, trueValue := false, true
+	cases := []struct {
+		name string
+		tool ResponseBuiltInTool
+		want string
+	}{
+		{
+			name: "omitted",
+			tool: ResponseXSearchOptionsTool{},
+			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"type":"x_search"}]}`,
+		},
+		{
+			name: "non-nil empty slices and false pointers",
+			tool: &ResponseXSearchOptionsTool{AllowedXHandles: []string{}, ExcludedXHandles: []string{}, EnableImageUnderstanding: &falseValue, EnableVideoUnderstanding: &falseValue},
+			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"allowed_x_handles":[],"enable_image_understanding":false,"enable_video_understanding":false,"excluded_x_handles":[],"type":"x_search"}]}`,
+		},
+		{
+			name: "singletons dates and true pointers",
+			tool: ResponseXSearchOptionsTool{AllowedXHandles: []string{"alice"}, FromDate: &from, ToDate: &to, EnableImageUnderstanding: &trueValue, EnableVideoUnderstanding: &trueValue},
+			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"allowed_x_handles":["alice"],"enable_image_understanding":true,"enable_video_understanding":true,"from_date":"2026-01-02","to_date":"2026-03-04","type":"x_search"}]}`,
+		},
+		{
+			name: "allowed documented maximum and duplicates",
+			tool: ResponseXSearchOptionsTool{AllowedXHandles: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "a"}},
+			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"allowed_x_handles":["a","b","c","d","e","f","g","h","i","a"],"type":"x_search"}]}`,
+		},
+		{
+			name: "excluded documented maximum and duplicates",
+			tool: ResponseXSearchOptionsTool{ExcludedXHandles: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "a"}},
+			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"excluded_x_handles":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","a"],"type":"x_search"}]}`,
+		},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{test.tool}}, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != test.want {
+				t.Fatalf("wire\n got: %s\nwant: %s", got, test.want)
+			}
+		})
+	}
+
+	mixed := ResponsesBuiltInToolsRequest{
+		Request: ResponsesRequest{Model: "spacexai/future-model", Input: ResponseTextInput("news"), Tools: []ResponseTool{{Name: "lookup", Parameters: map[string]any{}}}},
+		Tools:   []ResponseBuiltInTool{ResponseXSearchOptionsTool{AllowedXHandles: []string{"same", "same"}}, ResponseWebSearchTool{}, ResponseXSearchTool{}, &ResponseXSearchOptionsTool{ExcludedXHandles: []string{"blocked"}}},
+	}
+	wire, err := encodeResponsesBuiltInToolsRequest(mixed, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantMixed := `{"input":"news","model":"spacexai/future-model","stream":true,"tools":[{"name":"lookup","parameters":{},"type":"function"},{"allowed_x_handles":["same","same"],"type":"x_search"},{"search_context_size":"low","type":"web_search"},{"type":"x_search"},{"excluded_x_handles":["blocked"],"type":"x_search"}]}`
+	if string(wire) != wantMixed {
+		t.Fatalf("mixed wire\n got: %s\nwant: %s", wire, wantMixed)
+	}
+}
+
+func TestResponsesBuiltInXSearchOptionsPermissiveValidation(t *testing.T) {
+	badlyFormattedFrom, earlierTo := "not-a-date", "1900-01-01"
+	allowed := make([]string, 11)
+	for i := range allowed {
+		allowed[i] = "duplicate-or otherwise unvalidated"
+	}
+	excluded := make([]string, 21)
+	for i := range excluded {
+		excluded[i] = "duplicate-or otherwise unvalidated"
+	}
+	for _, tool := range []ResponseBuiltInTool{
+		ResponseXSearchOptionsTool{AllowedXHandles: allowed, FromDate: &badlyFormattedFrom, ToDate: &earlierTo},
+		ResponseXSearchOptionsTool{ExcludedXHandles: excluded},
+	} {
+		request := ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{tool}}
+		if err := validateResponsesBuiltInToolsRequest(request); err != nil {
+			t.Fatalf("permissive options rejected: %v", err)
+		}
+	}
+}
+
+func TestResponsesBuiltInXSearchOptionsGenericBounds(t *testing.T) {
+	overlong := strings.Repeat("x", maxResponseValueBytes+1)
+	tooMany := make([]string, maxResponseMembers+1)
+	cases := []struct {
+		tool ResponseXSearchOptionsTool
+		path string
+	}{
+		{ResponseXSearchOptionsTool{AllowedXHandles: []string{overlong}}, `$["tools"][0]["allowed_x_handles"][0]`},
+		{ResponseXSearchOptionsTool{ExcludedXHandles: tooMany}, `$["tools"][0]["excluded_x_handles"]`},
+		{ResponseXSearchOptionsTool{FromDate: &overlong}, `$["tools"][0]["from_date"]`},
+	}
+	for _, test := range cases {
+		err := validateResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{test.tool}})
+		if err == nil || err.Path() != test.path {
+			t.Fatalf("validation error = %#v, want path %s", err, test.path)
+		}
+	}
+}
+
 func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
 	clearCredentialEnvironment(t)
 	source := &transportTokenSource{token: "token"}
@@ -558,6 +658,8 @@ func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
 	}
 	var typedNil *ResponseWebSearchTool
 	var typedNilXSearch *ResponseXSearchTool
+	var typedNilXSearchOptions *ResponseXSearchOptionsTool
+	emptyDate := ""
 	tooManyFunctions := make([]ResponseTool, maxResponseMembers)
 	for i := range tooManyFunctions {
 		tooManyFunctions[i] = ResponseTool{Name: "f", Parameters: map[string]any{}}
@@ -573,6 +675,10 @@ func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
 		{"typed nil x_search tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{typedNilXSearch}}, `$["tools"][0]`},
 		{"unsupported tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{unsupportedResponseBuiltInTool{}}}, `$["tools"][0]`},
 		{"combined tool limit", ResponsesBuiltInToolsRequest{Request: ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Tools: tooManyFunctions}, Tools: []ResponseBuiltInTool{ResponseXSearchTool{}}}, `$["tools"]`},
+		{"typed nil x_search options tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{typedNilXSearchOptions}}, `$["tools"][0]`},
+		{"mutually exclusive x handles", ResponsesBuiltInToolsRequest{Request: ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Tools: []ResponseTool{{Name: "f", Parameters: map[string]any{}}}}, Tools: []ResponseBuiltInTool{ResponseXSearchOptionsTool{AllowedXHandles: []string{"private-allowed"}, ExcludedXHandles: []string{"private-excluded"}}}}, `$["tools"][1]["excluded_x_handles"]`},
+		{"empty from date", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{ResponseXSearchOptionsTool{FromDate: &emptyDate}}}, `$["tools"][0]["from_date"]`},
+		{"empty to date", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{ResponseXSearchOptionsTool{ToDate: &emptyDate}}}, `$["tools"][0]["to_date"]`},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -590,6 +696,9 @@ func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
 				var validation *ValidationError
 				if !errors.As(err, &validation) || validation.Path() != test.path {
 					t.Fatalf("error = %T %v, want ValidationError at %s", err, err, test.path)
+				}
+				if strings.Contains(err.Error(), "private-allowed") || strings.Contains(err.Error(), "private-excluded") {
+					t.Fatalf("validation error leaked field value: %v", err)
 				}
 			}
 		})
@@ -618,6 +727,8 @@ func TestResponsesBuiltInPublicContractAndLegacyCompatibility(t *testing.T) {
 	var _ ResponseBuiltInTool = ResponseXSearchTool{}
 	var _ ResponseBuiltInTool = (*ResponseXSearchTool)(nil)
 	_ = ResponsesBuiltInToolsRequest{ResponsesRequest{}, []ResponseBuiltInTool{ResponseWebSearchTool{}, ResponseXSearchTool{}}}
+	var _ ResponseBuiltInTool = ResponseXSearchOptionsTool{}
+	var _ ResponseBuiltInTool = (*ResponseXSearchOptionsTool)(nil)
 	var create func(*Client, context.Context, ResponsesBuiltInToolsRequest) (*ResponseResult, error) = (*Client).CreateResponseWithBuiltInTools
 	var stream func(*Client, context.Context, ResponsesBuiltInToolsRequest) (*ResponseStream, error) = (*Client).StreamResponseWithBuiltInTools
 	_ = create
@@ -626,6 +737,27 @@ func TestResponsesBuiltInPublicContractAndLegacyCompatibility(t *testing.T) {
 		t.Fatalf("ResponseXSearchTool must remain fieldless, got %d fields and size %d", typ.NumField(), typ.Size())
 	}
 	wrapper := reflect.TypeOf(ResponsesBuiltInToolsRequest{})
+	optionsType := reflect.TypeOf(ResponseXSearchOptionsTool{})
+	wantOptionFields := []struct {
+		name   string
+		typeOf reflect.Type
+	}{
+		{"AllowedXHandles", reflect.TypeOf([]string(nil))},
+		{"ExcludedXHandles", reflect.TypeOf([]string(nil))},
+		{"FromDate", reflect.TypeOf((*string)(nil))},
+		{"ToDate", reflect.TypeOf((*string)(nil))},
+		{"EnableImageUnderstanding", reflect.TypeOf((*bool)(nil))},
+		{"EnableVideoUnderstanding", reflect.TypeOf((*bool)(nil))},
+	}
+	if optionsType.NumField() != len(wantOptionFields) {
+		t.Fatalf("ResponseXSearchOptionsTool fields = %d, want %d", optionsType.NumField(), len(wantOptionFields))
+	}
+	for i, want := range wantOptionFields {
+		field := optionsType.Field(i)
+		if field.Name != want.name || field.Type != want.typeOf {
+			t.Fatalf("ResponseXSearchOptionsTool field %d = %s %v, want %s %v", i, field.Name, field.Type, want.name, want.typeOf)
+		}
+	}
 	if wrapper.NumField() != 2 || wrapper.Field(0).Name != "Request" || wrapper.Field(0).Type != reflect.TypeOf(ResponsesRequest{}) || wrapper.Field(1).Name != "Tools" || wrapper.Field(1).Type != reflect.TypeOf([]ResponseBuiltInTool(nil)) {
 		t.Fatalf("ResponsesBuiltInToolsRequest contract changed: %v", wrapper)
 	}

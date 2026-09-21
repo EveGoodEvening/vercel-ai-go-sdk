@@ -220,11 +220,57 @@ func validateResponsesBuiltInToolsRequest(r ResponsesBuiltInToolsRequest) *Valid
 		if nilValue(tool) {
 			return validationError(path, "must be a non-nil built-in tool")
 		}
-		switch tool.(type) {
+		switch tool := tool.(type) {
 		case ResponseWebSearchTool, *ResponseWebSearchTool, ResponseXSearchTool, *ResponseXSearchTool:
+		case ResponseXSearchOptionsTool:
+			if err := validateResponseXSearchOptionsTool(tool, path); err != nil {
+				return err
+			}
+		case *ResponseXSearchOptionsTool:
+			if err := validateResponseXSearchOptionsTool(*tool, path); err != nil {
+				return err
+			}
 		default:
 			return validationError(path, "built-in tool type is unsupported")
 		}
+	}
+	return nil
+}
+
+func validateResponseXSearchOptionsTool(tool ResponseXSearchOptionsTool, path string) *ValidationError {
+	allowedPath := memberPath(path, "allowed_x_handles")
+	excludedPath := memberPath(path, "excluded_x_handles")
+	if len(tool.AllowedXHandles) > 0 && len(tool.ExcludedXHandles) > 0 {
+		return validationError(excludedPath, "cannot be used with allowed_x_handles")
+	}
+	if len(tool.AllowedXHandles) > maxResponseMembers {
+		return validationError(allowedPath, "must contain at most 10000 items")
+	}
+	for i, handle := range tool.AllowedXHandles {
+		if err := stringBound(handle, indexPath(allowedPath, i)); err != nil {
+			return err
+		}
+	}
+	if len(tool.ExcludedXHandles) > maxResponseMembers {
+		return validationError(excludedPath, "must contain at most 10000 items")
+	}
+	for i, handle := range tool.ExcludedXHandles {
+		if err := stringBound(handle, indexPath(excludedPath, i)); err != nil {
+			return err
+		}
+	}
+	if err := validateResponseXSearchDate(tool.FromDate, memberPath(path, "from_date")); err != nil {
+		return err
+	}
+	return validateResponseXSearchDate(tool.ToDate, memberPath(path, "to_date"))
+}
+
+func validateResponseXSearchDate(date *string, path string) *ValidationError {
+	if err := stringPointer(date, path); err != nil {
+		return err
+	}
+	if date != nil && *date == "" {
+		return validationError(path, "must be nonempty")
 	}
 	return nil
 }
