@@ -1045,8 +1045,8 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 ```
 
 - [x] Final post-fix implementation verification evidence: gofmt/diff-check passed, and workspace diagnostics reported no issues across the nine owned files.
-- [x] After the `Client` documentation and both examples' path-presence corrections, the exact env-scrubbed `go test ./...` command passed; the exact env-scrubbed `go test ./examples/...` command passed; and the exact env-scrubbed `go doc -all .` command completed.
-- [x] After those closure corrections, the exact env-scrubbed `./scripts/verify-local-consumer.sh` command passed. The audit also retains the earlier corrections for legitimate exported `Path` and `MarshalJSON` symbols, internal receiver noise, and the `RetryAfter` arity.
+- [x] After the shared `TokenSource` and `RetryPolicy` multi-surface comment corrections, the exact env-scrubbed `go test ./...` command passed; the exact env-scrubbed `go test ./examples/...` command passed; and the exact env-scrubbed `go doc -all .` command completed.
+- [x] After those shared-comment corrections, the exact env-scrubbed `./scripts/verify-local-consumer.sh` command passed. The audit also retains the earlier corrections for legitimate exported `Path` and `MarshalJSON` symbols, internal receiver noise, and the `RetryAfter` arity.
 - [!] Paid Live status remains **NOT RUN**. No Chunk 23 documentation, example, hermetic test, documentation command, or external-consumer result substitutes for Chunk 22 Live evidence.
 
 - [x] All three review findings were fixed and verified: the support matrix now distinguishes the required endpoint and search categories; the generation example no longer logs unsanitized identifiers; and the external-consumer method audit uses receiver-qualified method identity rather than method name alone. The five implementation rows remain `[-]` until independent reviewers confirm a clean re-review; review completion and blocker accounting remain unchecked.
@@ -1056,6 +1056,7 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 - [x] Clean certification found contradictory Unreleased support and non-goal claims in `CHANGELOG.md`. The contradiction was corrected within the expanded eight-file documentation scope, and the generation-support correction is verified. Final acceptance remains open pending the last clean certification.
 - [x] Closure certification found a stale exported `Client` comment in `client.go` that still described the client as evaluation-only. The comment was corrected within the expanded nine-file documentation/API-comment scope, and the fix is verified.
 - [x] Closure certification also found raw `ResponseValidationError.Path()` logging in both runnable examples. Both examples now report only path presence, and the privacy-safe corrections are verified. Final acceptance remains open pending closure certification.
+- [x] A further closure review found stale evaluation-only comments on exported `TokenSource` and `RetryPolicy`. The multi-surface documentation corrections are implemented and verified. Final acceptance remains open pending final certification.
 
 **Review/blocker accounting:**
 

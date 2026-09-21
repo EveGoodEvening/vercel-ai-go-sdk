@@ -52,16 +52,17 @@ type clientConfig struct {
 type Option func(*clientConfig) error
 
 // TokenSource supplies an OIDC bearer token once per HTTP attempt using the
-// Evaluate context. Errors and blank tokens become a TransportError whose
-// Operation is "resolve OIDC token"; no credential fallback occurs.
+// current operation's request context. Errors and blank tokens become a
+// TransportError whose Operation is "resolve OIDC token"; no credential fallback occurs.
 type TokenSource interface {
 	Token(context.Context) (string, error)
 }
 
 // RetryPolicy configures bounded retries. MaxAttempts counts the initial
 // request: zero and one mean one attempt, and 2 through 10 enable retries that
-// may duplicate billable, non-idempotent evaluation work. With retries enabled,
-// zero InitialDelay, MaxDelay, and Multiplier resolve to 100*time.Millisecond,
+// may duplicate billable, non-idempotent generation or evaluation work.
+// Streaming responses are not retried after response headers are received. With
+// retries enabled, zero InitialDelay, MaxDelay, and Multiplier resolve to 100*time.Millisecond,
 // 2*time.Second, and 2; zero Jitter disables jitter. Explicit InitialDelay must
 // be 1ms..1m, MaxDelay 1ms..5m and at least InitialDelay, Multiplier 1..10,
 // and Jitter 0..1. Delay before retry r (starting at 1) is the saturated
