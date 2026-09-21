@@ -259,20 +259,10 @@ func validateResponseXSearchOptionsTool(tool ResponseXSearchOptionsTool, path st
 			return err
 		}
 	}
-	if err := validateResponseXSearchDate(tool.FromDate, memberPath(path, "from_date")); err != nil {
+	if err := stringPointer(tool.FromDate, memberPath(path, "from_date")); err != nil {
 		return err
 	}
-	return validateResponseXSearchDate(tool.ToDate, memberPath(path, "to_date"))
-}
-
-func validateResponseXSearchDate(date *string, path string) *ValidationError {
-	if err := stringPointer(date, path); err != nil {
-		return err
-	}
-	if date != nil && *date == "" {
-		return validationError(path, "must be nonempty")
-	}
-	return nil
+	return stringPointer(tool.ToDate, memberPath(path, "to_date"))
 }
 
 func validModelID(s string) bool { i := strings.IndexByte(s, '/'); return i > 0 && i < len(s)-1 }

@@ -458,14 +458,14 @@ func TestResponsesBuiltInXSearchExactWireAndRawBoundaries(t *testing.T) {
 	request := ResponsesBuiltInToolsRequest{
 		Request: ResponsesRequest{Model: "spacexai/grok-4.6", Input: ResponseTextInput("news"), Tools: []ResponseTool{function}},
 		Tools: []ResponseBuiltInTool{
-			&ResponseWebSearchTool{}, ResponseXSearchTool{}, &ResponseXSearchTool{}, ResponseWebSearchTool{}, ResponseXSearchTool{},
+			&ResponseWebSearchTool{}, ResponseXSearchTool{}, &ResponseXSearchTool{}, ResponseWebSearchTool{}, ResponseXSearchOptionsTool{AllowedXHandles: []string{"space-x"}},
 		},
 	}
 	buffered, err := encodeResponsesBuiltInToolsRequest(request, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantBuffered := `{"input":"news","model":"spacexai/grok-4.6","stream":false,"tools":[{"name":"lookup","parameters":{"type":"object"},"type":"function"},{"search_context_size":"low","type":"web_search"},{"type":"x_search"},{"type":"x_search"},{"search_context_size":"low","type":"web_search"},{"type":"x_search"}]}`
+	wantBuffered := `{"input":"news","model":"spacexai/grok-4.6","stream":false,"tools":[{"name":"lookup","parameters":{"type":"object"},"type":"function"},{"search_context_size":"low","type":"web_search"},{"type":"x_search"},{"type":"x_search"},{"search_context_size":"low","type":"web_search"},{"allowed_x_handles":["space-x"],"type":"x_search"}]}`
 	if string(buffered) != wantBuffered {
 		t.Fatalf("buffered wire\n got: %s\nwant: %s", buffered, wantBuffered)
 	}
@@ -519,6 +519,8 @@ func TestResponsesBuiltInXSearchExactWireAndRawBoundaries(t *testing.T) {
 	}
 
 	rawEvent := []byte(`{"type":"response.x_search_call.future","opaque":[1,true]}`)
+	streamRequest := ResponsesBuiltInToolsRequest{Request: request.Request, Tools: []ResponseBuiltInTool{&ResponseXSearchOptionsTool{ExcludedXHandles: []string{"noise"}}}}
+	wantStreaming := `{"input":"news","model":"spacexai/grok-4.6","stream":true,"tools":[{"name":"lookup","parameters":{"type":"object"},"type":"function"},{"excluded_x_handles":["noise"],"type":"x_search"}]}`
 	var streamBody []byte
 	streamClient, err := NewClient(WithAPIKey("key"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		streamBody, _ = io.ReadAll(req.Body)
@@ -528,7 +530,7 @@ func TestResponsesBuiltInXSearchExactWireAndRawBoundaries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := streamClient.StreamResponseWithBuiltInTools(context.Background(), request)
+	stream, err := streamClient.StreamResponseWithBuiltInTools(context.Background(), streamRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -540,13 +542,13 @@ func TestResponsesBuiltInXSearchExactWireAndRawBoundaries(t *testing.T) {
 	if !ok || event.Type != "response.x_search_call.future" || event.Event != "future" || event.ID != "search-1" || !bytes.Equal(event.RawJSON(), rawEvent) {
 		t.Fatalf("raw event = %#v / %q", stream.Event(), event.RawJSON())
 	}
-	if got, want := string(streamBody), strings.Replace(wantBuffered, `"stream":false`, `"stream":true`, 1); got != want {
-		t.Fatalf("sent streaming wire\n got: %s\nwant: %s", got, want)
+	if got := string(streamBody); got != wantStreaming {
+		t.Fatalf("sent streaming wire\n got: %s\nwant: %s", got, wantStreaming)
 	}
 }
 
 func TestResponsesBuiltInXSearchOptionsExactWire(t *testing.T) {
-	from, to := "2026-01-02", "2026-03-04"
+	from, to, empty := "2026-01-02", "2026-03-04", ""
 	falseValue, trueValue := false, true
 	cases := []struct {
 		name string
@@ -564,19 +566,25 @@ func TestResponsesBuiltInXSearchOptionsExactWire(t *testing.T) {
 			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"allowed_x_handles":[],"enable_image_understanding":false,"enable_video_understanding":false,"excluded_x_handles":[],"type":"x_search"}]}`,
 		},
 		{
-			name: "singletons dates and true pointers",
-			tool: ResponseXSearchOptionsTool{AllowedXHandles: []string{"alice"}, FromDate: &from, ToDate: &to, EnableImageUnderstanding: &trueValue, EnableVideoUnderstanding: &trueValue},
-			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"allowed_x_handles":["alice"],"enable_image_understanding":true,"enable_video_understanding":true,"from_date":"2026-01-02","to_date":"2026-03-04","type":"x_search"}]}`,
+			name: "present empty dates",
+			tool: ResponseXSearchOptionsTool{FromDate: &empty, ToDate: &empty},
+			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"from_date":"","to_date":"","type":"x_search"}]}`,
+		},
+		{name: "allowed singleton", tool: ResponseXSearchOptionsTool{AllowedXHandles: []string{"alice"}}, want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"allowed_x_handles":["alice"],"type":"x_search"}]}`},
+		{name: "excluded singleton", tool: ResponseXSearchOptionsTool{ExcludedXHandles: []string{"blocked"}}, want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"excluded_x_handles":["blocked"],"type":"x_search"}]}`},
+		{name: "from date singleton", tool: ResponseXSearchOptionsTool{FromDate: &from}, want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"from_date":"2026-01-02","type":"x_search"}]}`},
+		{name: "to date singleton", tool: ResponseXSearchOptionsTool{ToDate: &to}, want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"to_date":"2026-03-04","type":"x_search"}]}`},
+		{name: "image singleton", tool: ResponseXSearchOptionsTool{EnableImageUnderstanding: &trueValue}, want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"enable_image_understanding":true,"type":"x_search"}]}`},
+		{name: "video singleton", tool: ResponseXSearchOptionsTool{EnableVideoUnderstanding: &trueValue}, want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"enable_video_understanding":true,"type":"x_search"}]}`},
+		{
+			name: "allowed maximal",
+			tool: ResponseXSearchOptionsTool{AllowedXHandles: []string{"alice", "alice"}, FromDate: &from, ToDate: &to, EnableImageUnderstanding: &trueValue, EnableVideoUnderstanding: &trueValue},
+			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"allowed_x_handles":["alice","alice"],"enable_image_understanding":true,"enable_video_understanding":true,"from_date":"2026-01-02","to_date":"2026-03-04","type":"x_search"}]}`,
 		},
 		{
-			name: "allowed documented maximum and duplicates",
-			tool: ResponseXSearchOptionsTool{AllowedXHandles: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "a"}},
-			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"allowed_x_handles":["a","b","c","d","e","f","g","h","i","a"],"type":"x_search"}]}`,
-		},
-		{
-			name: "excluded documented maximum and duplicates",
-			tool: ResponseXSearchOptionsTool{ExcludedXHandles: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "a"}},
-			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"excluded_x_handles":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","a"],"type":"x_search"}]}`,
+			name: "excluded maximal",
+			tool: ResponseXSearchOptionsTool{ExcludedXHandles: []string{"blocked", "blocked"}, FromDate: &from, ToDate: &to, EnableImageUnderstanding: &trueValue, EnableVideoUnderstanding: &trueValue},
+			want: `{"input":"hello","model":"provider/model","stream":false,"tools":[{"enable_image_understanding":true,"enable_video_understanding":true,"excluded_x_handles":["blocked","blocked"],"from_date":"2026-01-02","to_date":"2026-03-04","type":"x_search"}]}`,
 		},
 	}
 	for _, test := range cases {
@@ -606,7 +614,7 @@ func TestResponsesBuiltInXSearchOptionsExactWire(t *testing.T) {
 }
 
 func TestResponsesBuiltInXSearchOptionsPermissiveValidation(t *testing.T) {
-	badlyFormattedFrom, earlierTo := "not-a-date", "1900-01-01"
+	badlyFormattedFrom, earlierTo, empty := "not-a-date", "1900-01-01", ""
 	allowed := make([]string, 11)
 	for i := range allowed {
 		allowed[i] = "duplicate-or otherwise unvalidated"
@@ -618,6 +626,7 @@ func TestResponsesBuiltInXSearchOptionsPermissiveValidation(t *testing.T) {
 	for _, tool := range []ResponseBuiltInTool{
 		ResponseXSearchOptionsTool{AllowedXHandles: allowed, FromDate: &badlyFormattedFrom, ToDate: &earlierTo},
 		ResponseXSearchOptionsTool{ExcludedXHandles: excluded},
+		ResponseXSearchOptionsTool{FromDate: &empty, ToDate: &empty},
 	} {
 		request := ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{tool}}
 		if err := validateResponsesBuiltInToolsRequest(request); err != nil {
@@ -659,7 +668,6 @@ func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
 	var typedNil *ResponseWebSearchTool
 	var typedNilXSearch *ResponseXSearchTool
 	var typedNilXSearchOptions *ResponseXSearchOptionsTool
-	emptyDate := ""
 	tooManyFunctions := make([]ResponseTool, maxResponseMembers)
 	for i := range tooManyFunctions {
 		tooManyFunctions[i] = ResponseTool{Name: "f", Parameters: map[string]any{}}
@@ -677,8 +685,6 @@ func TestResponsesBuiltInValidationBeforeCredentialAndNetwork(t *testing.T) {
 		{"combined tool limit", ResponsesBuiltInToolsRequest{Request: ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Tools: tooManyFunctions}, Tools: []ResponseBuiltInTool{ResponseXSearchTool{}}}, `$["tools"]`},
 		{"typed nil x_search options tool", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{typedNilXSearchOptions}}, `$["tools"][0]`},
 		{"mutually exclusive x handles", ResponsesBuiltInToolsRequest{Request: ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Tools: []ResponseTool{{Name: "f", Parameters: map[string]any{}}}}, Tools: []ResponseBuiltInTool{ResponseXSearchOptionsTool{AllowedXHandles: []string{"private-allowed"}, ExcludedXHandles: []string{"private-excluded"}}}}, `$["tools"][1]["excluded_x_handles"]`},
-		{"empty from date", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{ResponseXSearchOptionsTool{FromDate: &emptyDate}}}, `$["tools"][0]["from_date"]`},
-		{"empty to date", ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{ResponseXSearchOptionsTool{ToDate: &emptyDate}}}, `$["tools"][0]["to_date"]`},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
