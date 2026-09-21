@@ -221,7 +221,7 @@ func validateResponsesBuiltInToolsRequest(r ResponsesBuiltInToolsRequest) *Valid
 			return validationError(path, "must be a non-nil built-in tool")
 		}
 		switch tool.(type) {
-		case ResponseWebSearchTool:
+		case ResponseWebSearchTool, *ResponseWebSearchTool:
 		default:
 			return validationError(path, "built-in tool type is unsupported")
 		}

@@ -68,7 +68,7 @@ func encodeResponsesRequestWithBuiltInTools(request ResponsesRequest, builtInToo
 		}
 		for _, tool := range builtInTools {
 			switch tool.(type) {
-			case ResponseWebSearchTool:
+			case ResponseWebSearchTool, *ResponseWebSearchTool:
 				tools = append(tools, map[string]any{"type": "web_search", "search_context_size": "low"})
 			}
 		}
