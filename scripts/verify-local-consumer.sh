@@ -84,10 +84,13 @@ func compileResponses(client *gateway.Client) {
 	var choice gateway.ResponseToolChoice = gateway.ResponseToolChoiceNone
 	var format gateway.ResponseTextFormat = gateway.ResponseTextFormatJSONObject
 	_, _, _, _ = input, item, choice, format
-	builtInTool := gateway.ResponseBuiltInTool(gateway.ResponseWebSearchTool{})
+	webSearchTool := gateway.ResponseBuiltInTool(gateway.ResponseWebSearchTool{})
+	webSearchToolPointer := gateway.ResponseBuiltInTool(&gateway.ResponseWebSearchTool{})
+	xSearchTool := gateway.ResponseBuiltInTool(gateway.ResponseXSearchTool{})
+	xSearchToolPointer := gateway.ResponseBuiltInTool(&gateway.ResponseXSearchTool{})
 	builtInRequest := gateway.ResponsesBuiltInToolsRequest{
 		Request: request,
-		Tools:   []gateway.ResponseBuiltInTool{builtInTool},
+		Tools:   []gateway.ResponseBuiltInTool{webSearchTool, webSearchToolPointer, xSearchTool, xSearchToolPointer},
 	}
 	builtInResult, _ := client.CreateResponseWithBuiltInTools(context.Background(), builtInRequest)
 	_ = builtInResult.RawJSON()
@@ -244,7 +247,7 @@ var allowedTypes = names(
 	"Client", "Option", "TokenSource", "RetryPolicy",
 	"ConfigurationError", "ValidationError", "TransportError", "ResponseError", "ResponseValidationError",
 	"EvaluationRequest", "Question", "BooleanQuestion", "ChoiceQuestion", "ScoreQuestion", "OptionalJSON", "BooleanCriteria", "EvaluationResult", "Rounding", "Usage", "WarningType", "Warning", "ResponseMetadata", "Answer", "BooleanAnswer", "ChoiceAnswer", "ScoreAnswer",
-	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
+	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseXSearchTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
 	"ChatCompletionRequest", "ChatServerToolsRequest", "ChatServerTool", "ChatExaSearchTool", "ChatParallelSearchTool", "ChatPerplexitySearchTool", "ChatTakoSearchTool",
 	"ChatExaSearchType", "ChatExaCategory", "ChatExaVerbosity", "ChatExaSection", "ChatExaText", "ChatExaTextEnabled", "ChatExaTextOptions", "ChatExaHighlights", "ChatExaHighlightsEnabled", "ChatExaHighlightsOptions", "ChatExaExtras", "ChatExaSubpageTarget", "ChatExaSubpageTargetString", "ChatExaSubpageTargetStrings", "ChatExaContents", "ChatExaSearchConfig",
 	"ChatParallelMode", "ChatParallelSourcePolicy", "ChatParallelExcerpts", "ChatParallelFetchPolicy", "ChatParallelSearchConfig",

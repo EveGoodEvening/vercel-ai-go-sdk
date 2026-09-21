@@ -56,13 +56,17 @@ func compilePublicContract() {
 		Metadata: map[string]string{"key": "value"}, Caching: new("auto"), CacheAnchorItems: new(1), CacheTTL: new("5m"), PromptCacheKey: new("cache"),
 	}
 	_ = gateway.ResponsesRequest{Model: "provider/model", Input: gateway.ResponseTextInput("hello"), ToolChoice: gateway.ResponseToolChoiceAuto, Text: &gateway.ResponseText{Format: gateway.ResponseTextFormatText}}
-	var builtInTool gateway.ResponseBuiltInTool = gateway.ResponseWebSearchTool{}
+	var webSearchTool gateway.ResponseBuiltInTool = gateway.ResponseWebSearchTool{}
+	var webSearchToolPointer gateway.ResponseBuiltInTool = &gateway.ResponseWebSearchTool{}
+	var xSearchTool gateway.ResponseBuiltInTool = gateway.ResponseXSearchTool{}
+	var xSearchToolPointer gateway.ResponseBuiltInTool = &gateway.ResponseXSearchTool{}
+	_, _, _, _ = webSearchTool, webSearchToolPointer, xSearchTool, xSearchToolPointer
 	_ = gateway.ResponsesBuiltInToolsRequest{
 		Request: gateway.ResponsesRequest{Model: "provider/model", Input: gateway.ResponseTextInput("hello")},
-		Tools:   []gateway.ResponseBuiltInTool{builtInTool},
+		Tools:   []gateway.ResponseBuiltInTool{webSearchTool, xSearchTool},
 	}
 	// Keep an external unkeyed literal as an exact wrapper-field compile check.
-	_ = gateway.ResponsesBuiltInToolsRequest{gateway.ResponsesRequest{}, []gateway.ResponseBuiltInTool{gateway.ResponseWebSearchTool{}}}
+	_ = gateway.ResponsesBuiltInToolsRequest{gateway.ResponsesRequest{}, []gateway.ResponseBuiltInTool{gateway.ResponseWebSearchTool{}, gateway.ResponseXSearchTool{}}}
 	_ = []gateway.ResponseToolChoiceMode{gateway.ResponseToolChoiceAuto, gateway.ResponseToolChoiceRequired, gateway.ResponseToolChoiceNone}
 	description = "description"
 	strict = true
@@ -312,6 +316,12 @@ func TestExternalContractResponsesBuiltInToolsRequestFields(t *testing.T) {
 func TestExternalContractResponseWebSearchToolIsFieldless(t *testing.T) {
 	if got := reflect.TypeOf(gateway.ResponseWebSearchTool{}).NumField(); got != 0 {
 		t.Fatalf("ResponseWebSearchTool field count = %d, want 0", got)
+	}
+}
+
+func TestExternalContractResponseXSearchToolIsFieldless(t *testing.T) {
+	if got := reflect.TypeOf(gateway.ResponseXSearchTool{}).NumField(); got != 0 {
+		t.Fatalf("ResponseXSearchTool field count = %d, want 0", got)
 	}
 }
 
