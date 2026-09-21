@@ -2,11 +2,11 @@
 
 **Evidence reviewed:** 2026-09-20
 
-## Release decision
+## Continuation release decision
 
 Gateway-native xAI `x_search` is unsupported in this SDK. The SDK exports no `x_search` API, sends no `x_search` request, and contains no live Gateway `x_search` probe. This decision does not deny that direct xAI supports the tool; it keeps a direct-xAI contract separate from the unconfirmed Vercel AI Gateway contract.
 
-The implemented public surface is the separate [Evaluation Model V4 provider protocol](evaluation.md). Evaluation support does not provide, imply, or transport either Gateway-native or direct-xAI `x_search`.
+The implemented contracts are the provider [Evaluation Model V4 protocol](evaluation.md) plus the public Responses and Chat APIs in buffered and streaming forms. None provides, implies, or transports either Gateway-native or direct-xAI `x_search`.
 
 ## Confirmed direct-xAI behavior
 
@@ -22,7 +22,7 @@ The evidence baseline for this repository is `ai@7.0.107`, `@ai-sdk/gateway@4.0.
 - Public Gateway `/v1` documentation and model metadata do not establish a native xAI `x_search` endpoint, request schema, or native response evidence shape.
 - A model advertising generic tool capability is insufficient evidence for a provider-native tool. Generic tool calling does not prove that Gateway accepts `type: "x_search"` or returns native `x_search_call` evidence.
 
-Accordingly, this evaluation-focused Go SDK does not infer a Gateway contract, alias direct xAI behavior into Gateway, or add speculative API surface.
+Accordingly, this Go SDK does not infer a Gateway contract, alias direct xAI behavior into Gateway, or add speculative API surface.
 
 ## Evidence required to reconsider
 
@@ -31,7 +31,7 @@ Only a future reviewed implementation plan may change this decision. It must be 
 1. a first-party Gateway wire contract identifying the endpoint, protocol/request schema, native response evidence shape, and an explicit suitable model ID; and
 2. an authenticated contract result demonstrating native `x_search_call` evidence rather than merely generated text.
 
-Any future probe must separately define credential inputs, explicit cost acknowledgement, sanitization rules, and success criteria. Until all prerequisites exist, no placeholder test, skipped live test, invented request, exported API, or implementation claim belongs in this repository. The blocked probe is outside the evaluation release and is not a release prerequisite.
+Any future probe must separately define credential inputs, explicit cost acknowledgement, sanitization rules, and success criteria. Until all prerequisites exist, no placeholder test, skipped live test, invented request, exported API, or implementation claim belongs in this repository. The blocked probe is outside the current continuation release and is not a release prerequisite.
 
 ## Reviewed sources
 
@@ -42,4 +42,4 @@ Any future probe must separately define credential inputs, explicit cost acknowl
 - Gateway tool registry, `ai@7.0.107`: <https://github.com/vercel/ai/blob/ai%407.0.107/packages/gateway/src/gateway-tools.ts>
 - Vercel AI Gateway documentation: <https://vercel.com/docs/ai-gateway>
 
-These citations record the pinned evidence used for the 2026-09-20 release decision; later direct-provider or documentation changes do not silently broaden this SDK's supported surface.
+These citations record the pinned evidence used for the 2026-09-20 continuation release decision; later direct-provider or documentation changes do not silently broaden this SDK's supported surface.
