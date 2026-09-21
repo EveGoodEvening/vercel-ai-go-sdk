@@ -156,19 +156,18 @@ func printError(err error) {
 
 	switch {
 	case errors.As(err, &configurationErr):
-		log.Printf("configuration error: option=%q reason=%q", configurationErr.Option(), configurationErr.Reason())
+		log.Printf("configuration error")
 	case errors.As(err, &validationErr):
-		log.Printf("validation error: path=%q reason=%q", validationErr.Path(), validationErr.Reason())
+		log.Printf("validation error: path=%q", validationErr.Path())
 	case errors.As(err, &responseValidationErr):
-		log.Printf("response validation error: status=%d path=%q reason=%q request_id=%q response_id=%q truncated=%t",
-			responseValidationErr.StatusCode(), responseValidationErr.Path(), responseValidationErr.Reason(),
-			responseValidationErr.RequestID(), responseValidationErr.ResponseID(), responseValidationErr.BodyTruncated())
+		log.Printf("response validation error: status=%d path=%q request_id_present=%t response_id_present=%t truncated=%t",
+			responseValidationErr.StatusCode(), responseValidationErr.Path(), responseValidationErr.RequestID() != "",
+			responseValidationErr.ResponseID() != "", responseValidationErr.BodyTruncated())
 	case errors.As(err, &responseErr):
-		retryAfter, hasRetryAfter := responseErr.RetryAfter()
-		log.Printf("response error: status=%d type=%q code=%q request_id=%q response_id=%q generation_id=%q retryable=%t retry_after=%s retry_after_present=%t truncated=%t",
-			responseErr.StatusCode(), responseErr.Type(), responseErr.Code(), responseErr.RequestID(),
-			responseErr.ResponseID(), responseErr.GenerationID(), responseErr.Retryable(), retryAfter,
-			hasRetryAfter, responseErr.BodyTruncated())
+		_, hasRetryAfter := responseErr.RetryAfter()
+		log.Printf("response error: status=%d request_id_present=%t response_id_present=%t generation_id_present=%t retryable=%t retry_after_present=%t truncated=%t",
+			responseErr.StatusCode(), responseErr.RequestID() != "", responseErr.ResponseID() != "",
+			responseErr.GenerationID() != "", responseErr.Retryable(), hasRetryAfter, responseErr.BodyTruncated())
 	case errors.As(err, &transportErr):
 		log.Printf("transport error: operation=%q", transportErr.Operation())
 	default:

@@ -73,16 +73,18 @@ Errors support `errors.As`: `ConfigurationError`, `ValidationError`, `TransportE
 | Public Gateway Responses, buffered and SSE streaming | Implemented; hermetic fixtures pass; live execution **NOT RUN** |
 | Public Gateway Chat Completions, buffered and SSE streaming | Implemented; hermetic fixtures pass; live execution **NOT RUN** |
 | AI SDK Gateway Evaluation Model V4 provider protocol | Implemented; hermetic fixtures pass; live execution **NOT RUN** |
+| AI SDK internal `POST /v4/ai/language-model` provider protocol | Not supported; public generation uses `/v1/responses` and `/v1/chat/completions` instead |
 | Responses text/item input, function tools, tool choice, reasoning, text formats, metadata and cache controls | Supported as documented in the generation guide |
 | Chat text/image-URL/file parts, function tools, response formats and Gateway routing options | Supported as documented in the generation guide |
 | API-key and OIDC bearer authentication, team scope, safe custom headers | Supported |
 | Context cancellation and explicitly configured bounded retries | Supported; streams are not resumed or replayed |
-| Public REST `POST /v1/evaluate` | Not supported; no exported API or live evidence |
+| Public REST `POST /v1/evaluate` | Blocked on first-party success-schema evidence; no exported API or live probe |
 | Credits, spend, generation lookup, or model discovery APIs | Not supported |
 | Embeddings, image/video generation, reranking, speech, transcription, realtime, or batches | Not supported |
 | Agents, orchestration, automatic tool execution, UI helpers, schema framework, or global provider registry | Not supported |
-| Gateway search helpers of any category | Not supported; no exported request types or live evidence |
-| Gateway-native xAI `x_search` | Unsupported and unconfirmed; see [the decision record](docs/x-search.md) |
+| Responses built-in search | Blocked; current first-party Responses evidence documents function tools only, with no built-in search wire schema or live evidence |
+| Chat Gateway server-search tools | Blocked; exact identifiers, options, output, and citation schemas lack sufficient first-party evidence and live evidence |
+| Gateway-native xAI `x_search` | Unsupported and unconfirmed; direct-xAI evidence does not establish a Gateway contract; requires first-party Gateway wire evidence plus an authorized native `x_search_call` live probe; see [the decision record](docs/x-search.md) |
 | Direct provider clients, including direct xAI | Not provided |
 | Full parity with JavaScript `ai`, `@ai-sdk/gateway`, or OpenAI APIs | Not claimed |
 

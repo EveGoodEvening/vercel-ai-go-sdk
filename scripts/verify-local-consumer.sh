@@ -205,7 +205,16 @@ var allowedTypes = names(
 )
 
 var allowedFunctions = names("NewClient", "WithAPIKey", "WithOIDCToken", "WithOIDCTokenSource", "WithBaseURL", "WithPublicBaseURL", "WithHTTPClient", "WithTeam", "WithHeaders", "WithRetryPolicy")
-var allowedMethods = names("Evaluate", "CreateResponse", "StreamResponse", "CreateChatCompletion", "StreamChatCompletion", "MarshalJSON", "RawJSON", "Next", "Event", "Err", "Close", "Error", "Option", "Path", "Reason", "Operation", "Unwrap", "StatusCode", "Message", "Type", "Code", "Param", "GenerationID", "RequestID", "ResponseID", "RetryAfter", "Retryable", "BodyTruncated", "RawResponseBody")
+var allowedMethods = names(
+	"Client.Evaluate", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateChatCompletion", "Client.StreamChatCompletion",
+	"ResponseResult.RawJSON", "RawResponseEvent.RawJSON", "ResponseStream.Next", "ResponseStream.Event", "ResponseStream.Err", "ResponseStream.Close",
+	"ChatCompletionResult.RawJSON", "ChatCompletionChunk.RawJSON", "ChatCompletionStream.Next", "ChatCompletionStream.Event", "ChatCompletionStream.Err", "ChatCompletionStream.Close",
+	"ConfigurationError.Error", "ConfigurationError.Option", "ConfigurationError.Reason",
+	"ValidationError.Error", "ValidationError.Path", "ValidationError.Reason",
+	"TransportError.Error", "TransportError.Operation", "TransportError.Unwrap",
+	"ResponseError.Error", "ResponseError.Unwrap", "ResponseError.StatusCode", "ResponseError.Message", "ResponseError.Type", "ResponseError.Code", "ResponseError.Param", "ResponseError.GenerationID", "ResponseError.RequestID", "ResponseError.ResponseID", "ResponseError.RetryAfter", "ResponseError.Retryable", "ResponseError.BodyTruncated", "ResponseError.RawResponseBody",
+	"ResponseValidationError.Error", "ResponseValidationError.Unwrap", "ResponseValidationError.StatusCode", "ResponseValidationError.Path", "ResponseValidationError.Reason", "ResponseValidationError.RequestID", "ResponseValidationError.ResponseID", "ResponseValidationError.BodyTruncated", "ResponseValidationError.RawResponseBody",
+)
 var allowedValues = names("WarningUnsupported", "WarningCompatibility", "WarningDeprecated", "WarningOther", "ResponseToolChoiceAuto", "ResponseToolChoiceRequired", "ResponseToolChoiceNone", "ResponseTextFormatText", "ResponseTextFormatJSONObject", "ChatToolChoiceAuto", "ChatToolChoiceNone", "ChatResponseFormatText", "ChatResponseFormatJSON")
 
 func names(values ...string) map[string]bool {
@@ -287,7 +296,8 @@ func main() {
 				if typed.Recv == nil {
 					requireAllowed("function", typed.Name.Name, allowedFunctions)
 				} else if exportedReceiver(typed.Recv) {
-					requireAllowed("method", typed.Name.Name, allowedMethods)
+					receiver := receiverName(typed.Recv.List[0].Type)
+					requireAllowed("method", receiver+"."+typed.Name.Name, allowedMethods)
 				}
 			}
 		}
