@@ -7,7 +7,7 @@
 - `[x]` implemented, reviewed, and accepted with the listed checks
 - `[!]` blocked; the item must include the blocker, evidence, and the decision needed to unblock it
 
-Only mark a chunk complete after its code, tests, documentation changes, and acceptance checks are in the same reviewable commit. Execute chunks in order. Do not combine chunks or begin a later chunk while an earlier chunk is incomplete.
+Only mark a chunk complete after its code, tests, documentation changes, and acceptance checks are in the same reviewable commit. Execute locally actionable chunks in order and do not combine them. A later independently approved feature chunk may begin when every earlier chunk is either complete or locally complete with only explicitly named external release/publication gates remaining; that exception does not mark the externally blocked chunk complete, clear any gate, or authorize release/publication work. Under this rule Chunks 01–23 are complete, Chunk 24 remains externally blocked, and Chunk 25 is executable now.
 
 ## Goal
 
@@ -625,11 +625,11 @@ env -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK AI_GATEWAY_LIVE_COST_ACK=I_ACCEPT_LIVE_EV
 `AI_GATEWAY_API_KEY` and `VERCEL_OIDC_TOKEN` are the fixed production credential variables. `AI_GATEWAY_LIVE_COST_ACK` is the provider-evaluation live acknowledgement with sole sentinel `I_ACCEPT_LIVE_EVALUATION_COSTS`; `AI_GATEWAY_PUBLIC_LIVE_COST_ACK` is the public-API live acknowledgement with sole sentinel `I_ACCEPT_LIVE_PUBLIC_API_COSTS`. Every ordinary command and CI job must explicitly unset both credentials and both acknowledgements. A live command requires exactly one authorized credential already present plus only its named sentinel assignment. For pre-tag consumer verification in Chunk 11, create a temporary module outside the repository and use a local `replace`. The evaluation-only Chunk 12 tag/proxy/finalization sequence was superseded before execution; after Chunk 24 creates and pushes the single continuation prerelease tag, repeat from a fresh temporary module without `replace`: resolve direct VCS, resolve through `GOPROXY=proxy.golang.org`, compile, and record sanitized provenance/checksum evidence.
 
 ## Release checklist
-- [!] Chunks 01–23 required by the continuation are complete with Chunk 22 Hermetic `[x]`; Chunk 22 Live and Chunk 24 overall remain incomplete. Exact blocker: the two owner-authorized paid live contracts and the external release gates listed below. Public Evaluate and search remain intentionally absent behind their preserved evidence gates.
+- [!] **Historical release-check state before the authoritative evidence continuation below:** Chunks 01–23 required by the continuation were complete with Chunk 22 Hermetic `[x]`; Chunk 22 Live and Chunk 24 overall remained incomplete on the two owner-authorized paid live contracts and external release gates. At that time public Evaluate and every search category were absent. Current search disposition is stated only in the authoritative table below.
 - [x] Current upstream version/protocol evidence is re-checked and cited: the 2026-09-21 first-party review found the pinned AI SDK package versions, Gateway page dates/contracts, search evidence gaps, and maintained Go pins unchanged.
 - [!] The complete local hermetic, race, vet, example, docs, live-gate compile/fail-closed, and external-consumer inventory is successful with credentials/acknowledgements unset and non-loopback traffic denied. Exact remaining blocker: successful execution and retained evidence from the protected hosted CI environment; local evidence does not substitute for hosted CI.
 - [!] Authorized paid provider-evaluation and public-generation success contracts are **NOT RUN**. Exact blocker: owner authorization, exactly one protected credential per isolated job, approved pinned models, paid network execution, sanitized retained evidence, and independent review.
-- [x] README/support documentation and experimental/v0 status were updated for the implemented provider Evaluate, public Responses, and public Chat surfaces, while public `/v1/evaluate` and all search categories remain explicitly blocked and absent.
+- [x] **Historical documentation state at Chunk 24 closure:** README/support documentation described provider Evaluate, public Responses, and public Chat and listed public `/v1/evaluate` plus all search categories as blocked/absent. The later authoritative continuation supersedes only the Chat request-support disposition; it does not retroactively change this completed documentation record.
 - [!] License selection is blocked on the repository owner's explicit license choice and committed license text; none may be inferred locally.
 - [!] Hosted repository existence and metadata verification are blocked on owner/hosting access to confirm visibility, default branch, protection/release settings, and publication configuration. Local `origin` is complete and matches `git@github.com:EveGoodEvening/vercel-ai-go-sdk.git`, but that is not hosted verification.
 - [!] Local pre-tag API, clean-consumer, changelog/release-note, migration, and static secret/payload checks are complete. Remaining pre-tag work is blocked on protected hosted CI/environment evidence, owner license, hosted metadata/provenance/publication review, authorized live contracts, and hosting authorization.
@@ -647,7 +647,7 @@ The following continuation is a newly approved goal. It does **not** rewrite, re
 1. **Use public `/v1` generation surfaces, not internal `/v4/ai/language-model`.** Implement both `POST /v1/responses` and `POST /v1/chat/completions` as separate, explicitly named Go APIs. `/v1/responses` is the preferred feature-rich surface for new callers; `/v1/chat/completions` exists for established OpenAI Chat Completions compatibility. Do not implement `/v4/ai/language-model`: it is the AI SDK provider adapter protocol rather than the stable public REST API, and the pinned provider declaration/fixture disagreement over stream delta fields (`delta` versus `textDelta`) makes a Go wire contract unsafe to infer. Reconsidering `/v4/ai/language-model` requires a separate approved plan plus matching first-party schema/fixture and authenticated wire evidence.
 2. **Keep public `/v1/evaluate` as an evidence-gated additive surface.** <https://vercel.com/docs/ai-gateway/modalities/evaluation> (`last_updated: 2026-09-16`, inspected 2026-09-21) establishes `POST https://ai-gateway.vercel.sh/v1/evaluate` and its request shape, but not enough public success presence/nullability/extension semantics for a deterministic Go result decoder. The existing `Client.Evaluate` remains the Evaluation Model V4 provider-protocol method at `/v4/ai/evaluation-model`; the public method stays absent until the complete gate below clears and must never share or silently translate provider-protocol headers/body semantics. This does not block generation.
 3. **Model each implemented wire surface independently.** Responses, Chat Completions, provider-protocol Evaluate, and public Evaluate if later unblocked have separate request/response/stream DTOs, validation, and tests. Shared code is limited to transport mechanics, bounded reading, authentication, safe error capture, and SSE framing where the wire contract is actually common. There is no catch-all `Generate`, generic untyped tool bag, or automatic tool execution.
-4. **Search is evidence-gated and surface-specific.** The current first-party Vercel Responses pages (`/docs/ai-gateway/sdks-and-apis/responses` and `/responses/tool-calling`, both `last_updated: 2026-09-08`) document only function tools; they do not define a built-in `web_search`, `search_context_size`, search-call output, or citation wire schema. The current Chat tool-calling page (`/docs/ai-gateway/sdks-and-apis/openai-chat-completions/tool-calling`, `last_updated: 2026-09-08`) likewise documents only `type:"function"` and does not define any `vercel:*` request identifier or `config` schema. Therefore no Responses built-in search or Chat server-search wire type is in the required continuation chain. Each remains an explicit `[!]` evidence-gated item below; ordinary function tools remain in Chunks 15 and 18. A tool value for one surface must remain unrepresentable on the other, and provider routing/options remain surface-specific.
+4. **Historical search decision for Chunks 13–24; superseded for current status by the authoritative continuation below.** The first-party pages then used for those chunks did not establish Responses built-in search or Chat server-search request contracts, so neither entered the required continuation chain. Current evidence still leaves Responses built-in search blocked, while the later first-party Gateway web-search page now clears only the four Chat request declarations; typed Chat outputs remain blocked.
 5. **Gateway-native xAI `x_search` remains blocked.** Direct xAI evidence is insufficient for Gateway. No `x_search` request type, helper, response item, or support claim may ship until the blocker below is cleared by first-party Gateway evidence and an authorized live probe showing a native `x_search_call` item. Generic web search, model tool capability, or generated prose mentioning X is not proof.
 6. **Compatibility and package shape.** Keep module `github.com/EveGoodEvening/vercel-ai-go-sdk` and root package `gateway`. Preserve every existing exported identifier and existing `WithBaseURL` behavior for provider-protocol evaluation. Add explicit surface configuration (`WithPublicBaseURL`) defaulting to `https://ai-gateway.vercel.sh/v1`; do not reinterpret `WithBaseURL`. The existing credential precedence, `WithHTTPClient`, team/header ownership, token refresh, typed error safety, retry defaults, and context behavior apply unless a surface section below states a stricter rule.
 7. **Retries and resource ownership.** Generation and public evaluation default to one attempt. Non-stream retries may use the existing opt-in status policy only before a successful response is returned; streaming requests are never automatically replayed after response headers or any event bytes are received. Every stream is caller-closed, context-cancellable, single-consumer, and bounded by fixed event/line/error-body limits. The SDK never buffers an unbounded stream and never starts hidden goroutines that can outlive `Close` or context cancellation.
@@ -905,16 +905,16 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 - [x] Three clean independent re-reviews confirm both review fixes and the current focused, race, full, vet, formatting, diff-check, and diagnostics evidence.
 - [x] **Block every undocumented chunk-field interpretation** behind the exact first-party evidence gate above; retaining bounded raw chunk bytes is not a typed support claim.
 
-### Evidence-gated continuation item — Chat Gateway server search tools
+### Historical evidence-gated continuation item — Chat Gateway server search tools (superseded for current request disposition)
 
-**Prospective commit boundary after unblocking:** `feat: add chat gateway search tools`
+**Historical prospective commit boundary:** `feat: add chat gateway search tools`
 
-- [!] **`vercel:exa_search` gate:** no implementation until a versioned first-party Vercel Chat page/OpenAPI/released Gateway source/test names this exact identifier and defines its request `type`, complete `config` fields (snake-case names, types, requiredness, defaults, enums, bounds), compatible models/providers, non-stream result, streamed deltas, citations/offsets, errors/refusals, and routing/tool-choice interaction; add an owner-authorized sanitized live fixture when the source lacks executable response fixtures. After clearing, track implementation and review for this identifier independently.
-- [!] **`vercel:parallel_search` gate:** apply the same identifier-specific evidence, implementation, live-fixture-when-needed, and review requirements independently; evidence for another `vercel:*` tool does not clear this row.
-- [!] **`vercel:perplexity_search` gate:** apply the same identifier-specific evidence, implementation, live-fixture-when-needed, and review requirements independently; evidence for another `vercel:*` tool does not clear this row.
-- [!] **`vercel:tako_search` gate:** apply the same identifier-specific evidence, implementation, live-fixture-when-needed, and review requirements independently; evidence for another `vercel:*` tool does not clear this row.
-- [!] Current blocker for all four rows: <https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions/tool-calling> (`last_updated: 2026-09-08`) defines only ordinary `type:"function"` tools and publishes none of these identifiers or a server-tool `config` schema. AI SDK helpers and announcements are not proof of the public Chat JSON contract. A proven tool may use shared mechanics but may not clear, expose, or document any sibling identifier.
-- [!] **Prospective owned files after at least one identifier clears:** `chat_tools.go`, `chat_wire.go`, `chat_tools_test.go`, `chat_stream_test.go`, and `contract_external_test.go`. The resulting API remains compile-time Chat-only; focused hermetic/race/full ordinary commands run with both live acknowledgements unset. This item is outside the required chain and does not block Chunk 21.
+- [!] **Historical `vercel:exa_search` gate:** this former all-or-nothing request/output gate is superseded. Current request-only disposition and exact API are in Chunk 25 below; typed outputs remain blocked independently.
+- [!] **Historical `vercel:parallel_search` gate:** superseded for request serialization only; typed outputs remain blocked independently.
+- [!] **Historical `vercel:perplexity_search` gate:** superseded for request serialization only; typed outputs remain blocked independently.
+- [!] **Historical `vercel:tako_search` gate:** superseded for request serialization only; typed outputs remain blocked independently.
+- [!] **Historical blocker at Chunk 24 closure:** the Chat tool-calling page used then defined only ordinary `type:"function"` tools. This statement is retained as history, but its current-status effect is superseded by the later first-party Gateway web-search page cited in the authoritative continuation: the four request declarations are now plan-ready; typed outputs remain blocked.
+- [!] **Historical prospective ownership, not current authority:** the authoritative current Chunk 25 below uses one explicit seven-file atomic implementation-and-documentation boundary.
 
 ### Blocked continuation item — Gateway-native xAI `x_search`
 
@@ -1013,7 +1013,7 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 
 **Hermetic status (independently trackable):**
 
-- [x] Expanded hermetic fixtures cover Responses non-stream/stream and Chat non-stream/stream; public Evaluate remains excluded because its evidence gate has not cleared and it is not implemented, and evidence-gated search schemas remain excluded. `TestMain` scrubs both credentials and both live acknowledgements, installs a loopback-only default transport, and targeted coverage proves all four default public generation paths fail closed on non-loopback destinations.
+- [x] **Historical Chunk 22 Hermetic scope:** fixtures covered Responses non-stream/stream and Chat non-stream/stream; public Evaluate and every search schema were excluded because none had cleared at that time. `TestMain` scrubbed both credentials and both live acknowledgements, installed a loopback-only default transport, and targeted coverage proved all four default public generation paths fail closed on non-loopback destinations. The later Chat request-only plan does not alter this completed historical evidence.
 - [x] Static inspection of the six owned-file changes confirmed manual/scheduled-only protected-environment workflow configuration, single-credential selection, secret boundaries, isolated acknowledgements, and sanitized-evidence rules. Review found that the public live prerequisite gate used `t.Skip`, which could report a credential-free invocation as a passing package; all three public acknowledgement/credential rejection paths were corrected to `t.Fatalf`, and the fail-closed correction is verified.
 - [x] Post-correction orchestrator evidence records gofmt/diff-check success, workspace diagnostics with no issues, exact env-scrubbed `go test ./...` success, and exact env-scrubbed `go test -race ./...` success with `AI_GATEWAY_API_KEY`, `VERCEL_OIDC_TOKEN`, `AI_GATEWAY_LIVE_COST_ACK`, and `AI_GATEWAY_PUBLIC_LIVE_COST_ACK` unset. The credential-free targeted command `env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -tags=livecontract ./internal/livecontract -run '^TestGateway(Responses|Chat)Contract$' -count=1` failed at the exact public acknowledgement gates before network access. This verifies fail-closed behavior only and is **NOT A LIVE RUN** or live success.
 - [x] Independent Hermetic acceptance is complete. Three independent re-reviews returned **CLEAN** after the public live-gate finding was corrected; review accounting covers the six-file implementation, workflow/secret boundaries, exact acknowledgement and credential gates, fixture/non-loopback behavior, command evidence, and the finding-to-fix clean re-review. Implementation commit `b01c240` and fail-closed correction commit `c0892d1` form the recorded change chain. Chunk 22 Hermetic status is `[x]`, satisfying the dependency for Chunk 23; paid Live status remains separately `[!]` and conveys no success claim.
@@ -1022,7 +1022,7 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 
 **Live status (independently trackable release gate):**
 
-- [!] Public-generation paid live success smoke: **NOT RUN**. Build-tagged tests exist for Responses non-stream/stream and Chat non-stream/stream with minimal prompts, but execution remains blocked on explicit owner authorization for paid network use, exactly one authorized production credential, approval of the pinned `openai/gpt-5-nano` model, an approved protected environment, and sanitized retained evidence. Public Evaluate remains inapplicable because its separate evidence gate has not cleared and it is not implemented; search remains inapplicable because no search gate has cleared or support is claimed.
+- [!] Public-generation paid live success smoke: **NOT RUN**. Build-tagged tests exist for the already implemented Responses non-stream/stream and Chat non-stream/stream text paths, but execution remains blocked on explicit owner authorization for paid network use, exactly one authorized production credential, approval of the pinned `openai/gpt-5-nano` model, an approved protected environment, and sanitized retained evidence. Public Evaluate and Responses/Gateway-native search remain inapplicable because their gates have not cleared. Chat server-search request declarations are not part of this historical live gate; any future corroboration must be planned separately rather than appended to an implementation chunk.
 - [!] Provider-evaluation paid live success smoke: **NOT RUN**. The preserved build-tagged contract remains blocked on explicit owner authorization for paid network use, exactly one authorized production credential, approval of the pinned `typesafe-ai/jev-latest` model, an approved protected environment, and sanitized retained evidence. The credential-free invocation failed at the exact acknowledgement gate before network and is fail-closed proof, not live success.
 - [!] Paid live workflow execution and evidence review: **NOT RUN**. Static workflow code is manual/scheduled rather than pull-request-triggered; each protected job requires its sole exact acknowledgement, rejects the opposite acknowledgement at any value, and requires exactly one nonblank credential. Both build-tagged gates implement the same verified fail-closed policy and pass only the selected credential to the client. Credential-free gate failures occurred before network and are not paid-live evidence. Completion remains blocked on owner authorization, one authorized credential, approved pinned models, protected-environment execution, sanitized evidence, and independent Live review accounting.
 - [!] Mark this Live status `[x]` only after every applicable paid command passes with sanitized evidence and independent review accounting. **NOT RUN:** no paid command has executed. Chunk 24 and release remain blocked until then; Hermetic completion does not imply a live pass.
@@ -1077,7 +1077,7 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 - [x] Orchestrator evidence after the fixes records `gofmt` and diff-check success, targeted final-fix test success, examples/API-audit/livecontract compile success, and workspace diagnostics with no issues. `go vet ./...` passed before the later test-only retry expectation correction; that correction changed no production code.
 - [x] The first env-scrubbed full `go test ./...` and `go test -race ./...` runs failed because `retry_test.go` retained the old status-200 overflow expectation. After correcting that stale test to require `ResponseValidationError` and the bounded truncation contract, both complete env-scrubbed commands were rerun successfully. These are hermetic results only.
 - [x] Local repository configuration is no longer a rename blocker: orchestrator evidence records `origin` fetch and push as `git@github.com:EveGoodEvening/vercel-ai-go-sdk.git`. This does not verify hosted repository existence/metadata, license, hosted CI, provenance, authorization, immutable tags, direct-VCS/proxy publication, checksums, or paid live contracts; those release gates remain open.
-- [!] Public `POST /v1/evaluate` remains absent and explicitly blocked on first-party plus authorized-live success-schema evidence. Responses built-in search, every Chat Gateway server-search identifier, and Gateway-native `x_search` remain absent and independently evidence-gated as specified above; none is cleared by generic tool support, raw preservation, or the strengthened generation live gate.
+- [!] **Historical closure statement, superseded for current planning by the authoritative disposition table below.** At Chunk 24 closure, public `POST /v1/evaluate`, Responses built-in search, every Chat Gateway server-search identifier, and Gateway-native `x_search` were absent and evidence-gated. Current disposition: public Evaluate, Responses built-in search, and Gateway-native `x_search` remain blocked; the four Chat request declarations now have direct first-party request-shape evidence and are planned independently, while all Chat output/stream/citation/error projections remain blocked.
 - [!] No paid public-generation or provider-evaluation live run occurred. Chunk 24 and release remain incomplete and blocked on every applicable Live and external publication gate.
 - [x] Cleanup commit/current HEAD at the substantive closure review, `ee41722`, contains the final rereview corrections after `449aed2`: removal of the stale uncommitted-workspace statement, removal of the unsupported typed buffered-Responses implication while preserving `ResponseResult.RawJSON` as the SDK contract and test-only minimal structural decoding, and `docs/x-search.md` continuation-release wording that covers provider Evaluation plus buffered/streaming Responses and Chat. Closure review `final-closure-review-1` independently verified all three substantive corrections and returned **CLEAN**. Closure review `final-closure-review-2` confirmed the substantive blocker boundaries and found only tracker accounting/local-checkbox closure missing; accounting fix commit `3545fac` plus this closure evidence records that finding as fixed. Every local/doable continuation item is `[x]`, and every incomplete item is `[!]` with its exact external or explicitly deferred blocker; no paid-live, hosted, owner, tag, provenance, proxy, checksum, or publication gate is cleared.
 
@@ -1089,9 +1089,9 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 
 **Commit boundary:** `chore: verify public api release candidate`
 
-- [x] Re-checked current first-party Gateway documentation, released SDK package records/source baseline, endpoint schemas, search evidence, and maintained Go versions on 2026-09-21. Latest package records remain `ai@7.0.107`, `@ai-sdk/gateway@4.0.87`, `@ai-sdk/provider@4.0.17`, and `@ai-sdk/provider-utils@5.0.45`; Evaluation remains dated 2026-09-16, Responses/Chat/tool-calling remain dated 2026-09-08, and Go pins remain 1.27.1/1.26.8. No contract drift requiring code, fixture, or support-claim changes was found; public Evaluate and every search gate remain preserved.
+- [x] Historical Chunk 24 recheck completed on 2026-09-21. Its then-current conclusion that every search gate remained preserved is superseded only by the later first-party Gateway web-search page evidence recorded in the authoritative disposition below: Chat request declarations are now plan-ready; Responses built-in search and Gateway-native `x_search` remain blocked. No completed Chunk 24 implementation claim is changed.
 - [!] The complete local hermetic/race/vet/docs/examples/external-consumer inventory is successful, including the strengthened build-tagged live gates compiling and failing closed without credentials. Exact remaining blocker: protected hosted CI has not run and its environment/network-denial evidence is unavailable; local checks do not establish hosted CI success.
-- [!] Authorized sanitized live evidence is **NOT RUN / PENDING LIVE RUN** for both isolated contracts. Public generation requires owner-authorized paid execution for buffered/streaming Responses and Chat; provider Evaluation requires its separate owner-authorized paid execution. Each needs exactly one credential, its sole acknowledgement, approved pinned model, protected environment, sanitized retained evidence, and independent review. Public Evaluate and search remain excluded because their independent evidence gates have not cleared and no such API is implemented.
+- [!] Authorized sanitized live evidence is **NOT RUN / PENDING LIVE RUN** for the already implemented public generation and provider-Evaluation contracts. Public Evaluate, Responses built-in search, and Gateway-native `x_search` remain excluded because their evidence gates have not cleared. Chat server-search request declarations are separately planned below and require no live run for hermetic request serialization; optional future live corroboration is not part of their implementation chunks.
 - [x] Completed the full exported-API/backward-compatibility and unsupported-surface audit. Existing provider `Evaluate`/`WithBaseURL`, module/package identity, five error types, and documented evaluation types remain source-compatible; generation is additive through explicit Responses/Chat methods and `WithPublicBaseURL`. The API/local-consumer evidence found no compatibility aliases, generic tool bags, automatic execution, `/v4/ai/language-model`, public `/v1/evaluate`, direct-xAI, or blocked search exports.
 - [x] Completed the changelog and release-note audit. `CHANGELOG.md`, README, generation/evaluation/search documentation, and release guidance cover the implemented endpoints, buffered/streaming lifecycle and resource contracts, experimental v0 risk, module-path migration, separate hermetic/live status, raw-only Responses boundary, and independent public-Evaluate/search blockers without claiming hosted/live/publication success.
 - [!] Immutable continuation tag creation, direct-VCS/public-proxy import, fetched-module compilation, checksum/provenance capture, promotion, and publication are deferred. Exact blockers: owner-selected license; independently verified hosted repository metadata and protected release environment; authorized live contracts; hosted CI; provenance/publication/least-privilege review; hosting authorization; and post-tag direct-VCS/proxy/checksum evidence. No tag or release may be created or claimed before all blockers clear.
@@ -1124,11 +1124,371 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 
 ## Continuation release checklist
 
-- [!] Required Chunks 13, 15–16, 18–19, 21, and 23 plus Chunk 22 Hermetic are `[x]`; Chunk 22 Live and Chunk 24 overall remain blocked solely on the exact external release dependencies recorded above. Public Evaluate and search remain absent behind their preserved evidence gates.
+- [!] Required Chunks 13, 15–16, 18–19, 21, and 23 plus Chunk 22 Hermetic are `[x]`; Chunk 22 Live and Chunk 24 overall remain blocked solely on the exact external release dependencies recorded above. Public Evaluate, Responses built-in search, and Gateway-native `x_search` remain absent behind their preserved evidence gates. The four Chat request declarations are absent but plan-ready in the later authoritative continuation; their typed outputs remain blocked.
 - [x] Existing `Client.Evaluate`, `WithBaseURL`, exported evaluation types/errors, and module/package identity remain source-compatible; additive public generation uses `WithPublicBaseURL` and explicit surface methods.
 - [x] `/v1/responses` and `/v1/chat/completions` have hermetically proven buffered and streaming text paths with their originating bounds, cancellation, caller-owned closure, no hidden stream goroutine, no post-header replay, and no automatic tool execution. Local full/race/vet/docs/examples/external-consumer and live-gate compile/fail-closed evidence is recorded; hosted and paid-live success remain separate blockers.
 - [x] `/v1/evaluate` remains absent and explicitly evidence-gated until first-party plus authorized-live success presence/nullability/unknown-field semantics are sufficient for a deterministic public contract. Any future API must be distinct, and `/v4/ai/evaluation-model` remains unchanged.
-- [x] Responses built-in search, every Chat Gateway server-search identifier, and Gateway-native `x_search` are absent from exported API/support claims. Their independent first-party wire/live evidence gates remain intact; no generic search abstraction is present.
+- [x] **Historical Chunk 24 API state:** Responses built-in search, every Chat Gateway server-search identifier, and Gateway-native `x_search` were absent from exports/support claims at closure. **Current authority is the disposition table below:** Responses built-in search and Gateway-native `x_search` remain blocked; only request serialization for the four Chat identifiers is planned, with outputs/streams/citations/errors unchanged and raw-only where already available.
 - [x] `/v4/ai/language-model`, direct xAI, and Gateway-native `x_search` are absent from the exported API and support claims; only a later approved evidence-backed plan may change that decision.
 - [x] Current static secret/payload attestation is complete: error formatting, examples, docs, tests, workflows, and retained local artifacts do not expose credentials, authorization headers, prompts/state, provider/tool values, raw diagnostic bodies, streamed/generated content, or unsanitized live payloads. Future live/hosted/tag/proxy artifacts require their own pre-publication sanitization review.
 - [!] Publication is deferred until the following exact external gates complete: protected hosted CI; both authorized sanitized paid live contracts; owner-selected license; hosted repository metadata/provenance/permissions/publication review; hosting authorization; immutable continuation tag; direct-VCS and public-proxy fetched-module verification; checksum/provenance capture; and final promotion/publication. Current upstream/version, API/migration/docs, local hermetic/race/vet/doc/examples/external-consumer, and current static secret/payload audits are `[x]`.
+
+## 2026-09-21 evidence continuation — authoritative current disposition
+
+This section is the sole authority for the **current** disposition of the four requested search/evaluation surfaces. Earlier completed-chunk statements remain historical evidence of what was true when those chunks closed; where an earlier current-status sentence conflicts with this section, this section supersedes it without reopening completed Chunks 01–23 or relabeling externally blocked Chunk 24 complete. Chunk 24's only remaining work is the named external release/publication gates, so the global sequence exception expressly authorizes independently approved Chunk 25 to proceed now. No surface below has started implementation. The evidence baseline remains `ai@7.0.107`, `@ai-sdk/gateway@4.0.87`, `@ai-sdk/provider@4.0.17`, and `@ai-sdk/provider-utils@5.0.45`.
+
+### Surface disposition
+
+| Surface | Current status | Authoritative decision |
+| --- | --- | --- |
+| Public `POST /v1/evaluate` | [!] blocked | Keep `Client.EvaluatePublic` and public DTOs absent. The endpoint/request example and one observed 400 shape do not establish an exhaustive strict success/error contract. |
+| Responses `web_search` / `web_search_preview` | [!] blocked evidence gate | Do not add request types, tool-choice variants, `allowed_tools` variants, typed outputs, or typed events. OpenAI documentation and `@ai-sdk/openai` are direct-provider evidence, not proof that Vercel AI Gateway `/v1/responses` accepts or preserves the exact contract. |
+| Chat `vercel:exa_search` / `vercel:parallel_search` / `vercel:perplexity_search` / `vercel:tako_search` | [ ] request-only implementation ready | The first-party Vercel Gateway web-search page directly names all four Chat identifiers and their snake-case request config shapes. Implement request serialization only, independently of Responses. Preserve existing buffered results, streamed chunks, raw metadata, and error behavior unchanged. |
+| Gateway-native xAI `x_search` | [!] blocked | Model capability plus direct `@ai-sdk/xai` schemas do not prove the Gateway `/v1/responses` request or native output/event contract. No probe or export is authorized. |
+
+### Gate A — public `POST /v1/evaluate` remains blocked
+
+- [!] The official Evaluation page (`last_updated: 2026-09-16`) proves the endpoint, request members (`model`, `state`, `questions`, optional `providerOptions`), BYOK availability, and one representative success. A credential-free probe observed one HTTP 400 form, `{error:{message:string,param:null,type:"invalid_request_error"}}`. Released Evaluation Model V4 code supplies useful semantics only for the different `/v4/ai/evaluation-model` protocol.
+- [!] Missing first-party public-HTTP contract: exhaustive success properties/required list; nullability; choice/score probability presence; whether `rounding`, `warnings`, or `usage.totalTokens` exist; numeric constraints; additional-property and duplicate-key behavior; and complete error/status variants. Therefore no strict public decoder can be designed without inference.
+- [!] Unblock only with a first-party public `/v1/evaluate` schema/server artifact or documentation amendment resolving every item above. Live fixtures may corroborate documented variants but cannot prove exhaustiveness, absence, optionality, or unknown-field policy. Once cleared, plan a new implementation chunk; do not reuse the provider-protocol decoder.
+
+### Gate B — Responses built-in search remains blocked
+
+**Prospective commit boundary only after evidence clears:** `feat: add responses web search requests`
+
+- [!] Current first-party Gateway evidence establishes `POST /v1/responses` and generic tool support, but no Vercel Gateway page, OpenAPI, released `@ai-sdk/gateway` source/test, Gateway schema, or Gateway fixture explicitly establishes that `/v1/responses` accepts either `{type:"web_search",...}` or `{type:"web_search_preview",...}`. It likewise does not establish Gateway handling for `external_web_access`, filters, `search_context_size`, approximate location, specific tool choice, `allowed_tools`, compatible routing/fallbacks, or current-versus-preview coexistence.
+- [!] OpenAI documentation and released `@ai-sdk/openai@4.0.71` source are useful direct-OpenAI evidence only. They must not clear a Vercel Gateway contract gate and must not authorize a typed Gateway API. The Gateway model catalog and general Responses page do not bridge that gap.
+- [!] No typed output or event projection is authorized. `ResponseResult.RawJSON()` remains the only buffered output contract; `ResponseOutputTextDeltaEvent` plus `RawResponseEvent` remain the streaming contract. Do not add `web_search_call`, actions, citations, refusals, terminal/error event variants, or requiredness/nullability/unknown-variant rules from direct-provider evidence.
+- [!] Evidence required to unblock request work: a versioned first-party Vercel Gateway Responses page/OpenAPI/released Gateway source or test that explicitly identifies `/v1/responses`, each accepted search discriminator, every exposed request field and enum/presence rule, tool-choice/allowed-tools behavior, and compatible Gateway routing. A later owner-authorized sanitized live probe may corroborate only this published request contract; it cannot substitute for it.
+- [!] Evidence required before any typed output/event work is separately planned: first-party Gateway schema/source/test or owner-authorized Gateway fixtures that establish each exact discriminator, field type, requiredness, nullability, unknown-field/unknown-variant behavior, stream event ordering/termination effect, and raw preservation rule. Request evidence alone does not clear output evidence.
+- [!] After the request gate clears, create a new chunk with feasible ownership including `responses.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`, and `contract_external_test.go`; if streaming behavior is later proven, plan it as a separate chunk owning `responses_stream.go` and `responses_stream_test.go`. Migrate every repository caller, not only preselected files. No Responses search implementation is currently dependency-ready.
+
+### Chunk 25 — Chat Gateway server-search request declarations
+
+**Depends on:** completed Chat buffered/streaming infrastructure only. Chunk 24 is locally complete but remains `[!]` on the named external release/publication gates; under the global sequence exception, those gates do not block this independently approved feature chunk and Chunk 25 may proceed now without relabeling Chunk 24 complete. This chunk has no semantic dependency on Responses built-in search and may proceed while Gate B remains blocked.
+
+**Owned files (exact, seven-file exception):** `chat.go`, `chat_stream.go`, `chat_wire.go`, `chat_validate.go`, `chat_test.go`, `contract_external_test.go`, `docs/generation.md`. This is an explicit exception to the 3–5 target-path preference because the two exported server-tool entry points, their shared request encoding/validation, compile-locked contract, hermetic proof, and public support documentation must land in the same reviewable commit under the global completion rule; documentation may not trail the API in a separately accepted chunk.
+
+**Commit boundary:** `feat: add chat gateway search requests`
+
+The first-party page <https://vercel.com/docs/ai-gateway/models-and-providers/web-search> (`last_updated: 2026-09-08`, inspected 2026-09-21) directly names the four Chat Completions tool identifiers, the `{type,config}` request shape, snake-case config members, universal Gateway-model compatibility, hidden server execution, synthesized final answer behavior, coexistence with ordinary functions, name-collision rule, and `tool_choice` modes `auto` and `required`. It does **not** define typed raw results, streamed search lifecycle, structured citations/offsets, provider failures/refusals, or an exact `provider_metadata.gateway.gatewayToolCalls` schema. Released `@ai-sdk/gateway` helper schemas may corroborate member types but are not treated as Chat output evidence or as proof of REST rejection semantics.
+
+#### Exact exported Go API
+
+The existing exported `ChatCompletionRequest`, its field set, `ChatTool` function-tool struct, `ChatCompletionRequest.Tools []ChatTool`, and existing `CreateChatCompletion`/`StreamChatCompletion` method signatures remain exactly unchanged, including compatibility with external unkeyed `ChatCompletionRequest` literals. Server tools use a distinct wrapper request and two distinct methods, so no field is added to the existing request. Optional server-tool members use pointers: nil means omitted; a non-nil pointer emits the member even when the pointed scalar is its zero value. Optional slices use pointers so nil pointer means omitted, pointer-to-nil slice emits `[]`, and pointer-to-empty non-nil slice also emits `[]`; request JSON never emits `null`. Config is always emitted as an object. Required strings are ordinary strings and must be nonempty. No generic map or extension bag is added.
+```go
+// ChatCompletionRequest remains byte-for-byte the existing exported declaration.
+type ChatCompletionRequest struct {
+    Model            string
+    Messages         []ChatMessage
+    Temperature      *float64
+    MaxTokens        *int
+    TopP             *float64
+    FrequencyPenalty *float64
+    PresencePenalty  *float64
+    Stop             ChatStop
+    SafetyIdentifier *string
+    Tools            []ChatTool
+    ToolChoice       ChatToolChoice
+    ResponseFormat   ChatResponseFormat
+    Models           []string
+    ProviderOptions  *ChatProviderOptions
+    Provider         *ChatProvider
+}
+
+// ChatServerToolsRequest adds typed server tools without changing ChatCompletionRequest.
+type ChatServerToolsRequest struct {
+    Request     ChatCompletionRequest
+    ServerTools []ChatServerTool
+}
+
+func (c *Client) CreateChatCompletionWithServerTools(ctx context.Context, request ChatServerToolsRequest) (*ChatCompletionResult, error)
+func (c *Client) StreamChatCompletionWithServerTools(ctx context.Context, request ChatServerToolsRequest) (*ChatCompletionStream, error)
+
+type ChatServerTool interface{ chatServerTool() }
+
+// Existing function tool; declaration, source use, and wire shape remain unchanged.
+type ChatTool struct {
+    Name        string
+    Description *string
+    Parameters  any
+}
+
+type ChatExaSearchTool struct{ Config ChatExaSearchConfig }
+type ChatParallelSearchTool struct{ Config ChatParallelSearchConfig }
+type ChatPerplexitySearchTool struct{ Config ChatPerplexitySearchConfig }
+type ChatTakoSearchTool struct{ Config ChatTakoSearchConfig }
+func (ChatExaSearchTool) chatServerTool()
+func (ChatParallelSearchTool) chatServerTool()
+func (ChatPerplexitySearchTool) chatServerTool()
+func (ChatTakoSearchTool) chatServerTool()
+
+type ChatToolChoiceMode string
+const (
+    ChatToolChoiceAuto     ChatToolChoiceMode = "auto"
+    ChatToolChoiceNone     ChatToolChoiceMode = "none"
+    ChatToolChoiceRequired ChatToolChoiceMode = "required"
+)
+
+type ChatExaSearchType string
+const (
+    ChatExaSearchAuto    ChatExaSearchType = "auto"
+    ChatExaSearchFast    ChatExaSearchType = "fast"
+    ChatExaSearchInstant ChatExaSearchType = "instant"
+)
+type ChatExaCategory string
+const (
+    ChatExaCategoryCompany         ChatExaCategory = "company"
+    ChatExaCategoryPeople          ChatExaCategory = "people"
+    ChatExaCategoryResearchPaper   ChatExaCategory = "research paper"
+    ChatExaCategoryNews            ChatExaCategory = "news"
+    ChatExaCategoryPersonalSite    ChatExaCategory = "personal site"
+    ChatExaCategoryFinancialReport ChatExaCategory = "financial report"
+)
+type ChatExaVerbosity string
+const (
+    ChatExaVerbosityCompact  ChatExaVerbosity = "compact"
+    ChatExaVerbosityStandard ChatExaVerbosity = "standard"
+    ChatExaVerbosityFull     ChatExaVerbosity = "full"
+)
+type ChatExaSection string
+const (
+    ChatExaSectionHeader     ChatExaSection = "header"
+    ChatExaSectionNavigation ChatExaSection = "navigation"
+    ChatExaSectionBanner     ChatExaSection = "banner"
+    ChatExaSectionBody       ChatExaSection = "body"
+    ChatExaSectionSidebar    ChatExaSection = "sidebar"
+    ChatExaSectionFooter     ChatExaSection = "footer"
+    ChatExaSectionMetadata   ChatExaSection = "metadata"
+)
+type ChatExaText interface{ chatExaText() }
+type ChatExaTextEnabled bool
+type ChatExaTextOptions struct {
+    MaxCharacters   *int
+    IncludeHTMLTags *bool
+    Verbosity       *ChatExaVerbosity
+    IncludeSections *[]ChatExaSection
+    ExcludeSections *[]ChatExaSection
+}
+func (ChatExaTextEnabled) chatExaText()
+func (ChatExaTextOptions) chatExaText()
+type ChatExaHighlights interface{ chatExaHighlights() }
+type ChatExaHighlightsEnabled bool
+type ChatExaHighlightsOptions struct {
+    Query         *string
+    MaxCharacters *int
+}
+func (ChatExaHighlightsEnabled) chatExaHighlights()
+func (ChatExaHighlightsOptions) chatExaHighlights()
+type ChatExaExtras struct {
+    Links      *int
+    ImageLinks *int
+}
+type ChatExaSubpageTarget interface{ chatExaSubpageTarget() }
+type ChatExaSubpageTargetString string
+type ChatExaSubpageTargetStrings []string
+func (ChatExaSubpageTargetString) chatExaSubpageTarget()
+func (ChatExaSubpageTargetStrings) chatExaSubpageTarget()
+type ChatExaContents struct {
+    Text             ChatExaText
+    Highlights       ChatExaHighlights
+    MaxAgeHours      *int
+    LivecrawlTimeout *int
+    Subpages         *int
+    SubpageTarget    ChatExaSubpageTarget
+    Extras           *ChatExaExtras
+}
+type ChatExaSearchConfig struct {
+    Query              string
+    Type               *ChatExaSearchType
+    NumResults         *int
+    Category           *ChatExaCategory
+    UserLocation       *string
+    IncludeDomains     *[]string
+    ExcludeDomains     *[]string
+    StartPublishedDate *string
+    EndPublishedDate   *string
+    Contents           *ChatExaContents
+}
+
+type ChatParallelMode string
+const (
+    ChatParallelModeOneShot ChatParallelMode = "one-shot"
+    ChatParallelModeAgentic ChatParallelMode = "agentic"
+)
+type ChatParallelSourcePolicy struct {
+    IncludeDomains *[]string
+    ExcludeDomains *[]string
+    AfterDate      *string
+}
+type ChatParallelExcerpts struct {
+    MaxCharsPerResult *int
+    MaxCharsTotal     *int
+}
+type ChatParallelFetchPolicy struct{ MaxAgeSeconds *int }
+type ChatParallelSearchConfig struct {
+    Objective     string
+    SearchQueries *[]string
+    Mode          *ChatParallelMode
+    MaxResults    *int
+    SourcePolicy  *ChatParallelSourcePolicy
+    Excerpts      *ChatParallelExcerpts
+    FetchPolicy   *ChatParallelFetchPolicy
+}
+
+type ChatPerplexityQuery interface{ chatPerplexityQuery() }
+type ChatPerplexityQueryString string
+type ChatPerplexityQueryStrings []string
+func (ChatPerplexityQueryString) chatPerplexityQuery()
+func (ChatPerplexityQueryStrings) chatPerplexityQuery()
+type ChatPerplexityRecency string
+const (
+    ChatPerplexityRecencyDay   ChatPerplexityRecency = "day"
+    ChatPerplexityRecencyWeek  ChatPerplexityRecency = "week"
+    ChatPerplexityRecencyMonth ChatPerplexityRecency = "month"
+    ChatPerplexityRecencyYear  ChatPerplexityRecency = "year"
+)
+type ChatPerplexitySearchConfig struct {
+    Query                   ChatPerplexityQuery
+    MaxResults              *int
+    MaxTokensPerPage        *int
+    MaxTokens               *int
+    Country                 *string
+    SearchDomainFilter      *[]string
+    SearchLanguageFilter    *[]string
+    SearchAfterDate         *string
+    SearchBeforeDate        *string
+    LastUpdatedAfterFilter  *string
+    LastUpdatedBeforeFilter *string
+    SearchRecencyFilter     *ChatPerplexityRecency
+}
+
+type ChatTakoEffort string
+const (
+    ChatTakoEffortDeep    ChatTakoEffort = "deep"
+    ChatTakoEffortFast    ChatTakoEffort = "fast"
+    ChatTakoEffortInstant ChatTakoEffort = "instant"
+)
+type ChatTakoDataMode string
+const (
+    ChatTakoDataModeInline ChatTakoDataMode = "inline"
+    ChatTakoDataModeURL    ChatTakoDataMode = "url"
+)
+type ChatTakoContentFormat string
+const (
+    ChatTakoContentFormatCardJSON    ChatTakoContentFormat = "card_json"
+    ChatTakoContentFormatCSV         ChatTakoContentFormat = "csv"
+    ChatTakoContentFormatJSONCompact ChatTakoContentFormat = "json_compact"
+    ChatTakoContentFormatJSONRecords ChatTakoContentFormat = "json_records"
+)
+type ChatTakoWebCategory string
+const (
+    ChatTakoWebCategoryFinance ChatTakoWebCategory = "finance"
+    ChatTakoWebCategoryNews    ChatTakoWebCategory = "news"
+    ChatTakoWebCategorySports  ChatTakoWebCategory = "sports"
+)
+type ChatTakoDataSource struct {
+    Count           *int
+    IncludeContents *bool
+    Mode            *ChatTakoDataMode
+    ContentFormat   *ChatTakoContentFormat
+    MaxRows         *int
+    NodeIDs         *[]string
+    Strict          *bool
+}
+type ChatTakoWebSource struct {
+    Count                  *int
+    IncludeContents        *bool
+    Category               *ChatTakoWebCategory
+    IncludeDomains         *[]string
+    ExcludeDomains         *[]string
+    SnippetMaxChars        *int
+    Highlights             *bool
+    ArticleContentMaxChars *int
+    PublishedAfter         *string
+    PublishedBefore        *string
+}
+type ChatTakoSources struct {
+    Data *ChatTakoDataSource
+    Web  *ChatTakoWebSource
+}
+type ChatTakoLocation struct {
+    Latitude  float64
+    Longitude float64
+}
+type ChatTakoOutputSettings struct{ ImageDarkMode *bool; ForceRefresh *bool }
+type ChatTakoSearchConfig struct {
+    Query          string
+    Effort         *ChatTakoEffort
+    Sources        *ChatTakoSources
+    Location       *ChatTakoLocation
+    CountryCode    *string
+    Locale         *string
+    Timezone       *string
+    OutputSettings *ChatTakoOutputSettings
+    IncludeRelated *int
+}
+```
+
+`ChatCompletionRequest` and `ChatCompletionRequest.Tools []ChatTool` remain unchanged. `ChatServerToolsRequest.ServerTools []ChatServerTool` is the sole server-tool request addition, and the existing methods continue accepting only `ChatCompletionRequest`; callers opt in through `CreateChatCompletionWithServerTools` or `StreamChatCompletionWithServerTools`. No alias, generic tool bag, output type, or cross-surface converter is added. The two new methods must reuse the existing private Chat validation, encoding, transport/retry, response-decoding, and stream-lifecycle paths rather than duplicate the client; the wrapper contributes only its server-tool slice. Wire encoding produces one `tools` JSON array: `Request.Tools` entries first in their caller order, followed by `ServerTools` entries in their caller order. If both slices are nil or empty, preserve the existing omission behavior; otherwise emit exactly one array, including when only one slice is populated. Validation and the 10,000-tool limit apply to the combined count, and an overflow is reported deterministically at the first entry beyond the limit in this same ordinary-then-server order.
+
+#### Request encoding and validation contract
+
+- [ ] Encode ordinary `ChatTool` exactly as today, then encode each server tool as `{type:"vercel:<identifier>",config:{...}}` in the deterministic combined ordering above, using the exact snake-case member names represented above. Omit nil optionals; never emit JSON null; preserve explicit false, zero, and empty arrays through non-nil pointers. Reject nil/typed-nil `ChatServerTool`, `ChatExaText`, `ChatExaHighlights`, `ChatExaSubpageTarget`, and `ChatPerplexityQuery` implementations before credential or network work.
+- [ ] Validate only proven local invariants: required `query`/`objective`; the closed enum values above; valid documented union variants; the existing 1 MiB string, 64-container-depth, 10,000-member/item, finite-number, cycle, and request-body bounds; a client-function/server-tool name collision only when the corresponding server tool is present in `ServerTools`; and the explicitly documented Tako rule that `strict:true` requires present nonempty `node_ids`. An ordinary function named `exa_search`, `parallel_search`, `perplexity_search`, or `tako_search` is valid when its corresponding server tool is absent. Do **not** infer hostname/date/ISO normalization, default insertion, unknown-field forwarding, model-catalog restrictions, or server rejection from prose descriptions. Do not locally enforce descriptive numeric/cardinality maxima, date formats, ISO codes, Perplexity allowlist/denylist syntax, or recency/date interaction unless a later first-party Chat REST contract makes them normative.
+- [ ] Add the exact exported constant declared above: `ChatToolChoiceRequired ChatToolChoiceMode = "required"`. Named `ChatSpecificToolChoice{Name: ...}` remains legal for an ordinary function, including one with a reserved-looking name when the corresponding server tool is absent. Reject a named choice only when the corresponding server tool is present in the same request and the name attempts to select that server tool, whether by its full identifier or corresponding function name (`exa_search`, `parallel_search`, `perplexity_search`, `tako_search`); never encode a named-function choice as a way to select a present server tool. Do not reject other named function choices merely because any server tool is present. Preserve existing `auto` and `none`; add `required`. The first-party page documents how `auto` and `required` affect server search but does not establish that `none` is rejected, so the SDK must not invent that validation.
+- [ ] Preserve `ChatCompletionResult`, `ChatCompletionChunk`, `RawJSON`, streamed raw chunk bytes, `ResponseError`, and all existing metadata behavior byte-for-byte and type-for-type. Do not decode `gatewayToolCalls`, costs, raw results, citations, offsets, lifecycle deltas, refusals, or server-tool-specific errors. No field is added to buffered or streaming output types.
+
+#### Independent identifier acceptance checklist
+
+| Identifier | Minimum exact JSON | Option/omission fixtures | Collision and tool-choice fixtures | Zero-dispatch invalid fixtures | Output unchanged |
+| --- | --- | --- | --- | --- | --- |
+| `vercel:exa_search` | [ ] | [ ] every declared option group/union/enum and nil-vs-explicit-zero/false/empty presence | [ ] ordinary `exa_search` alone allowed; with Exa server tool present reject collision and matching named choice; allow named different function | [ ] empty query, bad enum/union, nil interface, generic bounds | [ ] buffered/stream raw compatibility; no new projection |
+| `vercel:parallel_search` | [ ] | [ ] every declared policy/object/enum and presence case | [ ] ordinary `parallel_search` alone allowed; with Parallel server tool present reject collision and matching named choice; allow named different function | [ ] empty objective, bad enum, nil interface, generic bounds | [ ] buffered/stream raw compatibility; no new projection |
+| `vercel:perplexity_search` | [ ] | [ ] string and string-array query plus every declared option/enum/presence case | [ ] ordinary `perplexity_search` alone allowed; with Perplexity server tool present reject collision and matching named choice; allow named different function | [ ] nil/empty query union, bad enum/union, generic bounds | [ ] buffered/stream raw compatibility; no new projection |
+| `vercel:tako_search` | [ ] | [ ] every declared source/location/output/enum and presence case | [ ] ordinary `tako_search` alone allowed; with Tako server tool present reject collision and matching named choice; allow named different function | [ ] empty query, bad enum, `strict:true` without node IDs, nonfinite location, generic bounds | [ ] buffered/stream raw compatibility; no new projection |
+
+- [ ] Cross-identifier tests cover both new methods; multiple server tools together; exact `Request.Tools`-then-`ServerTools` wire ordering; ordinary-only, server-only, and both-empty omission behavior; the combined 10,000-tool boundary and limit-plus-one path; `auto`, `required`, preserved `none` with and without server tools; named choice of a different ordinary function; each reserved-looking ordinary function and named choice accepted when its corresponding server tool is absent; rejection only when the corresponding server tool is present and creates a collision or is targeted by name; duplicate server-tool declarations serialized in caller order rather than deduplicated; and exact preservation of all existing function-tool fixtures, `[]ChatTool` assignments, method signatures, and keyed and unkeyed `ChatCompletionRequest` literals.
+- [ ] `contract_external_test.go` compile-locks every declaration and constant above, including the exact unchanged `ChatCompletionRequest` field set, an external positional composite literal containing all existing fields, unchanged `Tools []ChatTool`, `ChatServerToolsRequest`, both new method signatures, and exact `ChatToolChoiceRequired` type/value; verifies each private-marker implementation through wrapper request construction; and compile-locks unchanged existing methods and result/chunk/raw APIs. It must not assert any server-search output field.
+
+**Focused verification commands (implementation time only):**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'Test(CreateChatCompletion|ChatRequest|ChatGatewaySearch|ExternalContract)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -race -run 'Test(CreateChatCompletion|ChatRequest|ChatGatewaySearch)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go doc -all .
+```
+
+**Documentation tasks in the same atomic chunk:**
+
+- [ ] Update `docs/generation.md` Chat request inventory with all four identifiers, exact `{type,config}` shapes, exported Go declarations, the opt-in `ChatServerToolsRequest` and its two methods, the fact that `ChatCompletionRequest` and existing method signatures are unchanged, deterministic `Request.Tools`-then-`ServerTools` wire ordering, nil/zero/false/empty presence semantics, required fields, enums, conditional collision behavior, and the proven named-tool-choice rule. Include migration examples for buffered and streaming calls and state that existing keyed and unkeyed `ChatCompletionRequest` literals keep compiling because its field set is unchanged. State that server execution is hidden and any inline citations are model-generated text rather than a structured SDK contract.
+- [ ] Keep the Responses section explicitly unchanged and blocked for built-in search. State that Chat support does not imply Responses support and that neither OpenAI nor direct-provider SDK evidence clears the Gateway Responses gate.
+- [ ] State prominently that buffered/streamed outputs, raw accessors, metadata, errors, privacy/resource limits, and live status are unchanged; no raw search results, lifecycle events, structured citations, refusals, provider errors, `gatewayToolCalls`, or cost shape is typed.
+- [ ] Add an independent support table for all four identifiers with request `[x]` only when this entire Chunk 25 is accepted, typed output `[!]`, and live corroboration `not part of implementation acceptance`.
+
+**Completion/review boundary:** mark Chunk 25 `[x]` only after every per-identifier cell, cross-identifier item, and documentation task above is `[x]`; the exact commands pass; independent review records findings/fixes; and clean re-review confirms the genuinely additive wrapper/method request-only scope, unchanged `ChatCompletionRequest` and existing method signatures (including external unkeyed-literal compile proof), accurate documentation, shared nonduplicated implementation paths, exact wire ordering, and unchanged outputs. Commit only the seven owned files together with the listed subject. This seven-file commit is the single acceptance boundary; there is no separately completable documentation chunk.
+
+### Optional future Chat live corroboration — not an implementation chunk
+
+- [!] No live test, workflow, evidence file, sentinel, model, or protected job is owned by Chunk 25; therefore no live run or live-status row is part of its acceptance. Hermetic request serialization is the complete implementation proof for this chunk.
+- [!] If the owner later requests paid corroboration, first add a separate planned evidence chunk naming exact ownership for a build-tagged test under `internal/livecontract`, `.github/workflows/live-contract.yml`, and the retained evidence document; define a fail-closed sentinel, approved model, exact sanitized record, and four independent identifier cases. Evidence for one identifier must not clear another. Until that plan exists, do not append ad hoc live work to Chunk 25.
+
+### Gate C — typed Chat search outputs remain blocked
+
+- [!] The first-party Chat page promises the synthesized final answer and says Gateway executes the search internally; it does not publish exact buffered `gatewayToolCalls`/cost metadata schema, stream placement, search lifecycle events, structured citations/offsets, refusal behavior, or provider-error mapping. Released helper output unions are not Chat wire outputs.
+- [!] Unblock each typed field/event only with identifier-specific first-party Chat REST schema/source/test or an approved fixture contract establishing exact discriminator/path/type/presence/nullability/cardinality/unknown-field and streaming termination semantics. Keep existing raw boundaries unchanged until then.
+
+### Gate D — Gateway-native xAI `x_search` remains blocked
+
+- [!] First-party Gateway evidence proves `spacexai/grok-4.5` is Responses-compatible and advertises X Search capability. Direct `@ai-sdk/xai@5.0.4` separately proves xAI's own request options and `x_search_call` schemas. Released `@ai-sdk/gateway@4.0.87` has no xSearch helper or `/v1/responses` native-tool schema.
+- [!] No Vercel Gateway document, OpenAPI, released Gateway source/test, model-metadata schema, or changelog establishes that Gateway `/v1/responses` accepts `{type:"x_search"}`, how it validates omitted/null/unknown options, whether it preserves/transforms `x_search_call`, or which lifecycle events it emits. Combining capability with direct-xAI schema would be inference.
+- [!] No inferred paid probe is authorized. Reconsider only after first-party Gateway evidence supplies the exact request and observable native success discriminator; then plan a separate fail-closed evidence-acquisition chunk before any exported API.
+
+### Current completion accounting
+
+- [!] Public `/v1/evaluate`: blocked; no exported method or DTO.
+- [!] Responses current/legacy built-in search: blocked at the Gateway request-evidence gate; no request type, tool choice, allowed-tools variant, output projection, or event projection is authorized.
+- [ ] Chat server search: Chunk 25 atomically adds a source-compatible opt-in wrapper and two methods without changing `ChatCompletionRequest` or existing method signatures, plus hermetic proof and documentation in one seven-file reviewable commit; it is independent of Responses. Existing outputs/raw metadata remain unchanged and typed search outputs stay blocked.
+- [!] Gateway-native xAI `x_search`: blocked before probe and implementation.
+- [x] Historical Chunks 01–23 are complete local work. Chunk 24 remains `[!]` solely on its named external release/publication gates; it is not relabeled complete. The global sequence exception authorizes independently approved Chunk 25 to execute now while those gates remain pending.
