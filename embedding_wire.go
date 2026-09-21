@@ -111,10 +111,14 @@ func decodeEmbeddingUsage(raw json.RawMessage) (*EmbeddingUsage, *embeddingFailu
 	if !ok || bytes.Equal(bytes.TrimSpace(v), []byte("null")) {
 		return nil, &embeddingFailure{path, "required", nil}
 	}
-	var number json.Number
 	decoder := json.NewDecoder(bytes.NewReader(v))
 	decoder.UseNumber()
-	if decoder.Decode(&number) != nil {
+	var token any
+	if decoder.Decode(&token) != nil {
+		return nil, &embeddingFailure{path, "must be an integer", nil}
+	}
+	number, ok := token.(json.Number)
+	if !ok {
 		return nil, &embeddingFailure{path, "must be an integer", nil}
 	}
 	rational, ok := new(big.Rat).SetString(number.String())
