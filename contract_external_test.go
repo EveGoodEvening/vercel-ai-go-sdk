@@ -19,6 +19,7 @@ func compilePublicContract() {
 	var _ func(...gateway.Option) (*gateway.Client, error) = gateway.NewClient
 	var _ func(*gateway.Client, context.Context, string, gateway.EvaluationRequest) (*gateway.EvaluationResult, error) = (*gateway.Client).Evaluate
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponse
+	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseStream, error) = (*gateway.Client).StreamResponse
 	var _ func(string) gateway.Option = gateway.WithAPIKey
 	var _ func(string) gateway.Option = gateway.WithOIDCToken
 	var _ func(gateway.TokenSource) gateway.Option = gateway.WithOIDCTokenSource
@@ -51,6 +52,15 @@ func compilePublicContract() {
 	_ = []gateway.ResponseTextFormatType{gateway.ResponseTextFormatText, gateway.ResponseTextFormatJSONObject}
 	var responseResult *gateway.ResponseResult
 	_ = responseResult.RawJSON()
+	var responseStream *gateway.ResponseStream
+	var responseEvent gateway.ResponseEvent
+	_ = responseStream.Next()
+	responseEvent = responseStream.Event()
+	_, _ = responseStream.Err(), responseStream.Close()
+	_ = gateway.ResponseOutputTextDeltaEvent{Type: "response.output_text.delta", Event: "event", ID: "id", Delta: "text"}
+	rawResponseEvent := gateway.RawResponseEvent{Type: "future", Event: "event", ID: "id"}
+	_ = rawResponseEvent.RawJSON()
+	_ = responseEvent
 
 	probabilityDecimals := 2
 	scoreDecimals := 3
