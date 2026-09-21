@@ -2191,7 +2191,7 @@ For stream provenance, the complete pinned discriminator set is nevertheless cla
 Independent review and clean rereview verified the frozen provenance, exports, signatures, variants, fields, limits, raw representations, helpers, ownership rules, ledger mappings, blockers, rollback rules, commands, and subjects with no unresolved finding. The landed predecessor plan commit is exactly `f289e31e24b0304c8c6108c71478bb81b280fcde` (`docs: approve gateway capability expansion plan`) with sole changed path `planning/IMPLEMENTATION_PLAN.md`. This post-review accounting handoff updates both durable status documents to point to “the first dependency-ready item in the authoritative Chunk 35–52 queue”, preserving every external live/release blocker, and closes Chunk 35 without claiming this accounting commit's own hash. Rollback removes only this continuation and its two status pointers.
 
 #### Chunk 36 — Shared provider transport and sealed options foundation
-**Status:** `[ ]` — first dependency-ready unchecked chunk in the authoritative Chunk 35–52 queue.
+**Status:** `[x]` — complete and accounted; Chunk 37 is the first dependency-ready unchecked item in the authoritative Chunk 35–52 queue.
 
 
 **Depends on:** 35. **Paths:** `client.go`, `headers.go`, `transport.go`, `provider_options.go`, `contract_internal_test.go`. **Subject:** `feat: add gateway modality transport foundation`. **Tracker:** `docs: record gateway modality foundation accounting`.
@@ -2205,6 +2205,16 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -race -count=1 -run '^(Test(ModalityTransport|ProviderOptions|Evaluate)|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^TestExternalContract' ./...
 ```
+
+**Chunk 36 accounting handoff.** Chunk 36 is complete after implementation, review fixes, exact focused verification, and three clean independent rereviews. The exact landed predecessor series is:
+
+- `f114bd6f140c1a83ff6cf5db1dfb8e3e3936b9a0` (`feat: add gateway modality transport foundation`) — changed paths: `client.go`, `contract_internal_test.go`, `headers.go`, `provider_options.go`, `transport.go`.
+- `3376a9180d3170056b76b9e681cc121045dc70fc` (`fix: correct gateway modality foundation api contract`) — changed paths: `contract_internal_test.go`, `provider_options.go`.
+- `0a2113b9a18f04a674eefee7cffe4cb40f8cddc8` (`fix: correct gateway modality foundation wire contract`) — sole changed path: `contract_internal_test.go`.
+- `bea02f06288abab6d9786e47b2189466b94b8b40` (`fix: correct gateway modality foundation resource safety`) — sole changed path: `contract_internal_test.go`.
+- `f0138925c6385cf3ab5966f605a211661a738589` (`fix: correct gateway modality foundation accounting`) — sole changed path: `planning/IMPLEMENTATION_PLAN.md`.
+
+The exact focused ordinary command above passed, the exact focused race command above passed, and the exact focused external-contract command above passed, all with the five credential/live-acknowledgement variables unset and `GOPROXY=off`. `gopls` was unavailable, so no LSP result is claimed. Clean rereviews `chunk36-clean-rereview-1`, `chunk36-clean-rereview-2`, and `chunk36-clean-rereview-3` each returned **CLEAN** with no remaining actionable correctness, security, resource, cancellation, API/wire-contract, or accounting finding; the worktree was clean and the aggregate diff passed `git diff --check`. The landed amendment preserves the existing public Chat/Responses SSE limits and parser behavior, reserves the distinct provider-stream SSE limits for the first approved provider-streaming chunk (currently blocked Chunk 43), excludes `sse.go` from Chunk 36, and requires externally constructible nil plus future typed-nil or unsupported `ProviderOption` entries to fail at the private validation/encoding boundary before credentials or network work. No downstream modality request/result API, concrete provider option, modality consumer, decoder, provider-stream parser, public behavior, documentation/support claim, live/hosted/license/tag/release gate, or other downstream scope landed. The intended tracker-only accounting subject is exactly `docs: record gateway modality foundation accounting`, with sole changed path `planning/IMPLEMENTATION_PLAN.md`; under the acyclic tracker-accounting rule this handoff does not and cannot claim that accounting commit's own hash. Chunk 37 is now the first dependency-ready unchecked item.
 
 #### Chunks 37–45 — Modality chain and retained language blockers
 
