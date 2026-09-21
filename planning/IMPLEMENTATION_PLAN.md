@@ -1572,7 +1572,7 @@ The unchecked chunks below are sequential. **Chunk 26 is the first dependency-re
 
 **Draft commit boundary:** `feat: add responses web search request`. **Serialized accounting commit boundary:** `docs: record responses web search implementation`.
 
-**Current status:** `[-]` implementation and implementation-time verification are complete in draft commit `0295db6` (`feat: add responses web search request`); independent API/wire review is the next gate. Chunk 26 remains intentionally incomplete pending its review/accounting gates and the final encompassing Chunk 30 closure.
+**Current status:** `[-]` implementation and implementation-time verification are complete in draft commit `0295db6` (`feat: add responses web search request`); the confirmed pointer-form review finding is fixed in commit `25e9a08` (`fix: accept pointer web search tools`). A clean independent rereview is the next gate before Chunk 26A may begin. Chunk 26 remains intentionally incomplete pending that rereview/accounting gate and the final encompassing Chunk 30 closure.
 
 **Draft implementation changed paths (exact four):** `responses.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`.
 
@@ -1612,9 +1612,23 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 
 **Recorded draft verification (`0295db6`):** `gofmt` completed. Each credential-scrubbed command above passed exactly as shown: the focused test command, the race-focused test command, and the full Go test command. Go LSP diagnostics were attempted but unavailable because no Go language server is installed.
 
+**Recorded independent review finding and fix (`25e9a08`):**
+
+- [x] Two independent API/wire reviews confirmed that the value-receiver marker makes both `ResponseWebSearchTool{}` and a non-nil `*ResponseWebSearchTool` valid public `ResponseBuiltInTool` values, but the validator and encoder accepted only the value form. The defect was owned by `responses_validate.go` and `responses_wire.go`; `responses_test.go` owns the value/pointer wire-parity regression coverage. Typed-nil pointers remain rejected before credentials or network work.
+- [x] Fix commit `25e9a08` (`fix: accept pointer web search tools`) changed exactly `responses_validate.go`, `responses_wire.go`, and `responses_test.go`.
+- [x] Post-fix `gofmt` completed, and all three exact credential-scrubbed gates passed:
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -race -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test ./...
+```
+
+Go LSP diagnostics remain unavailable from the prior attempt because no Go language server is installed.
+
 **Review/accounting gate:**
 
-- [ ] Independent API/wire review confirms the fixed low-context shape, source compatibility, zero undocumented knobs, validation-before-credential/network, unchanged raw output/event boundaries, and no direct-provider output inference.
+- [ ] Clean independent API/wire rereview confirms the pointer-form fix plus the fixed low-context shape, source compatibility, zero undocumented knobs, validation-before-credential/network, unchanged raw output/event boundaries, and no direct-provider output inference.
 - [ ] After the clean rereview, commit to `planning/IMPLEMENTATION_PLAN.md` the draft and review-fix hashes, exact changed paths, exact focused verification results, and clean rereview result. That serialized accounting commit permits Chunk 26A to begin; Chunk 26 remains intentionally incomplete until Chunk 30 closure.
 - [ ] Rollback ownership is the wrapper, its two methods, encoder/validator branches, focused tests, Chunk 26A's external contract/audit, and the matching `web_search` portions of Chunks 28–29. These paths form the atomic `web_search` rollback group defined in Chunk 30: they are removed in one committed state only after the `x_search` group is gone, restoring the prior function-only Responses request surface and unsupported-status documentation without changing shared transport, results, or streams.
 
