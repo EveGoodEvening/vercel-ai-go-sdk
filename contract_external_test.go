@@ -21,6 +21,7 @@ func compilePublicContract() {
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponse
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseStream, error) = (*gateway.Client).StreamResponse
 	var _ func(string) gateway.Option = gateway.WithAPIKey
+	var _ func(*gateway.Client, context.Context, gateway.ChatCompletionRequest) (*gateway.ChatCompletionResult, error) = (*gateway.Client).CreateChatCompletion
 	var _ func(string) gateway.Option = gateway.WithOIDCToken
 	var _ func(gateway.TokenSource) gateway.Option = gateway.WithOIDCTokenSource
 	var _ func(string) gateway.Option = gateway.WithBaseURL
@@ -49,6 +50,47 @@ func compilePublicContract() {
 	}
 	_ = gateway.ResponsesRequest{Model: "provider/model", Input: gateway.ResponseTextInput("hello"), ToolChoice: gateway.ResponseToolChoiceAuto, Text: &gateway.ResponseText{Format: gateway.ResponseTextFormatText}}
 	_ = []gateway.ResponseToolChoiceMode{gateway.ResponseToolChoiceAuto, gateway.ResponseToolChoiceRequired, gateway.ResponseToolChoiceNone}
+	description = "description"
+	strict = true
+	safetyIdentifier := "user-hash"
+	maxTokens := 128
+	temperature := 0.5
+	topP := 0.9
+	frequencyPenalty := -0.1
+	presencePenalty := 0.1
+	sort := "price"
+	_ = gateway.ChatCompletionRequest{
+		Model: "provider/model",
+		Messages: []gateway.ChatMessage{
+			{Role: "system", Content: gateway.ChatTextContent("be concise")},
+			{Role: "user", Content: gateway.ChatPartsContent{
+				gateway.ChatTextPart{Text: "describe"},
+				gateway.ChatImageURLPart{URL: "https://example.com/image.png"},
+				gateway.ChatFilePart{Data: "ZmlsZQ==", MediaType: "text/plain", Filename: "file.txt"},
+			}},
+		},
+		Temperature: &temperature, MaxTokens: &maxTokens, TopP: &topP,
+		FrequencyPenalty: &frequencyPenalty, PresencePenalty: &presencePenalty,
+		Stop: gateway.ChatStopStrings{"stop"}, SafetyIdentifier: &safetyIdentifier,
+		Tools:           []gateway.ChatTool{{Name: "tool", Description: &description, Parameters: map[string]any{"type": "object"}}},
+		ToolChoice:      gateway.ChatSpecificToolChoice{Name: "tool"},
+		ResponseFormat:  gateway.ChatJSONSchemaResponseFormat{Name: "answer", Description: &description, Schema: map[string]any{"type": "object"}, Strict: &strict},
+		Models:          []string{"provider/fallback"},
+		ProviderOptions: &gateway.ChatProviderOptions{Gateway: gateway.ChatGatewayOptions{Order: []string{"provider"}, Models: []string{"provider/model"}, Sort: &sort, ProviderTimeouts: &gateway.ChatProviderTimeouts{BYOK: map[string]int{"provider": 1000}}}},
+		Provider:        &gateway.ChatProvider{Sort: "latency"},
+	}
+	_ = gateway.ChatCompletionRequest{Model: "provider/model", Messages: []gateway.ChatMessage{{Role: "user", Content: gateway.ChatTextContent("hello")}}, Stop: gateway.ChatStopString("stop"), ToolChoice: gateway.ChatToolChoiceAuto, ResponseFormat: gateway.ChatResponseFormatText}
+	_ = []gateway.ChatToolChoiceMode{gateway.ChatToolChoiceAuto, gateway.ChatToolChoiceNone}
+	_ = []gateway.ChatResponseFormatType{gateway.ChatResponseFormatText, gateway.ChatResponseFormatJSON}
+	_ = gateway.ChatLegacyJSONResponseFormat{Schema: map[string]any{"type": "object"}, Name: &description, Description: &description}
+	_ = gateway.JSONField[string]{Present: true, Value: "value"}
+	var chatResult *gateway.ChatCompletionResult
+	_ = chatResult.RawJSON()
+	_ = gateway.ChatChoice{}
+	_ = gateway.ChatAssistantMessage{}
+	_ = gateway.ChatToolCall{}
+	_ = gateway.ChatFunctionCall{}
+	_ = gateway.ChatUsage{}
 	_ = []gateway.ResponseTextFormatType{gateway.ResponseTextFormatText, gateway.ResponseTextFormatJSONObject}
 	var responseResult *gateway.ResponseResult
 	_ = responseResult.RawJSON()
