@@ -1665,7 +1665,7 @@ The test-only fix received two fresh CLEAN independent final rereviews; neither 
 
 **Depends on:** Chunk 26 implementation, focused verification, committed accounting, and clean code/API rereview are recorded while Chunk 26 remains intentionally incomplete.
 
-**Current status:** `[-]` the draft external compile contract and strict consumer audit are implemented; the first three independent-review findings were fixed at `b902f48`, the selector-based embedding finding was fixed at `72aaae0`, and both final-rereview findings were fixed at `949f95c`. Both exact credential-scrubbed Chunk 26A gates pass after the latest fix. Chunk 26A remains incomplete pending a fresh clean independent rereview of the complete strengthened sealed-interface, legacy-request, interface-member, and no-embedding audit contracts.
+**Current status:** `[-]` implementation-time verification and all review fixes are complete; both fresh independent rereviews are **CLEAN**, the complete commit/path/fix/accounting chain through `a16b990` is recorded below, and no actionable Chunk 26A finding remains. The local review/accounting gate is satisfied and Chunk 26A is dependency-ready for Chunk 27. Chunk 26A remains intentionally incomplete until the final encompassing Chunk 30 closure.
 
 **Owned paths (exact three):** `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `planning/IMPLEMENTATION_PLAN.md`.
 
@@ -1698,12 +1698,28 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'TestExternalContract' ./...
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK ./scripts/verify-local-consumer.sh
 ```
+**Complete commit/path/fix/accounting chain through final pre-rereview accounting (`a16b990`):**
+
+- `4dced7c` (`test: lock web search external contract`) changed exactly `contract_external_test.go` and `scripts/verify-local-consumer.sh`; `74d72ce` changed exactly `planning/IMPLEMENTATION_PLAN.md` to serialize that green draft and its credential-scrubbed gates.
+- `b902f48` changed exactly `contract_external_test.go` and `scripts/verify-local-consumer.sh` to lock the sealed marker, legacy `ResponsesRequest` fields, and exported interface methods; `6ff6772` changed exactly `planning/IMPLEMENTATION_PLAN.md` to serialize those findings, fixes, paths, and passing gates.
+- `72aaae0` changed exactly `scripts/verify-local-consumer.sh` to reject selector-based and wrapped qualified interface embeddings; `0243f6c` changed exactly `planning/IMPLEMENTATION_PLAN.md` to serialize that finding, fix, path, and passing gates.
+- `949f95c` (`test: lock sealed interface contracts`) changed exactly `scripts/verify-local-consumer.sh` to enforce exact unexported marker signatures and reject private and all other interface embedding forms; `a16b990` changed exactly `planning/IMPLEMENTATION_PLAN.md` to serialize both final-rereview findings, the fix, exact path, and both passing credential-scrubbed gates.
+
+**Recorded final clean rereviews:**
+
+- [x] `agent://chunk26a-clean-review-1` re-audited the complete strengthened external contract through `a16b990` and returned **CLEAN**. It confirmed the exact wrapper and fieldless-tool shapes, both public method signatures, the sealed `ResponseBuiltInTool` marker, unchanged legacy `ResponsesRequest` inventory, strict bidirectional export/interface/method accounting, rejection of all embedding forms, and the offline external-consumer exercise; both exact credential-scrubbed Chunk 26A gates passed.
+- [x] `agent://chunk26a-clean-review-2` independently re-audited the complete Chunk 26/26A chain through `a16b990`, verified every 26A commit's exact changed-path inventory and serialized gate evidence, and returned **CLEAN**. It found no security, portability, API, wire, test, or accounting defect; confirmed all prior findings are resolved by `b902f48`, `72aaae0`, and `949f95c`; and confirmed that no Chunk 27 or later `x_search` scope has landed.
+
+**Review/accounting gate:**
+
+- [x] Both fresh independent rereviews are clean and no actionable Chunk 26A finding remains.
+- [x] The tracker records the complete draft, review-fix, selector-fix, sealed-interface-fix, and serialized accounting hash/path chain through `a16b990`, together with both credential-scrubbed gate results and both clean rereviews. The local review/accounting gate is satisfied and Chunk 26A is dependency-ready for Chunk 27; Chunk 26A remains `[-]` and intentionally incomplete until Chunk 30 closure.
 
 - [x] Extend the external compile contract for `ResponsesBuiltInToolsRequest`, sealed `ResponseBuiltInTool`, `ResponseWebSearchTool`, and both `CreateResponseWithBuiltInTools` and `StreamResponseWithBuiltInTools` method signatures while compile-locking unchanged legacy request/result/event contracts. Reflection-lock the sealed interface's exact sole unexported zero-argument/zero-result marker, the wrapper's exact fields, the fieldless tool, and the complete legacy `ResponsesRequest` exported field order/names/types.
 - [x] Update the strict bidirectional expected-export inventory and external temporary-consumer compile exercise for the wrapper, web-search tool, and both methods. Inventory exported interface members as well as top-level declarations, retain the expected `TokenSource.Token` member, and reject any exported `ResponseBuiltInTool` member, missing expected declaration, unexpected export, alias, configurable search knob, or inferred typed output/event API.
 - [x] Run the focused external contract test and `./scripts/verify-local-consumer.sh` with all credentials and live-cost acknowledgements unset.
-- [ ] Independently review the expected/export equality and consumer exercise, then cleanly rereview every fix.
-- [ ] Before Chunk 27 starts, commit to the tracker the draft/review-fix hashes, exact changed paths, focused command results, and clean rereview result. Chunk 26A belongs to the atomic `web_search` rollback group with Chunk 26 and the surviving `web_search` claims/accounting; it is never committed as rolled back separately from that API surface.
+- [x] Independently review the expected/export equality and consumer exercise, then cleanly rereview every fix. Both fresh rereviews returned **CLEAN** with no actionable finding.
+- [x] Before Chunk 27 starts, commit to the tracker the draft/review-fix hashes, exact changed paths, focused command results, and clean rereview result. The complete chain through `a16b990` and both clean rereviews are recorded above, satisfying the serialized dependency gate. Chunk 26A belongs to the atomic `web_search` rollback group with Chunk 26 and the surviving `web_search` claims/accounting; it is never committed as rolled back separately from that API surface.
 
 ### Chunk 27 — Gateway-native SpaceXAI `x_search` request declaration
 
