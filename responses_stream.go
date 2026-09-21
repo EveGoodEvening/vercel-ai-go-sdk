@@ -54,13 +54,14 @@ type ResponseStream struct {
 	parser     *sseParser
 	stopCancel func() bool
 
-	closed atomic.Bool
-	once   sync.Once
-	mu     sync.Mutex
-	event  ResponseEvent
-	err    error
-	count  int
-	close  error
+	closed        atomic.Bool
+	once          sync.Once
+	mu            sync.Mutex
+	event         ResponseEvent
+	err           error
+	count         int
+	close         error
+	beforePublish func()
 }
 
 // StreamResponse validates and starts a streaming Responses API request.
@@ -171,9 +172,15 @@ func (s *ResponseStream) Next() bool {
 		s.finish(&TransportError{operation: "read response stream", cause: err})
 		return false
 	}
+	if s.beforePublish != nil {
+		s.beforePublish()
+	}
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed.Load() {
+		return false
+	}
 	s.event = decoded
-	s.mu.Unlock()
 	return true
 }
 
@@ -205,16 +212,16 @@ func (s *ResponseStream) Close() error {
 	if s == nil {
 		return nil
 	}
+	s.mu.Lock()
 	s.closed.Store(true)
+	s.event = nil
+	s.mu.Unlock()
 	s.once.Do(func() {
 		err := s.body.Close()
 		s.mu.Lock()
 		s.close = err
 		s.mu.Unlock()
 	})
-	s.mu.Lock()
-	s.event = nil
-	s.mu.Unlock()
 	if s.stopCancel != nil {
 		s.stopCancel()
 	}

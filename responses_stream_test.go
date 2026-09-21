@@ -452,3 +452,51 @@ func TestStreamResponseCloseClearsEventAfterCancellationOwnsBodyClose(t *testing
 		t.Fatalf("event=%#v closes=%d later Next=%v stable error=%v current error=%v", stream.Event(), body.closes(), stream.Next(), stableErr, stream.Err())
 	}
 }
+
+func TestStreamResponseClosePreventsDecodedEventPublication(t *testing.T) {
+	body := newCountedBlockingBody([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"late\"}\n\n"), false)
+	requests := 0
+	client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(streamHTTPClient(http.StatusOK, nil, body, &requests)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.StreamResponse(context.Background(), validResponsesRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decoded := make(chan struct{})
+	publish := make(chan struct{})
+	stream.beforePublish = func() {
+		close(decoded)
+		<-publish
+	}
+	defer func() {
+		select {
+		case <-publish:
+		default:
+			close(publish)
+		}
+	}()
+
+	done := make(chan bool, 1)
+	go func() { done <- stream.Next() }()
+	waitForSignal(t, decoded, "Next did not pause before event publication")
+	if err := stream.Close(); err != nil {
+		t.Fatalf("Close error = %v", err)
+	}
+	stableErr := stream.Err()
+	close(publish)
+
+	select {
+	case next := <-done:
+		if next {
+			t.Fatal("Next published an event after Close returned")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Next did not return after publication was released")
+	}
+	if stream.Event() != nil || body.closes() != 1 || stream.Next() || stream.Err() != stableErr || stableErr != nil {
+		t.Fatalf("event=%#v closes=%d later Next=%v stable error=%v current error=%v", stream.Event(), body.closes(), stream.Next(), stableErr, stream.Err())
+	}
+}
