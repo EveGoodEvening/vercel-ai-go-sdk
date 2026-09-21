@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	gateway "github.com/EveGoodEvening/vercel-ai-go-sdk"
 )
@@ -18,13 +20,16 @@ import (
 const modelID = "typesafe-ai/jev-latest"
 
 func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	client, err := gateway.NewClient()
 	if err != nil {
 		printError(err)
 		os.Exit(1)
 	}
 
-	result, err := client.Evaluate(context.Background(), modelID, gateway.EvaluationRequest{
+	result, err := client.Evaluate(ctx, modelID, gateway.EvaluationRequest{
 		State: map[string]any{
 			"response":  "Paris is the capital of France.",
 			"reference": "The capital of France is Paris.",

@@ -1,10 +1,13 @@
 # Vercel AI Go SDK
 
-Experimental Go client for Vercel AI Gateway's **AI SDK Evaluation Model V4 provider protocol**. It calls `POST https://ai-gateway.vercel.sh/v4/ai/evaluation-model`; it is not a client for the separate public REST `POST /v1/evaluate` API and is not an OpenAI-compatible wrapper.
+Experimental Go client for two distinct Vercel AI Gateway contracts:
 
-The module declares Go 1.26 as its minimum (`go 1.26` in `go.mod`). The maintained support window is the Go 1.26 and 1.27 families. CI is pinned to Go 1.26.8 and Go 1.27.1; changing either pin requires a reviewed plan and evidence update.
+- public generation through `POST /v1/responses` and `POST /v1/chat/completions`, with buffered and streaming calls; and
+- the AI SDK Evaluation Model V4 provider protocol at `POST /v4/ai/evaluation-model`.
 
-Evaluation is experimental and compatibility-sensitive. The contract is pinned to `ai@7.0.107`, `@ai-sdk/gateway@4.0.87`, `@ai-sdk/provider@4.0.17`, and `@ai-sdk/provider-utils@5.0.45`. Releases begin at v0, v1 compatibility is not promised while evaluation remains experimental, and this project does not claim parity with JavaScript `ai` or `@ai-sdk/gateway`.
+The public generation surface is not the separate public `POST /v1/evaluate` API. The provider evaluation surface is not an OpenAI-compatible generation endpoint. Search and all other categories remain unsupported unless listed below.
+
+The module requires Go 1.26. The maintained families are Go 1.26 and 1.27; CI is pinned to Go 1.26.8 and Go 1.27.1. The experimental contract baseline is `ai@7.0.107`, `@ai-sdk/gateway@4.0.87`, `@ai-sdk/provider@4.0.17`, and `@ai-sdk/provider-utils@5.0.45`.
 
 ## Install
 
@@ -12,9 +15,9 @@ Evaluation is experimental and compatibility-sensitive. The contract is pinned t
 go get github.com/EveGoodEvening/vercel-ai-go-sdk
 ```
 
-A public release remains blocked until the repository owner selects and commits a license, renames the hosted repository and updates `origin` to match the module path, completes the authorized live contract, and reviews publication provenance. See the [release-readiness policy and checklist](docs/releasing.md); no tag or published release currently exists.
+No public release exists. Release is blocked until the owner selects and commits a license, renames the hosted repository and updates `origin` to match the module path, completes the authorized live contracts, and reviews publication provenance. See [release readiness](docs/releasing.md).
 
-## Evaluation
+## Public generation
 
 ```go
 client, err := gateway.NewClient() // resolves credentials from the environment
@@ -22,102 +25,75 @@ if err != nil {
     log.Fatal(err)
 }
 
+result, err := client.CreateResponse(ctx, gateway.ResponsesRequest{
+    Model: "openai/gpt-5-nano",
+    Input: gateway.ResponseTextInput("Explain Go contexts briefly."),
+})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(string(result.RawJSON()))
+```
+
+The package also exposes `StreamResponse`, `CreateChatCompletion`, and `StreamChatCompletion`. See the [complete generation guide](docs/generation.md) and [generation example](examples/generate/main.go).
+
+## Provider evaluation
+
+```go
 result, err := client.Evaluate(ctx, "typesafe-ai/jev-latest", gateway.EvaluationRequest{
     State: map[string]any{"answer": "Paris"},
     Questions: map[string]gateway.Question{
-        "correct": gateway.BooleanQuestion{
-            Instructions: "Is the answer factually correct?",
-        },
+        "correct": gateway.BooleanQuestion{Instructions: "Is the answer factually correct?"},
     },
 })
 ```
 
-See the [complete evaluation guide](docs/evaluation.md) and [runnable example](examples/evaluate/main.go). The authorized paid live-contract run is still pending; the [live evidence record](docs/evaluation-live-evidence.md) accurately records `NOT RUN` and must not be read as a pass.
+See the [evaluation guide](docs/evaluation.md) and [evaluation example](examples/evaluate/main.go). This evaluates shared state against keyed questions; it does not generate text and is unrelated to public `/v1/evaluate`.
 
-## Authentication and options
+## Authentication and client options
 
-Credential precedence is strict:
+Credential precedence is fixed: explicit `WithAPIKey`, nonblank `AI_GATEWAY_API_KEY`, the last explicit `WithOIDCToken` or `WithOIDCTokenSource`, then nonblank `VERCEL_OIDC_TOKEN`. Otherwise `NewClient` returns `*ConfigurationError`. A selected credential is never replaced after rejection. A token source is called once per HTTP attempt with the operation context.
 
-1. explicit `WithAPIKey`;
-2. `AI_GATEWAY_API_KEY`;
-3. explicit `WithOIDCToken` or `WithOIDCTokenSource` (last explicit OIDC form wins);
-4. `VERCEL_OIDC_TOKEN`;
-5. otherwise `NewClient` returns `*ConfigurationError` with `Option()=="credentials"`.
+`WithBaseURL` changes only the provider-protocol base (default `https://ai-gateway.vercel.sh/v4/ai`). `WithPublicBaseURL` changes only the public generation base (default `https://ai-gateway.vercel.sh/v1`). Both require whitespace-exact absolute HTTP(S) URLs with host and no userinfo, query, or fragment; existing paths are retained and trailing path slashes removed. This split prevents a test or proxy URL for one contract from silently rerouting the other.
 
-A nonblank environment API key therefore beats explicit OIDC. There is no fallback after a selected credential is rejected. Blank environment credentials are absent; accepted nonblank credential strings are preserved exactly. A selected token source is called once per HTTP attempt with the `Evaluate` context; source errors or blank results are `*TransportError` values with operation `resolve OIDC token`.
+`WithHTTPClient` retains the supplied non-nil pointer. `WithTeam` sets the optional team header. `WithHeaders` clones caller headers and rejects protocol-owned names case-insensitively. `WithRetryPolicy` configures status-based retries for buffered calls; retries are disabled by default. Options apply in order and construction stops at the first error.
 
-Options are applied in order and stop at the first error:
+## Retries, cancellation, errors, and privacy
 
-- `WithBaseURL` requires a nonblank, whitespace-exact, absolute non-opaque HTTP(S) URL with host and without userinfo, query, or fragment. Existing paths are allowed. Only trailing path slashes are removed before `/evaluation-model` is appended; the remaining URL is preserved.
-- `WithHTTPClient` rejects nil, stores the supplied pointer, and neither clones nor mutates it. Caller-side concurrent use and mutation follow `http.Client` rules.
-- `WithAPIKey`, `WithOIDCToken`, and `WithTeam` reject empty/all-Unicode-whitespace input and otherwise preserve it exactly. There is no environment team fallback.
-- `WithOIDCTokenSource` rejects nil and typed-nil sources.
-- `WithHeaders(nil)` is valid. Non-nil headers are cloned when configured and again per request; later caller mutation cannot affect the client. Values, order, duplicates, nil/empty slices, and empty strings are preserved.
-- Caller headers may not contain, case-insensitively, `Authorization`, `Content-Type`, `Ai-Gateway-Protocol-Version`, `Ai-Gateway-Auth-Method`, `Ai-Evaluation-Model-Specification-Version`, `Ai-Model-Id`, or `X-Vercel-Ai-Gateway-Team`, even with no values.
-- `WithRetryPolicy` copies and validates the value; details are below.
+`RetryPolicy.MaxAttempts` includes the initial attempt: 0 and 1 mean one attempt; 2–10 opt in. Only 408, 409, 429, and 500–599 are retryable. Valid `Retry-After` is honored up to `MaxDelay`; waits are context-cancellable. Buffered Responses, Chat, and Evaluation calls use this policy. Streaming calls do not retry after response headers are received. Opting in can duplicate billable generation or evaluation work.
 
-`Evaluate(nil, ...)` fails locally with `*ValidationError` at `$["context"]`, reason `required`, before token-source or network work.
+All operations reject a nil context locally. Cancellation covers credential resolution, request execution, buffered body reads, retry waits, and stream reads. Call `Close` on streams, normally with `defer`, to release the response body and unblock a concurrent `Next`.
 
-## Wire protocol
-
-Every request is `POST {baseURL}/evaluation-model` with:
-
-- `Authorization: Bearer <credential>`
-- `Content-Type: application/json`
-- `ai-gateway-protocol-version: 0.0.1`
-- `ai-gateway-auth-method: api-key` or `oidc`
-- `ai-evaluation-model-specification-version: 4`
-- `ai-model-id: <modelID>`
-- optional `x-vercel-ai-gateway-team`
-
-The JSON body contains only `state`, `questions`, and optional `providerOptions`; it never contains `model`. Only HTTP 200 is success. Every other status, including other 2xx statuses, is a `*ResponseError`. Response `Content-Type` is deliberately ignored because intermediaries may omit or rewrite it.
-
-## Retries
-
-Retries are off by default because evaluation may be billable and non-idempotent. `MaxAttempts` counts the initial request: 0 and 1 mean one attempt; 2–10 opt in. With retries enabled, zero values resolve to `InitialDelay=100ms`, `MaxDelay=2s`, and `Multiplier=2`; `Jitter=0` disables jitter. Explicit bounds are: initial delay 1ms–1m, maximum delay 1ms–5m and not below initial, multiplier 1–10, jitter 0–1. Durations are Go `time.Duration` values.
-
-Only status 408, 409, 429, or 500–599 is retryable. Gateway `error.type` and `error.code` never change that status-only decision. A successfully parsed `Retry-After` controls the wait (capped at `MaxDelay`); waits are context-cancellable. Read/overflow/close failures on non-200 bodies are not retried. Opting in accepts possible duplicate billable work.
-
-## Typed errors
-
-All five types work with `errors.As`; accessors are nil-safe and return their documented zero values:
-
-| Type | Role and structured accessors |
-| --- | --- |
-| `ConfigurationError` | Construction failure: `Option`, `Reason`. Option/reason values are closed and documented in the evaluation guide. |
-| `ValidationError` | Local request failure: canonical `Path`, stable `Reason`. |
-| `TransportError` | Token, encoding, request, HTTP, or body-read failure: closed `Operation`, `Unwrap`. |
-| `ResponseError` | Non-200 response: status, parsed envelope fields/IDs, retry metadata, bounded diagnostic body, `Unwrap`. |
-| `ResponseValidationError` | Malformed or contract-invalid status-200 body: status, canonical wire `Path`, stable `Reason`, IDs, bounded diagnostic body, `Unwrap`. |
-
-`RawResponseBody` and successful `ResponseMetadata.Body` may contain echoed state or provider options. Never log or persist them without sanitization. Prefer the safe structured accessors.
+Errors support `errors.As`: `ConfigurationError`, `ValidationError`, `TransportError`, `ResponseError`, and `ResponseValidationError`. Raw successful generation JSON, stream event JSON, `RawResponseBody`, evaluation `ResponseMetadata.Body`, prompts, uploaded file data, tool arguments/results, provider options, headers, and identifiers may be sensitive. Do not log or persist them without deliberate sanitization.
 
 ## Support matrix
 
 | Surface | Status |
 | --- | --- |
-| AI SDK Gateway provider protocol, `POST /v4/ai/evaluation-model` | Supported |
-| Evaluation Model V4 boolean, choice, and score questions | Supported |
-| Arbitrary nonempty model IDs, including `typesafe-ai/jev-latest` | Supported; no closed model catalog |
-| JSON-compatible shared state and provider options | Supported |
-| API-key and OIDC bearer authentication | Supported |
-| Team scope and non-protected caller headers | Supported |
-| Context cancellation and explicitly configured bounded retries | Supported |
-| Public REST `POST /v1/evaluate` | Not supported |
-| OpenAI-compatible `/v1/chat/completions` or `/v1/responses` | Not supported |
-| Language/text generation or streaming | Not supported |
-| Embeddings, images, video, reranking, speech, transcription, realtime, batches | Not supported |
-| Credits, spend, generation lookup, model discovery | Not supported |
-| Agents, `generateText` orchestration, automatic tools, UI helpers, schema framework, global provider registry | Not supported |
-| Gateway-executed search helpers | Not supported |
+| Public Gateway Responses, buffered and SSE streaming | Implemented; hermetic fixtures pass; live execution **NOT RUN** |
+| Public Gateway Chat Completions, buffered and SSE streaming | Implemented; hermetic fixtures pass; live execution **NOT RUN** |
+| AI SDK Gateway Evaluation Model V4 provider protocol | Implemented; hermetic fixtures pass; live execution **NOT RUN** |
+| Responses text/item input, function tools, tool choice, reasoning, text formats, metadata and cache controls | Supported as documented in the generation guide |
+| Chat text/image-URL/file parts, function tools, response formats and Gateway routing options | Supported as documented in the generation guide |
+| API-key and OIDC bearer authentication, team scope, safe custom headers | Supported |
+| Context cancellation and explicitly configured bounded retries | Supported; streams are not resumed or replayed |
+| Public REST `POST /v1/evaluate` | Not supported; no exported API or live evidence |
+| Credits, spend, generation lookup, or model discovery APIs | Not supported |
+| Embeddings, image/video generation, reranking, speech, transcription, realtime, or batches | Not supported |
+| Agents, orchestration, automatic tool execution, UI helpers, schema framework, or global provider registry | Not supported |
+| Gateway search helpers of any category | Not supported; no exported request types or live evidence |
 | Gateway-native xAI `x_search` | Unsupported and unconfirmed; see [the decision record](docs/x-search.md) |
-| Direct xAI `x_search` client | Not provided; direct xAI facts do not establish Gateway support |
-| Full parity with JavaScript `ai` or `@ai-sdk/gateway` | Not claimed |
+| Direct provider clients, including direct xAI | Not provided |
+| Full parity with JavaScript `ai`, `@ai-sdk/gateway`, or OpenAI APIs | Not claimed |
 
-## Live evidence
+## Evidence status and blockers
 
-The gated contract test and sanitized record are in [`docs/evaluation-live-evidence.md`](docs/evaluation-live-evidence.md). It remains **NOT RUN / PENDING LIVE RUN** because no authorized paid credentialed execution has occurred. Do not claim a live pass until that record is completed from the exact authorized command.
+The ordinary suite is hermetic: it uses loopback fixtures and rejects non-loopback traffic. That proves local encoding, validation, response parsing, streaming, resource limits, cancellation, and retry behavior; it does not prove the hosted Gateway currently accepts the requests.
 
-## Release and migration policy
+The sole sanitized live record is [`docs/evaluation-live-evidence.md`](docs/evaluation-live-evidence.md). Both public generation and provider evaluation remain **NOT RUN / PENDING LIVE RUN** because no owner-authorized paid-network execution, protected-environment run, or sanitized live result exists. Public generation requires its exact acknowledgement and isolated Responses/Chat command; provider evaluation requires its separate acknowledgement and isolated evaluation command. Neither contract is evidence for the other. Search and public `/v1/evaluate` have no authorized probe, exported API, or first-party wire evidence in this repository and remain unsupported rather than pending implementation.
 
-Every exported breaking change, including during v0, requires an appropriate version increment, a changelog entry, and a release-note **Migration** section naming each removed or changed API and the caller action required. Published tags are immutable: never move, delete as a rollback, or reuse one. Correct a defective release with a new patch version containing an appropriate `retract` directive and rationale, mark the hosting release as affected, publish corrected notes, and issue a security advisory when applicable. The complete policy and unresolved external blockers are maintained in [`docs/releasing.md`](docs/releasing.md).
+## Migration and release policy
+
+Generation is additive: existing evaluation callers continue using `Evaluate` and `WithBaseURL` unchanged. New generation callers choose Responses or Chat and may set `WithPublicBaseURL`; it does not affect evaluation. No compatibility alias or endpoint auto-detection is provided.
+
+Every exported breaking change, including during v0, requires a version increment, changelog entry, and release-note **Migration** section naming every changed API and caller action. Published tags are immutable. See the complete [release policy](docs/releasing.md).

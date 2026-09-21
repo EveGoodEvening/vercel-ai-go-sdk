@@ -1,8 +1,8 @@
 # Evaluation Model V4 guide
 
-This package implements the experimental AI SDK Gateway provider protocol at `POST https://ai-gateway.vercel.sh/v4/ai/evaluation-model`. It does **not** implement the separate public REST `POST /v1/evaluate` API, an OpenAI-compatible API, or other AI SDK modalities. The [Gateway-native xAI `x_search` decision](x-search.md) remains unsupported/unconfirmed; direct xAI support is a different contract and this package provides no direct xAI client.
+This package implements the experimental AI SDK Gateway provider protocol at `POST https://ai-gateway.vercel.sh/v4/ai/evaluation-model`. `Evaluate` judges shared state against keyed questions; it does not generate text. The same client separately implements public Responses and Chat generation documented in [generation.md](generation.md), using an independently configurable `/v1` base URL. Neither surface implements the separate public REST `POST /v1/evaluate` API. Search remains unsupported: the [Gateway-native xAI `x_search` decision](x-search.md) is unconfirmed, direct xAI support is a different contract, and this package provides no direct xAI client.
 
-The authorized paid live-contract check has not run. [`evaluation-live-evidence.md`](evaluation-live-evidence.md) is the sole record and currently says `NOT RUN` / `PENDING LIVE RUN`; this guide does not imply a live pass.
+Hermetic fixtures cover provider evaluation, but the authorized paid evaluation live-contract check has not run. [`evaluation-live-evidence.md`](evaluation-live-evidence.md) is the sole record and currently says provider evaluation `NOT RUN` / `PENDING LIVE RUN`; public generation has its own independently pending record. Neither contract is evidence for the other.
 
 ## Constructing a client
 
@@ -25,6 +25,7 @@ A selected `TokenSource` is invoked once for each HTTP attempt with the `Evaluat
 ### Option contract
 
 - `WithBaseURL`: input must be nonempty, contain no leading/trailing Unicode whitespace, and parse as an absolute, non-opaque `http` or `https` URL with host and no userinfo, query, or fragment. Existing paths are allowed. Every trailing `/` is removed from the path; if empty, the origin has no trailing slash. Scheme, host, port, escaping, and remaining path are preserved, then `/evaluation-model` is appended. Invalid input is not trimmed or repaired.
+- `WithPublicBaseURL`: configures only the public Responses and Chat base URL described in [generation.md](generation.md). It does not affect `Evaluate`; conversely, `WithBaseURL` does not affect generation. It applies the same URL requirements and additionally rejects a literal fragment delimiter.
 - `WithHTTPClient`: nil is invalid. The exact pointer is stored and used; the SDK does not clone or mutate the client or transport. The caller owns concurrency safety for subsequent mutation.
 - `WithAPIKey`, `WithOIDCToken`, `WithTeam`: empty/all-Unicode-whitespace input is invalid; accepted input is preserved exactly. Team has no environment fallback.
 - `WithOIDCTokenSource`: nil interfaces and typed-nil sources are invalid.
@@ -34,7 +35,7 @@ A selected `TokenSource` is invoked once for each HTTP attempt with the `Evaluat
 
 ### `ConfigurationError` closed mappings
 
-`Option()` returns only `WithBaseURL`, `WithHTTPClient`, `WithAPIKey`, `WithOIDCToken`, `WithOIDCTokenSource`, `WithTeam`, `WithHeaders`, `WithRetryPolicy`, or `credentials`.
+`Option()` returns only `WithBaseURL`, `WithPublicBaseURL`, `WithHTTPClient`, `WithAPIKey`, `WithOIDCToken`, `WithOIDCTokenSource`, `WithTeam`, `WithHeaders`, `WithRetryPolicy`, or `credentials`.
 
 `Reason()` returns only `must not be empty or whitespace`, `must be an absolute http or https URL`, `must not contain userinfo, query, or fragment`, `must not be nil`, `contains protected header`, `invalid MaxAttempts`, `invalid InitialDelay`, `invalid MaxDelay`, `MaxDelay is less than InitialDelay`, `invalid Multiplier`, `invalid Jitter`, or `no credential configured`.
 
@@ -163,7 +164,11 @@ if errors.As(err, &responseErr) {
 
 Before retry number `r` (first retry is 1), base delay is `min(MaxDelay, InitialDelay*Multiplier^(r-1))`, saturating rather than overflowing. With uniform `u` in `[0,1)`, jitter changes it to `delay*(1+Jitter*(2*u-1))`, rounded to the nearest nanosecond and capped again. Valid `Retry-After` seconds or HTTP date replaces that delay and is capped; malformed/negative values are absent. Waiting is context-cancellable.
 
-Retryability is **only** `status==408 || status==409 || status==429 || 500<=status<=599`. Parsed or malformed error type/code never changes it; `Retry-After` never makes another status retryable. A retry occurs only with an attempt remaining, successfully read response body, and active context. Body-read failures are never retried. The default is one attempt because retrying evaluation can duplicate billable/non-idempotent work.
+Retryability is **only** `status==408 || status==409 || status==429 || 500<=status<=599`. Parsed or malformed error type/code never changes it; `Retry-After` never makes another status retryable. A retry occurs only with an attempt remaining, successfully read response body, and active context. Body-read failures are never retried. The default is one attempt because evaluation can duplicate billable/non-idempotent work. The same policy is shared by buffered public generation calls; generation streams are never retried after headers.
+
+## Additive generation migration
+
+Generation support does not change this evaluation contract. Existing callers keep `Evaluate` and `WithBaseURL`. New Responses or Chat callers use the APIs in [generation.md](generation.md) and may configure `WithPublicBaseURL`; there is no alias, endpoint auto-detection, or conversion between evaluation and generation requests.
 
 ## Runnable example
 
