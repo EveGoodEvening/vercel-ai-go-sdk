@@ -91,6 +91,7 @@ func (p *sseParser) next() (sseEvent, error) {
 			if additional > maxSSEEventBytes-len(p.data) {
 				return sseEvent{}, errSSEEventTooLarge
 			}
+			p.growData(additional)
 			if p.hasData {
 				p.data = append(p.data, '\n')
 			}
@@ -98,6 +99,26 @@ func (p *sseParser) next() (sseEvent, error) {
 			p.hasData = true
 		}
 	}
+}
+
+// growData keeps the parser's retained event allocation within the documented
+// event ceiling. The built-in append growth policy may otherwise reserve past
+// maxSSEEventBytes even though the framed payload itself is within the limit.
+func (p *sseParser) growData(additional int) {
+	required := len(p.data) + additional
+	if required <= cap(p.data) {
+		return
+	}
+	capacity := cap(p.data) * 2
+	if capacity < required {
+		capacity = required
+	}
+	if capacity > maxSSEEventBytes {
+		capacity = maxSSEEventBytes
+	}
+	data := make([]byte, len(p.data), capacity)
+	copy(data, p.data)
+	p.data = data
 }
 
 func (p *sseParser) readLine() (line []byte, eof bool, err error) {

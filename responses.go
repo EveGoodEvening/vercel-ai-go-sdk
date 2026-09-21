@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"time"
 	"unicode/utf8"
-
-	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 )
 
 // ResponsesRequest is a non-streaming Responses API request.
@@ -181,7 +179,7 @@ func (client *Client) executeResponsesRequest(ctx context.Context, payload []byt
 	if err != nil {
 		return rawEvaluationResponse{}, &TransportError{operation: "send request", cause: err}
 	}
-	capture := httpx.ReadAndClose(resp.Body)
+	capture := readAndCloseResponse(ctx, resp.Body)
 	return rawEvaluationResponse{statusCode: resp.StatusCode, headers: resp.Header.Clone(), body: capture.Body, bodyTruncated: capture.Truncated, bodyErr: capture.Err}, nil
 }
 

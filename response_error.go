@@ -33,10 +33,6 @@ func composeResponseError(raw rawEvaluationResponse, now time.Time) *ResponseErr
 		bodyTruncated:   raw.bodyTruncated,
 		rawResponseBody: append([]byte(nil), raw.body...),
 	}
-	if raw.bodyErr != nil {
-		responseErr.cause = &TransportError{operation: "read response body", cause: raw.bodyErr}
-		return responseErr
-	}
 	if envelope, ok := parseResponseErrorEnvelope(raw.body); ok {
 		responseErr.message = envelope.Error.Message
 		responseErr.typeName = envelope.Error.Type
@@ -45,6 +41,9 @@ func composeResponseError(raw rawEvaluationResponse, now time.Time) *ResponseErr
 		responseErr.generationID = envelope.GenerationID
 		responseErr.requestID = envelope.RequestID
 		responseErr.responseID = envelope.ResponseID
+	}
+	if raw.bodyErr != nil {
+		responseErr.cause = &TransportError{operation: "read response body", cause: raw.bodyErr}
 	}
 	return responseErr
 }

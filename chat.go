@@ -5,8 +5,6 @@ import (
 	"context"
 	"net/http"
 	"time"
-
-	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 )
 
 // ChatCompletionRequest is a non-streaming Chat Completions request.
@@ -236,6 +234,6 @@ func (client *Client) executeChatCompletionRequest(ctx context.Context, payload 
 	if err != nil {
 		return rawEvaluationResponse{}, &TransportError{operation: "send request", cause: err}
 	}
-	capture := httpx.ReadAndClose(resp.Body)
+	capture := readAndCloseResponse(ctx, resp.Body)
 	return rawEvaluationResponse{statusCode: resp.StatusCode, headers: resp.Header.Clone(), body: capture.Body, bodyTruncated: capture.Truncated, bodyErr: capture.Err}, nil
 }
