@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
@@ -54,9 +53,13 @@ type ResponseStream struct {
 	parser     *sseParser
 	stopCancel func() bool
 
-	closed        atomic.Bool
-	once          sync.Once
 	mu            sync.Mutex
+	once          sync.Once
+	closed        bool
+	terminating   bool
+	terminalDone  chan struct{}
+	terminalErr   error
+	includeClose  bool
 	event         ResponseEvent
 	err           error
 	count         int
@@ -101,22 +104,10 @@ func (client *Client) StreamResponse(ctx context.Context, request ResponsesReque
 		}
 		return nil, composeResponseError(rawEvaluationResponse{statusCode: resp.StatusCode, headers: resp.Header.Clone(), body: capture.Body, bodyTruncated: capture.Truncated, bodyErr: capture.Err}, now)
 	}
-	stream := &ResponseStream{ctx: ctx, body: resp.Body}
+	stream := &ResponseStream{ctx: ctx, body: resp.Body, terminalDone: make(chan struct{})}
 	stream.parser = newSSEParser(resp.Body)
 	stream.stopCancel = context.AfterFunc(ctx, func() {
-		stream.mu.Lock()
-		if !stream.closed.Load() {
-			stream.closed.Store(true)
-			stream.event = nil
-			stream.err = &TransportError{operation: "read response stream", cause: ctx.Err()}
-		}
-		stream.mu.Unlock()
-		stream.once.Do(func() {
-			err := stream.body.Close()
-			stream.mu.Lock()
-			stream.close = err
-			stream.mu.Unlock()
-		})
+		stream.finish(&TransportError{operation: "read response stream", cause: ctx.Err()})
 	})
 	return stream, nil
 }
@@ -141,7 +132,7 @@ func encodeStreamingResponsesRequest(request ResponsesRequest) ([]byte, error) {
 // Next advances to the next event. It returns false at clean framed EOF, after
 // Close, or on error. Event is valid only after Next returns true.
 func (s *ResponseStream) Next() bool {
-	if s == nil || s.closed.Load() {
+	if s == nil || s.stopped() {
 		return false
 	}
 	if err := s.ctx.Err(); err != nil {
@@ -150,7 +141,7 @@ func (s *ResponseStream) Next() bool {
 	}
 	event, err := s.parser.next()
 	if err != nil {
-		if s.closed.Load() {
+		if s.stopped() {
 			return false
 		} else if contextErr := s.ctx.Err(); contextErr != nil {
 			s.finish(&TransportError{operation: "read response stream", cause: contextErr})
@@ -161,11 +152,17 @@ func (s *ResponseStream) Next() bool {
 		}
 		return false
 	}
-	if s.closed.Load() {
+	if s.stopped() {
 		return false
 	}
 
 	s.mu.Lock()
+	if s.closed || s.terminating {
+		done := s.terminalDone
+		s.mu.Unlock()
+		<-done
+		return false
+	}
 	if s.count >= maxResponseStreamEvents {
 		s.mu.Unlock()
 		s.finish(&TransportError{operation: "read response stream", cause: errors.New("response stream exceeds 10000 events")})
@@ -183,28 +180,31 @@ func (s *ResponseStream) Next() bool {
 		s.beforePublish()
 	}
 	s.mu.Lock()
-	if s.closed.Load() {
+	if s.closed || s.terminating {
+		done := s.terminalDone
 		s.mu.Unlock()
+		<-done
 		return false
 	}
 	if contextErr := s.ctx.Err(); contextErr != nil {
-		s.closed.Store(true)
-		s.event = nil
-		s.err = &TransportError{operation: "read response stream", cause: contextErr}
 		s.mu.Unlock()
-		s.once.Do(func() {
-			closeErr := s.body.Close()
-			s.mu.Lock()
-			s.close = closeErr
-			s.mu.Unlock()
-		})
-		if s.stopCancel != nil {
-			s.stopCancel()
-		}
+		s.finish(&TransportError{operation: "read response stream", cause: contextErr})
 		return false
 	}
 	s.event = decoded
 	s.mu.Unlock()
+	return true
+}
+
+func (s *ResponseStream) stopped() bool {
+	s.mu.Lock()
+	if !s.closed && !s.terminating {
+		s.mu.Unlock()
+		return false
+	}
+	done := s.terminalDone
+	s.mu.Unlock()
+	<-done
 	return true
 }
 
@@ -236,45 +236,54 @@ func (s *ResponseStream) Close() error {
 	if s == nil {
 		return nil
 	}
-	s.mu.Lock()
-	s.closed.Store(true)
-	s.event = nil
-	s.mu.Unlock()
-	s.once.Do(func() {
-		err := s.body.Close()
-		s.mu.Lock()
-		s.close = err
-		s.mu.Unlock()
-	})
-	if s.stopCancel != nil {
-		s.stopCancel()
-	}
+	s.terminate(nil, false)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.close
 }
 
 func (s *ResponseStream) finish(streamErr error) {
-	if s.closed.Swap(true) {
+	s.terminate(streamErr, true)
+}
+
+func (s *ResponseStream) terminate(streamErr error, includeClose bool) {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
 		return
 	}
-	s.once.Do(func() {
-		closeErr := s.body.Close()
-		s.mu.Lock()
-		s.close = closeErr
+	if s.terminating {
+		done := s.terminalDone
 		s.mu.Unlock()
+		<-done
+		return
+	}
+	s.terminating = true
+	s.terminalErr = streamErr
+	s.includeClose = includeClose
+	done := s.terminalDone
+	s.mu.Unlock()
+
+	var closeErr error
+	s.once.Do(func() {
+		closeErr = s.body.Close()
 	})
+
+	s.mu.Lock()
+	s.close = closeErr
+	s.event = nil
+	if s.terminalErr != nil {
+		s.err = s.terminalErr
+	}
+	if s.includeClose && closeErr != nil {
+		s.err = &TransportError{operation: "read response stream", cause: errors.Join(s.terminalErr, closeErr)}
+	}
+	s.closed = true
+	close(done)
+	s.mu.Unlock()
+
 	if s.stopCancel != nil {
 		s.stopCancel()
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.event = nil
-	if streamErr != nil || s.close != nil {
-		s.err = &TransportError{operation: "read response stream", cause: errors.Join(streamErr, s.close)}
-		if transportErr, ok := streamErr.(*TransportError); ok && s.close == nil {
-			s.err = transportErr
-		}
 	}
 }
 

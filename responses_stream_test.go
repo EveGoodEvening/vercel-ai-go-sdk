@@ -137,6 +137,44 @@ func (body *countedBlockingBody) closes() int {
 	return body.closeCount
 }
 
+type slowCloseBody struct {
+	reader       *bytes.Reader
+	closeStarted chan struct{}
+	closeRelease chan struct{}
+	closeErr     error
+	once         sync.Once
+	mu           sync.Mutex
+	closeCount   int
+}
+
+func newSlowCloseBody(payload []byte, closeErr error) *slowCloseBody {
+	return &slowCloseBody{
+		reader:       bytes.NewReader(payload),
+		closeStarted: make(chan struct{}),
+		closeRelease: make(chan struct{}),
+		closeErr:     closeErr,
+	}
+}
+
+func (body *slowCloseBody) Read(buffer []byte) (int, error) {
+	return body.reader.Read(buffer)
+}
+
+func (body *slowCloseBody) Close() error {
+	body.mu.Lock()
+	body.closeCount++
+	body.mu.Unlock()
+	body.once.Do(func() { close(body.closeStarted) })
+	<-body.closeRelease
+	return body.closeErr
+}
+
+func (body *slowCloseBody) closes() int {
+	body.mu.Lock()
+	defer body.mu.Unlock()
+	return body.closeCount
+}
+
 func streamHTTPClient(status int, headers http.Header, body io.ReadCloser, requests *int) *http.Client {
 	return &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
 		*requests++
@@ -547,5 +585,102 @@ func TestStreamResponseCancellationPreventsDecodedEventPublication(t *testing.T)
 	var transportErr *TransportError
 	if stream.Event() != nil || body.closes() != 1 || stream.Next() || stream.Err() != stableErr || !errors.As(stableErr, &transportErr) || transportErr.Operation() != "read response stream" || !errors.Is(stableErr, context.Canceled) {
 		t.Fatalf("event=%#v closes=%d later Next=%v stable error=%T %v current error=%v", stream.Event(), body.closes(), stream.Next(), stableErr, stableErr, stream.Err())
+	}
+}
+
+func TestStreamResponseTerminalStateWaitsForSlowBodyClose(t *testing.T) {
+	closeErr := errors.New("slow close failed")
+	body := newSlowCloseBody([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"first\"}\n\ndata: not-json\n\n"), closeErr)
+	requests := 0
+	client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(streamHTTPClient(http.StatusOK, nil, body, &requests)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.StreamResponse(context.Background(), validResponsesRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stream.Next() || stream.Event() == nil {
+		t.Fatalf("first Next/event = true/%#v, error=%v", stream.Event(), stream.Err())
+	}
+
+	terminalNext := make(chan bool, 1)
+	go func() { terminalNext <- stream.Next() }()
+	waitForSignal(t, body.closeStarted, "terminal Next did not start closing the body")
+	concurrentNext := make(chan bool, 1)
+	go func() { concurrentNext <- stream.Next() }()
+	concurrentClose := make(chan error, 1)
+	go func() { concurrentClose <- stream.Close() }()
+
+	select {
+	case next := <-terminalNext:
+		t.Fatalf("terminal Next returned %v before body Close completed", next)
+	case next := <-concurrentNext:
+		t.Fatalf("concurrent Next returned %v before terminal state was published", next)
+	case err := <-concurrentClose:
+		t.Fatalf("concurrent Close returned %v before terminal state was published", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(body.closeRelease)
+
+	if next := <-terminalNext; next {
+		t.Fatal("terminal Next returned true")
+	}
+	if next := <-concurrentNext; next {
+		t.Fatal("concurrent Next returned true")
+	}
+	if err := <-concurrentClose; !errors.Is(err, closeErr) {
+		t.Fatalf("concurrent Close error = %v", err)
+	}
+	stableErr := stream.Err()
+	var transportErr *TransportError
+	if stream.Event() != nil || stableErr == nil || !errors.As(stableErr, &transportErr) || !errors.Is(stableErr, closeErr) || stream.Next() || stream.Err() != stableErr || body.closes() != 1 {
+		t.Fatalf("event=%#v error=%T %v current error=%v later Next=%v closes=%d", stream.Event(), stableErr, stableErr, stream.Err(), stream.Next(), body.closes())
+	}
+}
+
+func TestStreamResponseExplicitClosePublishesStableStateAfterSlowBodyClose(t *testing.T) {
+	body := newSlowCloseBody([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"late\"}\n\n"), nil)
+	requests := 0
+	client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(streamHTTPClient(http.StatusOK, nil, body, &requests)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.StreamResponse(context.Background(), validResponsesRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded := make(chan struct{})
+	publish := make(chan struct{})
+	stream.beforePublish = func() {
+		close(decoded)
+		<-publish
+	}
+	nextDone := make(chan bool, 1)
+	go func() { nextDone <- stream.Next() }()
+	waitForSignal(t, decoded, "Next did not pause before event publication")
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- stream.Close() }()
+	waitForSignal(t, body.closeStarted, "Close did not start closing the body")
+	close(publish)
+
+	select {
+	case next := <-nextDone:
+		t.Fatalf("Next returned %v before body Close completed", next)
+	case err := <-closeDone:
+		t.Fatalf("Close returned %v before terminal state was published", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(body.closeRelease)
+
+	if err := <-closeDone; err != nil {
+		t.Fatalf("Close error = %v", err)
+	}
+	if next := <-nextDone; next {
+		t.Fatal("Next published an event after Close")
+	}
+	stableErr := stream.Err()
+	if stream.Event() != nil || stableErr != nil || stream.Next() || stream.Err() != stableErr || body.closes() != 1 {
+		t.Fatalf("event=%#v error=%v current error=%v later Next=%v closes=%d", stream.Event(), stableErr, stream.Err(), stream.Next(), body.closes())
 	}
 }

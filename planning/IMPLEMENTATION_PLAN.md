@@ -807,7 +807,8 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 - [x] Review fix implemented and verified: explicit `Close` clears a previously exposed `Event` even when context cancellation won the shared `sync.Once`, with focused lifecycle and race coverage.
 - [x] Review fix implemented and verified: concurrent `Close` and successful `Next` event publication are serialized so `Next` cannot publish an event after closure, with a deterministic lifecycle regression and race coverage.
 - [x] Review fix implemented and verified: cancellation observed after event decode but before publication synchronizes terminal-state transition with publication so a decoded event cannot be exposed after cancellation. The first deterministic regression ordering failed because it sampled `Err` before terminal state; test synchronization was corrected to await the terminal transition, after which focused, race, full, vet, formatting, diff-check, and diagnostics verification passed.
-- [ ] Clean independent re-review confirms all six review fixes and finds no remaining implementation issue.
+- [x] Review fix implemented and verified: terminal state is published atomically only after body closure and final `Event`/`Err` stabilization, preventing observers from seeing closed state before terminal accessors are stable, with deterministic slow/blocking body-close concurrency regressions and race coverage.
+- [ ] Clean independent re-review confirms all seven review fixes and finds no remaining implementation issue.
 - [-] **Block every event interpretation beyond `response.output_text.delta`** until the exact first-party evidence gate above clears; raw bounded preservation is implemented, but final completion remains pending clean independent re-review closure.
 
 ### Evidence-gated continuation item — Responses built-in web search
