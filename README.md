@@ -15,7 +15,7 @@ The module requires Go 1.26. The maintained families are Go 1.26 and 1.27; CI is
 go get github.com/EveGoodEvening/vercel-ai-go-sdk
 ```
 
-No public release exists. Release is blocked until the owner selects and commits a license, renames the hosted repository and updates `origin` to match the module path, completes the authorized live contracts, and reviews publication provenance. See [release readiness](docs/releasing.md).
+No public release exists. Local `origin` already matches the module path (`git@github.com:EveGoodEvening/vercel-ai-go-sdk.git`); release remains blocked until the owner selects and commits a license, verifies that the hosted repository metadata matches that path, completes the authorized live contracts, and reviews publication provenance. See [release readiness](docs/releasing.md).
 
 ## Public generation
 
@@ -92,7 +92,7 @@ Errors support `errors.As`: `ConfigurationError`, `ValidationError`, `TransportE
 
 The ordinary suite is hermetic: it uses loopback fixtures and rejects non-loopback traffic. That proves local encoding, validation, response parsing, streaming, resource limits, cancellation, and retry behavior; it does not prove the hosted Gateway currently accepts the requests.
 
-The sole sanitized live record is [`docs/evaluation-live-evidence.md`](docs/evaluation-live-evidence.md). Both public generation and provider evaluation remain **NOT RUN / PENDING LIVE RUN** because no owner-authorized paid-network execution, protected-environment run, or sanitized live result exists. Public generation requires its exact acknowledgement and isolated Responses/Chat command; provider evaluation requires its separate acknowledgement and isolated evaluation command. Neither contract is evidence for the other. Search and public `/v1/evaluate` have no authorized probe, exported API, or first-party wire evidence in this repository and remain unsupported rather than pending implementation.
+The sole sanitized live record is [`docs/evaluation-live-evidence.md`](docs/evaluation-live-evidence.md), and it records **NOT RUN / PENDING LIVE RUN** rather than hosted success. The live boundary recognizes both credential variables (`AI_GATEWAY_API_KEY` and `VERCEL_OIDC_TOKEN`) and uses two distinct acknowledgements: `AI_GATEWAY_PUBLIC_LIVE_COST_ACK=I_ACCEPT_LIVE_PUBLIC_API_COSTS` for generation and `AI_GATEWAY_LIVE_COST_ACK=I_ACCEPT_LIVE_EVALUATION_COSTS` for provider evaluation. The protected workflow keeps public generation and provider Evaluation in isolated jobs, with the opposite acknowledgement unset; its configured API-key path also requires `VERCEL_OIDC_TOKEN` to be unset. Before release, authorized evidence must cover all four generation paths (`CreateResponse`, `StreamResponse`, `CreateChatCompletion`, and `StreamChatCompletion`) plus `Evaluate`, and the exported continuation API must be audited against current first-party contract evidence. No owner-authorized paid run or sanitized hosted result has established those contracts. Search and public `/v1/evaluate` have no authorized probe, exported API, or first-party wire evidence in this repository and remain unsupported rather than pending implementation.
 
 ## Migration and release policy
 

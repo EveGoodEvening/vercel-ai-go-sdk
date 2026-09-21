@@ -145,6 +145,9 @@ func (client *Client) CreateResponse(ctx context.Context, request ResponsesReque
 			return nil, err
 		}
 		if raw.statusCode == http.StatusOK {
+			if raw.bodyTruncated {
+				return nil, &ResponseValidationError{cause: raw.bodyErr, statusCode: http.StatusOK, path: "$", reason: "response body exceeds 1 MiB", bodyTruncated: true, rawResponseBody: append([]byte(nil), raw.body...)}
+			}
 			if raw.bodyErr != nil {
 				return nil, &TransportError{operation: "read response body", cause: raw.bodyErr}
 			}
@@ -189,7 +192,7 @@ func (client *Client) executeResponsesRequest(ctx context.Context, payload []byt
 
 func decodeRawResponseResult(raw rawEvaluationResponse) (*ResponseResult, error) {
 	if raw.bodyTruncated {
-		return nil, &ResponseValidationError{statusCode: http.StatusOK, path: "$", reason: "response body exceeds 1 MiB", bodyTruncated: true, rawResponseBody: append([]byte(nil), raw.body...)}
+		return nil, &ResponseValidationError{cause: raw.bodyErr, statusCode: http.StatusOK, path: "$", reason: "response body exceeds 1 MiB", bodyTruncated: true, rawResponseBody: append([]byte(nil), raw.body...)}
 	}
 	return decodeResponseResult(raw.body)
 }

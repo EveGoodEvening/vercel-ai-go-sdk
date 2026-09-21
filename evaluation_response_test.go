@@ -1,15 +1,20 @@
 package gateway
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 )
 
 func TestComposeEvaluationResultValidMixedResponse(t *testing.T) {
@@ -405,6 +410,34 @@ func TestComposeEvaluationResultValidationDiagnostics(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEvaluateSuccessBodyLimitPlusOneReturnsValidationError(t *testing.T) {
+	body := bytes.Repeat([]byte("x"), (1<<20)+1)
+	client, err := NewClient(WithAPIKey("key"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(body)), Request: request}, nil
+	})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.Evaluate(context.Background(), "provider/model", EvaluationRequest{State: "state", Questions: map[string]Question{"q": BooleanQuestion{Instructions: "yes?"}}})
+	var validation *ResponseValidationError
+	if !errors.As(err, &validation) {
+		t.Fatalf("error = %T %v, want ResponseValidationError", err, err)
+	}
+	if validation.StatusCode() != http.StatusOK || validation.Path() != "$" || validation.Reason() != "response body exceeds 1 MiB" || !validation.BodyTruncated() {
+		t.Fatalf("status=%d path=%q reason=%q truncated=%v", validation.StatusCode(), validation.Path(), validation.Reason(), validation.BodyTruncated())
+	}
+	if raw := validation.RawResponseBody(); len(raw) != 1<<20 || !bytes.Equal(raw, body[:1<<20]) {
+		t.Fatalf("raw body length = %d", len(validation.RawResponseBody()))
+	}
+	if !errors.Is(err, httpx.ErrResponseBodyTooLarge) {
+		t.Fatalf("overflow cause not retained: %v", err)
+	}
+	var transportErr *TransportError
+	if errors.As(err, &transportErr) {
+		t.Fatalf("overflow returned TransportError: %v", err)
 	}
 }
 

@@ -343,12 +343,29 @@ func TestCreateResponseSuccessBodyOverflowAndNon200(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
+			if test.status == http.StatusOK {
+				var validation *ResponseValidationError
+				if !errors.As(err, &validation) {
+					t.Fatalf("error = %T %v, want ResponseValidationError", err, err)
+				}
+				if validation.StatusCode() != http.StatusOK || validation.Path() != "$" || validation.Reason() != "response body exceeds 1 MiB" || !validation.BodyTruncated() {
+					t.Fatalf("status=%d path=%q reason=%q truncated=%v", validation.StatusCode(), validation.Path(), validation.Reason(), validation.BodyTruncated())
+				}
+				if raw := validation.RawResponseBody(); len(raw) != 1<<20 || !bytes.Equal(raw, test.body[:1<<20]) {
+					t.Fatalf("raw body length = %d", len(validation.RawResponseBody()))
+				}
+				if !errors.Is(err, httpx.ErrResponseBodyTooLarge) {
+					t.Fatalf("overflow cause not retained: %v", err)
+				}
+				var transportErr *TransportError
+				if errors.As(err, &transportErr) {
+					t.Fatalf("overflow returned TransportError: %v", err)
+				}
+				return
+			}
 			var responseErr *ResponseError
 			if errors.As(err, &responseErr) != test.wantResponse {
 				t.Fatalf("ResponseError presence=%v error=%T %v", errors.As(err, &responseErr), err, err)
-			}
-			if test.status == 200 && !errors.Is(err, httpx.ErrResponseBodyTooLarge) {
-				t.Fatalf("overflow error=%v", err)
 			}
 			if responseErr != nil && responseErr.StatusCode() != test.status {
 				t.Fatalf("status=%d", responseErr.StatusCode())

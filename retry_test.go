@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 )
 
 func TestRetryPolicyValidationBoundaries(t *testing.T) {
@@ -324,14 +326,35 @@ func TestEvaluateNeverRetriesResponseBodyFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 				_, err = client.Evaluate(context.Background(), "provider/model", validRequest())
-				var transportErr *TransportError
-				if !errors.As(err, &transportErr) || transportErr.Operation() != "read response body" {
-					t.Fatalf("error = %T %v", err, err)
-				}
-				if status != 200 {
-					var responseErr *ResponseError
-					if !errors.As(err, &responseErr) || responseErr.StatusCode() != status {
-						t.Fatalf("response error = %T %v", err, err)
+				if failure.name == "overflow" && status == http.StatusOK {
+					var validationErr *ResponseValidationError
+					if !errors.As(err, &validationErr) {
+						t.Fatalf("error = %T %v, want ResponseValidationError", err, err)
+					}
+					if validationErr.StatusCode() != http.StatusOK || validationErr.Path() != "$" || validationErr.Reason() != "response body exceeds 1 MiB" || !validationErr.BodyTruncated() {
+						t.Fatalf("status=%d path=%q reason=%q truncated=%v", validationErr.StatusCode(), validationErr.Path(), validationErr.Reason(), validationErr.BodyTruncated())
+					}
+					raw := validationErr.RawResponseBody()
+					if len(raw) != 1<<20 || !bytes.Equal(raw, make([]byte, 1<<20)) {
+						t.Fatalf("raw body length=%d", len(raw))
+					}
+					if !errors.Is(err, httpx.ErrResponseBodyTooLarge) {
+						t.Fatalf("overflow cause not retained: %v", err)
+					}
+					var transportErr *TransportError
+					if errors.As(err, &transportErr) {
+						t.Fatalf("overflow returned TransportError: %v", err)
+					}
+				} else {
+					var transportErr *TransportError
+					if !errors.As(err, &transportErr) || transportErr.Operation() != "read response body" {
+						t.Fatalf("error = %T %v", err, err)
+					}
+					if status != http.StatusOK {
+						var responseErr *ResponseError
+						if !errors.As(err, &responseErr) || responseErr.StatusCode() != status {
+							t.Fatalf("response error = %T %v", err, err)
+						}
 					}
 				}
 				if requests != 1 || sleeps != 0 {

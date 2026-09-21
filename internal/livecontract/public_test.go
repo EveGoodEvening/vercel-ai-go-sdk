@@ -4,6 +4,7 @@ package livecontract_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -30,9 +31,7 @@ func TestGatewayResponsesContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create live Gateway response: %v", err)
 	}
-	if len(result.RawJSON()) == 0 {
-		t.Fatal("live Gateway response was empty")
-	}
+	assertBufferedResponseStructure(t, result.RawJSON())
 
 	stream, err := client.StreamResponse(ctx, request)
 	if err != nil {
@@ -40,14 +39,26 @@ func TestGatewayResponsesContract(t *testing.T) {
 	}
 	defer stream.Close()
 	events := 0
+	lastType := ""
 	for stream.Next() {
 		events++
+		event := stream.Event()
+		switch event := event.(type) {
+		case gateway.ResponseOutputTextDeltaEvent:
+			lastType = event.Type
+		case gateway.RawResponseEvent:
+			lastType = event.Type
+			assertStreamResponseModel(t, event.RawJSON(), event.Type == "response.completed")
+		}
 	}
 	if err := stream.Err(); err != nil {
 		t.Fatalf("read live Gateway response stream: %v", err)
 	}
 	if events == 0 {
 		t.Fatal("live Gateway response stream contained no events")
+	}
+	if lastType != "response.completed" {
+		t.Fatal("live Gateway response stream did not terminate with response.completed")
 	}
 }
 
@@ -68,8 +79,16 @@ func TestGatewayChatContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create live Gateway chat completion: %v", err)
 	}
-	if len(result.RawJSON()) == 0 {
-		t.Fatal("live Gateway chat completion was empty")
+	if !result.Model.Present || result.Model.Null || result.Model.Value != publicLiveModel {
+		t.Fatal("live Gateway chat completion omitted or changed the pinned model")
+	}
+	if !result.Choices.Present || result.Choices.Null || len(result.Choices.Value) == 0 {
+		t.Fatal("live Gateway chat completion omitted choices")
+	}
+	for _, choice := range result.Choices.Value {
+		if !choice.FinishReason.Present || choice.FinishReason.Null || strings.TrimSpace(choice.FinishReason.Value) == "" {
+			t.Fatal("live Gateway chat completion omitted a finish reason")
+		}
 	}
 
 	stream, err := client.StreamChatCompletion(ctx, request)
@@ -80,12 +99,68 @@ func TestGatewayChatContract(t *testing.T) {
 	chunks := 0
 	for stream.Next() {
 		chunks++
+		var envelope struct {
+			Model string `json:"model"`
+		}
+		if err := json.Unmarshal(stream.Event().RawJSON(), &envelope); err != nil {
+			t.Fatalf("decode live Gateway chat stream structure: %v", err)
+		}
+		if envelope.Model != "" && envelope.Model != publicLiveModel {
+			t.Fatal("live Gateway chat stream changed the pinned model")
+		}
 	}
 	if err := stream.Err(); err != nil {
 		t.Fatalf("read live Gateway chat completion stream: %v", err)
 	}
 	if chunks == 0 {
 		t.Fatal("live Gateway chat completion stream contained no chunks")
+	}
+}
+
+func assertBufferedResponseStructure(t *testing.T, raw []byte) {
+	t.Helper()
+	var envelope struct {
+		Model  string `json:"model"`
+		Output []struct {
+			Type string `json:"type"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		t.Fatalf("decode live Gateway response structure: %v", err)
+	}
+	if envelope.Model != publicLiveModel {
+		t.Fatal("live Gateway response omitted or changed the pinned model")
+	}
+	if len(envelope.Output) == 0 {
+		t.Fatal("live Gateway response omitted output items")
+	}
+	for _, item := range envelope.Output {
+		if strings.TrimSpace(item.Type) == "" {
+			t.Fatal("live Gateway response output item omitted its type")
+		}
+	}
+}
+
+func assertStreamResponseModel(t *testing.T, raw []byte, required bool) {
+	t.Helper()
+	var envelope struct {
+		Model    *string `json:"model"`
+		Response *struct {
+			Model *string `json:"model"`
+		} `json:"response"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		t.Fatalf("decode live Gateway response stream structure: %v", err)
+	}
+	observed := envelope.Model
+	if envelope.Response != nil && envelope.Response.Model != nil {
+		observed = envelope.Response.Model
+	}
+	if observed != nil && *observed != publicLiveModel {
+		t.Fatal("live Gateway response stream changed the pinned model")
+	}
+	if required && observed == nil {
+		t.Fatal("live Gateway response.completed omitted the pinned model")
 	}
 }
 

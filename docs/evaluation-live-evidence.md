@@ -46,15 +46,15 @@ These examples select an already-present `AI_GATEWAY_API_KEY`. For an authorized
 
 ## Sanitized public generation record
 
-Complete only from real successful runs. Record structural facts, never content.
+Complete only from real successful runs. Record only the structural facts asserted by the live contract, never content. The contract checks the pinned model wherever the wire response exposes it, requires every buffered Chat choice to carry a nonblank finish reason, requires a `response.completed` terminal Responses stream event, and minimally decodes buffered Responses output item discriminators. These checks do not authorize retaining raw payloads or generated values.
 
 - Execution date (UTC): **PENDING LIVE RUN**
 - Operator/run reference (non-secret): **PENDING LIVE RUN**
-- Model ID observed: **PENDING LIVE RUN** (must exactly match `openai/gpt-5-nano`)
-- Responses non-stream result: **PENDING LIVE RUN** (record pass/fail and structural item types only)
-- Responses stream result: **PENDING LIVE RUN** (record pass/fail and structural event types plus terminal completion presence only)
-- Chat non-stream result: **PENDING LIVE RUN** (record pass/fail and finish-reason presence only)
-- Chat stream result: **PENDING LIVE RUN** (record pass/fail and terminal completion presence only)
+- Model ID observed: **PENDING LIVE RUN** (record exact-match pass/fail for `openai/gpt-5-nano`; do not retain any other model value)
+- Responses non-stream result: **PENDING LIVE RUN** (record pass/fail and structural output item types only)
+- Responses stream result: **PENDING LIVE RUN** (record pass/fail, structural event types, and `response.completed` presence only)
+- Chat non-stream result: **PENDING LIVE RUN** (record pass/fail and finish-reason presence only; omit reason values)
+- Chat stream result: **PENDING LIVE RUN** (record pass/fail and pinned-model match wherever exposed only)
 - Usage shape: **PENDING LIVE RUN** (record absent/present and field names only; omit counts)
 - Response metadata shape: **PENDING LIVE RUN** (record model-ID match and metadata presence only; omit IDs, headers, and body bytes)
 - Protocol drift: **PENDING LIVE RUN** (record `none observed` only after every applicable generation smoke succeeds; otherwise record only the sanitized structural difference)
@@ -80,8 +80,9 @@ Complete only from a real successful run. Never infer or invent values.
 Before retaining evidence, confirm all of the following:
 
 - [ ] No credential, acknowledgement, authorization value, request ID, or response ID is present.
-- [ ] No prompt, evaluation state, generated output, selected choice, score, probability, tool argument, or tool result is present.
-- [ ] No raw request, response header, response body, provider-option value, or provider-metadata value is present.
+- [ ] No prompt, evaluation state, generated output, output-item content, finish-reason value, selected choice, score, probability, tool argument, or tool result is present.
+- [ ] No raw request, response header, response body, stream event payload, provider-option value, or provider-metadata value is present.
 - [ ] No token count, warning payload, or other billable-content detail is present.
+- [ ] Public model evidence records only exact-match pass/fail for the pinned model, never an unexpected model value.
 - [ ] Each recorded result came from its exact isolated authorized command and was not reconstructed from a mock or fixture.
 - [ ] Public generation and provider evaluation evidence remain independently attributable; neither run inherited the opposite acknowledgement.

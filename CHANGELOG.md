@@ -21,7 +21,7 @@ All notable changes, including every exported breaking change during v0, are rec
 - No Gateway-native xAI `x_search` API. Confirmed direct-xAI behavior does not establish Gateway support; first-party Gateway wire evidence and an authorized native live probe are still required.
 - No automatic tool execution, agents, or orchestration; function-tool payload support is data transport only.
 - No claim of full Vercel AI SDK or provider feature parity.
-- Public generation and provider evaluation live execution remain **NOT RUN / PENDING LIVE RUN**. Hermetic fixtures are not hosted-service evidence, and the separately acknowledged live contracts are not evidence for each other.
+- Public generation and provider evaluation live execution remain **NOT RUN / PENDING LIVE RUN**. Hermetic fixtures are not hosted-service evidence, and the two isolated live jobs, their distinct acknowledgements, and their credential checks do not establish success until authorized runs produce sanitized evidence covering buffered and streaming Responses and Chat plus provider Evaluation. The exported continuation API also remains subject to a pre-release contract audit.
 
 ### Experimental status and risk
 
@@ -29,7 +29,7 @@ This is an experimental v0 surface. Exported APIs may change incompatibly during
 
 ### Release status
 
-No public version has been published. Release remains blocked by the owner-selected license, a hosted-repository rename and matching `origin`, completed authorized live-contract evidence, and reviewed publication/provenance configuration. No tag is created or implied by this changelog.
+No public version has been published. Local `origin` is already `git@github.com:EveGoodEvening/vercel-ai-go-sdk.git`; it is not a blocker. Release remains blocked by the owner-selected license, verification of the hosted repository metadata, completed authorized live-contract evidence, and reviewed publication/provenance configuration. No hosted CI, live contract, tag, proxy publication, license selection, or release success is claimed or implied by this changelog.
 
 ### Migration
 

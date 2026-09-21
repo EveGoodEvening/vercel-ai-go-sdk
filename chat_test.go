@@ -248,6 +248,30 @@ func TestChatRequestDocumentedObjectAndTimeoutValidation(t *testing.T) {
 	}
 }
 
+func TestChatRequestJSONNestingLimit(t *testing.T) {
+	nested := func(levels int) any {
+		value := any("leaf")
+		for range levels - 1 {
+			value = []any{value}
+		}
+		return map[string]any{"value": value}
+	}
+
+	level64 := nested(64)
+	wrappedLevel64 := any(&level64)
+	request := validChatRequest()
+	request.Tools = []ChatTool{{Name: "f", Parameters: wrappedLevel64}}
+	if _, err := encodeChatCompletionRequest(request); err != nil {
+		t.Fatalf("64 JSON container levels rejected: %v", err)
+	}
+	level65 := nested(65)
+	request.Tools[0].Parameters = &level65
+	err := validateChatCompletionRequest(request)
+	if err == nil || err.Reason() != "maximum depth is 64" {
+		t.Fatalf("65 JSON container levels error = %#v", err)
+	}
+}
+
 func TestChatRequestResourceLimits(t *testing.T) {
 	tooDeep := any("leaf")
 	for range 65 {

@@ -302,15 +302,12 @@ func stringBound(v, path string) *ValidationError {
 	return nil
 }
 func validateBoundedJSON(v any, path string) *ValidationError {
-	return (&boundedJSONValidator{active: map[jsonVisit]bool{}}).walk(reflect.ValueOf(v), path, 1)
+	return (&boundedJSONValidator{active: map[jsonVisit]bool{}}).walk(reflect.ValueOf(v), path, 0, 0)
 }
 
 type boundedJSONValidator struct{ active map[jsonVisit]bool }
 
-func (b *boundedJSONValidator) walk(v reflect.Value, path string, depth int) *ValidationError {
-	if depth > maxResponseJSONDepth {
-		return validationError(path, "maximum depth is 64")
-	}
+func (b *boundedJSONValidator) walk(v reflect.Value, path string, depth, indirections int) *ValidationError {
 	if !v.IsValid() {
 		return nil
 	}
@@ -318,7 +315,10 @@ func (b *boundedJSONValidator) walk(v reflect.Value, path string, depth int) *Va
 		if v.IsNil() {
 			return nil
 		}
-		return b.walk(v.Elem(), path, depth+1)
+		if indirections >= maxResponseJSONDepth {
+			return validationError(path, "maximum depth is 64")
+		}
+		return b.walk(v.Elem(), path, depth, indirections+1)
 	}
 	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
@@ -328,9 +328,12 @@ func (b *boundedJSONValidator) walk(v reflect.Value, path string, depth int) *Va
 		if b.active[visit] {
 			return validationError(path, "cycle detected")
 		}
+		if indirections >= maxResponseJSONDepth {
+			return validationError(path, "maximum depth is 64")
+		}
 		b.active[visit] = true
 		defer delete(b.active, visit)
-		return b.walk(v.Elem(), path, depth+1)
+		return b.walk(v.Elem(), path, depth, indirections+1)
 	}
 	switch v.Kind() {
 	case reflect.Bool:
@@ -342,6 +345,10 @@ func (b *boundedJSONValidator) walk(v reflect.Value, path string, depth int) *Va
 			return validationError(path, "number must be finite")
 		}
 	case reflect.Map:
+		depth++
+		if depth > maxResponseJSONDepth {
+			return validationError(path, "maximum depth is 64")
+		}
 		if v.Type().Key().Kind() != reflect.String {
 			return validationError(path, "map keys must be strings")
 		}
@@ -360,11 +367,15 @@ func (b *boundedJSONValidator) walk(v reflect.Value, path string, depth int) *Va
 			if err := stringBound(k.String(), memberPath(path, k.String())); err != nil {
 				return err
 			}
-			if err := b.walk(v.MapIndex(k), memberPath(path, k.String()), depth+1); err != nil {
+			if err := b.walk(v.MapIndex(k), memberPath(path, k.String()), depth, 0); err != nil {
 				return err
 			}
 		}
 	case reflect.Slice, reflect.Array:
+		depth++
+		if depth > maxResponseJSONDepth {
+			return validationError(path, "maximum depth is 64")
+		}
 		if v.Len() > maxResponseMembers {
 			return validationError(path, "must contain at most 10000 members")
 		}
@@ -377,7 +388,7 @@ func (b *boundedJSONValidator) walk(v reflect.Value, path string, depth int) *Va
 			defer delete(b.active, visit)
 		}
 		for i := range v.Len() {
-			if err := b.walk(v.Index(i), indexPath(path, i), depth+1); err != nil {
+			if err := b.walk(v.Index(i), indexPath(path, i), depth, 0); err != nil {
 				return err
 			}
 		}
