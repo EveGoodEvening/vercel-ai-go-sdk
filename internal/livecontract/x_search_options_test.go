@@ -28,9 +28,29 @@ const (
 )
 
 var xSearchGeneralAckEnvs = [...]string{"AI_GATEWAY_LIVE_COST_ACK", "AI_GATEWAY_PUBLIC_LIVE_COST_ACK"}
+var xSearchPrivateInputEnvs = [...]string{
+	"AI_GATEWAY_X_SEARCH_PROBE_INPUT",
+	"AI_GATEWAY_X_SEARCH_PROBE_HANDLE_A",
+	"AI_GATEWAY_X_SEARCH_PROBE_HANDLE_B",
+	"AI_GATEWAY_X_SEARCH_PROBE_FROM_DATE",
+	"AI_GATEWAY_X_SEARCH_PROBE_TO_DATE",
+}
 
 type xSearchCredential struct {
 	value string
+}
+
+type xSearchPrivateInputs struct {
+	probeInput string
+	handleA    string
+	handleB    string
+	fromDate   string
+	toDate     string
+}
+
+type xSearchPrerequisites struct {
+	credential xSearchCredential
+	private    xSearchPrivateInputs
 }
 
 type xSearchProbeCase struct {
@@ -76,7 +96,7 @@ func (transport *countingRoundTripper) RoundTrip(*http.Request) (*http.Response,
 }
 
 func TestGatewayXSearchOptionsContract(t *testing.T) {
-	credential, err := resolveXSearchOptionsPrerequisites(os.LookupEnv)
+	prerequisites, err := resolveXSearchOptionsPrerequisites(os.LookupEnv)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,15 +110,15 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 	}
 	baseCases := []xSearchProbeCase{
 		{label: "fieldless-control", wantSuccess: true},
-		{label: "canonical-all-six", options: canonicalXSearchOptions(), wantSuccess: true, optionClasses: []string{"boolean", "date", "handle-list"}},
+		{label: "canonical-all-six", options: canonicalXSearchOptions(prerequisites.private), wantSuccess: true, optionClasses: []string{"boolean", "date", "handle-list"}},
 		{label: "explicit-empty-and-false", options: emptyXSearchOptions(), wantSuccess: true, optionClasses: []string{"boolean", "handle-list"}},
-		{label: "from-only", options: map[string]any{"from_date": privateFromDate()}, wantSuccess: true, optionClasses: []string{"date"}},
-		{label: "to-only", options: map[string]any{"to_date": privateToDate()}, wantSuccess: true, optionClasses: []string{"date"}},
+		{label: "from-only", options: map[string]any{"from_date": prerequisites.private.fromDate}, wantSuccess: true, optionClasses: []string{"date"}},
+		{label: "to-only", options: map[string]any{"to_date": prerequisites.private.toDate}, wantSuccess: true, optionClasses: []string{"date"}},
 		{label: "wrong-handle-list-family", options: map[string]any{"allowed_x_handles": true, "excluded_x_handles": true}, optionClasses: []string{"wrong-handle-list"}},
 		{label: "wrong-date-family", options: map[string]any{"from_date": false, "to_date": false}, optionClasses: []string{"wrong-date"}},
-		{label: "wrong-boolean-family", options: map[string]any{"enable_image_understanding": privateHandleList(), "enable_video_understanding": privateHandleList()}, optionClasses: []string{"wrong-boolean"}},
+		{label: "wrong-boolean-family", options: map[string]any{"enable_image_understanding": []string{prerequisites.private.handleA}, "enable_video_understanding": []string{prerequisites.private.handleA}}, optionClasses: []string{"wrong-boolean"}},
 	}
-	if len(baseCases)+len(individualXSearchOptionDiagnostics()) > xSearchOptionsMaxCalls {
+	if len(baseCases)+len(individualXSearchOptionDiagnostics(prerequisites.private)) > xSearchOptionsMaxCalls {
 		t.Fatal("x_search options probe matrix exceeds its hard request cap")
 	}
 
@@ -109,7 +129,7 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 		if calls >= xSearchOptionsMaxCalls {
 			t.Fatal("x_search options probe reached its hard request cap")
 		}
-		record, probeErr := runXSearchOptionsProbe(context.Background(), client, credential, probeCase)
+		record, probeErr := runXSearchOptionsProbe(context.Background(), client, prerequisites, probeCase)
 		calls++
 		if probeErr != nil {
 			failures = append(failures, probeCase.label+": "+probeErr.Error())
@@ -120,17 +140,21 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 		if probeCase.label == "canonical-all-six" {
 			canonicalSucceeded = succeeded
 		}
-		if succeeded != probeCase.wantSuccess {
-			failures = append(failures, probeCase.label+": unexpected HTTP status class")
+		if probeCase.wantSuccess {
+			if !succeeded {
+				failures = append(failures, probeCase.label+": unexpected HTTP status class")
+			}
+		} else if !isAttributableXSearchValidationRejection(record) {
+			failures = append(failures, probeCase.label+": expected attributable HTTP validation rejection")
 		}
 	}
 
 	if !canonicalSucceeded {
-		for _, probeCase := range individualXSearchOptionDiagnostics() {
+		for _, probeCase := range individualXSearchOptionDiagnostics(prerequisites.private) {
 			if calls >= xSearchOptionsMaxCalls {
 				t.Fatal("x_search options probe reached its hard request cap")
 			}
-			record, probeErr := runXSearchOptionsProbe(context.Background(), client, credential, probeCase)
+			record, probeErr := runXSearchOptionsProbe(context.Background(), client, prerequisites, probeCase)
 			calls++
 			if probeErr != nil {
 				failures = append(failures, probeCase.label+": "+probeErr.Error())
@@ -149,6 +173,9 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 
 func TestGatewayXSearchOptionsPrerequisiteMismatchesZeroDispatch(t *testing.T) {
 	valid := map[string]string{xSearchOptionsAckEnv: xSearchOptionsAck, "AI_GATEWAY_API_KEY": "credential"}
+	for _, name := range xSearchPrivateInputEnvs {
+		valid[name] = "nonblank"
+	}
 	tests := []struct {
 		name   string
 		change func(map[string]string)
@@ -164,6 +191,16 @@ func TestGatewayXSearchOptionsPrerequisiteMismatchesZeroDispatch(t *testing.T) {
 		{name: "blank API key", change: func(env map[string]string) { env["AI_GATEWAY_API_KEY"] = " \t" }},
 		{name: "blank OIDC token", change: func(env map[string]string) { delete(env, "AI_GATEWAY_API_KEY"); env["VERCEL_OIDC_TOKEN"] = "\n" }},
 		{name: "ambiguous credentials", change: func(env map[string]string) { env["VERCEL_OIDC_TOKEN"] = "credential" }},
+		{name: "missing probe input", change: func(env map[string]string) { delete(env, xSearchPrivateInputEnvs[0]) }},
+		{name: "blank probe input", change: func(env map[string]string) { env[xSearchPrivateInputEnvs[0]] = " \t" }},
+		{name: "missing first handle", change: func(env map[string]string) { delete(env, xSearchPrivateInputEnvs[1]) }},
+		{name: "blank first handle", change: func(env map[string]string) { env[xSearchPrivateInputEnvs[1]] = "\n" }},
+		{name: "missing second handle", change: func(env map[string]string) { delete(env, xSearchPrivateInputEnvs[2]) }},
+		{name: "blank second handle", change: func(env map[string]string) { env[xSearchPrivateInputEnvs[2]] = " " }},
+		{name: "missing start date", change: func(env map[string]string) { delete(env, xSearchPrivateInputEnvs[3]) }},
+		{name: "blank start date", change: func(env map[string]string) { env[xSearchPrivateInputEnvs[3]] = "\t" }},
+		{name: "missing end date", change: func(env map[string]string) { delete(env, xSearchPrivateInputEnvs[4]) }},
+		{name: "blank end date", change: func(env map[string]string) { env[xSearchPrivateInputEnvs[4]] = " \n" }},
 	}
 
 	for _, test := range tests {
@@ -189,46 +226,64 @@ func TestGatewayXSearchOptionsPrerequisiteMismatchesZeroDispatch(t *testing.T) {
 	}
 }
 
-func resolveXSearchOptionsPrerequisites(lookup func(string) (string, bool)) (xSearchCredential, error) {
+func resolveXSearchOptionsPrerequisites(lookup func(string) (string, bool)) (xSearchPrerequisites, error) {
 	ack, present := lookup(xSearchOptionsAckEnv)
 	if !present || ack != xSearchOptionsAck {
-		return xSearchCredential{}, fmt.Errorf("live Gateway x_search options contract requires %s=%s exactly", xSearchOptionsAckEnv, xSearchOptionsAck)
+		return xSearchPrerequisites{}, fmt.Errorf("live Gateway x_search options contract requires %s=%s exactly", xSearchOptionsAckEnv, xSearchOptionsAck)
 	}
 	for _, name := range xSearchGeneralAckEnvs {
 		if _, present := lookup(name); present {
-			return xSearchCredential{}, fmt.Errorf("live Gateway x_search options contract requires general acknowledgement %s to be absent", name)
+			return xSearchPrerequisites{}, fmt.Errorf("live Gateway x_search options contract requires general acknowledgement %s to be absent", name)
 		}
+	}
+	privateValues := [len(xSearchPrivateInputEnvs)]string{}
+	for index, name := range xSearchPrivateInputEnvs {
+		value, present := lookup(name)
+		if !present || strings.TrimSpace(value) == "" {
+			return xSearchPrerequisites{}, fmt.Errorf("live Gateway x_search options contract requires nonblank %s", name)
+		}
+		privateValues[index] = value
 	}
 	apiKey, _ := lookup("AI_GATEWAY_API_KEY")
 	oidcToken, _ := lookup("VERCEL_OIDC_TOKEN")
 	hasAPIKey := strings.TrimSpace(apiKey) != ""
 	hasOIDC := strings.TrimSpace(oidcToken) != ""
 	if hasAPIKey == hasOIDC {
-		return xSearchCredential{}, errors.New("live Gateway x_search options contract requires exactly one nonblank credential")
+		return xSearchPrerequisites{}, errors.New("live Gateway x_search options contract requires exactly one nonblank credential")
 	}
+	credential := xSearchCredential{value: oidcToken}
 	if hasAPIKey {
-		return xSearchCredential{value: apiKey}, nil
+		credential.value = apiKey
 	}
-	return xSearchCredential{value: oidcToken}, nil
+	return xSearchPrerequisites{
+		credential: credential,
+		private: xSearchPrivateInputs{
+			probeInput: privateValues[0],
+			handleA:    privateValues[1],
+			handleB:    privateValues[2],
+			fromDate:   privateValues[3],
+			toDate:     privateValues[4],
+		},
+	}, nil
 }
 
 func executeXSearchOptionsWithPrerequisites(ctx context.Context, lookup func(string) (string, bool), newClient func() *http.Client, probeCase xSearchProbeCase) error {
-	credential, err := resolveXSearchOptionsPrerequisites(lookup)
+	prerequisites, err := resolveXSearchOptionsPrerequisites(lookup)
 	if err != nil {
 		return err
 	}
-	_, err = runXSearchOptionsProbe(ctx, newClient(), credential, probeCase)
+	_, err = runXSearchOptionsProbe(ctx, newClient(), prerequisites, probeCase)
 	return err
 }
 
-func runXSearchOptionsProbe(ctx context.Context, client *http.Client, credential xSearchCredential, probeCase xSearchProbeCase) (xSearchProbeRecord, error) {
+func runXSearchOptionsProbe(ctx context.Context, client *http.Client, prerequisites xSearchPrerequisites, probeCase xSearchProbeCase) (xSearchProbeRecord, error) {
 	tool := map[string]any{"type": "x_search"}
 	for key, value := range probeCase.options {
 		tool[key] = value
 	}
 	payload, err := json.Marshal(map[string]any{
 		"model":       xSearchOptionsModel,
-		"input":       privateProbeInput(),
+		"input":       prerequisites.private.probeInput,
 		"tools":       []any{tool},
 		"tool_choice": "required",
 		"stream":      false,
@@ -240,7 +295,7 @@ func runXSearchOptionsProbe(ctx context.Context, client *http.Client, credential
 	if err != nil {
 		return xSearchProbeRecord{}, errors.New("construct request")
 	}
-	req.Header.Set("Authorization", "Bearer "+credential.value)
+	req.Header.Set("Authorization", "Bearer "+prerequisites.credential.value)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -282,12 +337,12 @@ func runXSearchOptionsProbe(ctx context.Context, client *http.Client, credential
 	return record, nil
 }
 
-func canonicalXSearchOptions() map[string]any {
+func canonicalXSearchOptions(private xSearchPrivateInputs) map[string]any {
 	return map[string]any{
-		"allowed_x_handles":          privateHandleList(),
-		"excluded_x_handles":         privateOtherHandleList(),
-		"from_date":                  privateFromDate(),
-		"to_date":                    privateToDate(),
+		"allowed_x_handles":          []string{private.handleA},
+		"excluded_x_handles":         []string{private.handleB},
+		"from_date":                  private.fromDate,
+		"to_date":                    private.toDate,
 		"enable_image_understanding": true,
 		"enable_video_understanding": true,
 	}
@@ -302,8 +357,8 @@ func emptyXSearchOptions() map[string]any {
 	}
 }
 
-func individualXSearchOptionDiagnostics() []xSearchProbeCase {
-	canonical := canonicalXSearchOptions()
+func individualXSearchOptionDiagnostics(private xSearchPrivateInputs) []xSearchProbeCase {
+	canonical := canonicalXSearchOptions(private)
 	keys := []struct {
 		label string
 		key   string
@@ -321,6 +376,24 @@ func individualXSearchOptionDiagnostics() []xSearchProbeCase {
 		result = append(result, xSearchProbeCase{label: item.label, options: map[string]any{item.key: canonical[item.key]}, wantSuccess: true, optionClasses: []string{item.class}})
 	}
 	return result
+}
+
+func isAttributableXSearchValidationRejection(record xSearchProbeRecord) bool {
+	if record.httpStatus != http.StatusBadRequest && record.httpStatus != http.StatusUnprocessableEntity {
+		return false
+	}
+	validCategory := record.errorCategory == "absent" || record.errorCategory == "invalid_request_error"
+	if !validCategory {
+		return false
+	}
+	switch record.errorCode {
+	case "invalid_request", "invalid_tool", "invalid_argument":
+		return true
+	case "absent":
+		return record.errorCategory == "invalid_request_error"
+	default:
+		return false
+	}
 }
 
 func logXSearchProbeRecord(t *testing.T, record xSearchProbeRecord) {
@@ -411,11 +484,3 @@ func cloneStringMap(values map[string]string) map[string]string {
 	}
 	return clone
 }
-
-func privateProbeInput() string {
-	return "Find one recent public post relevant to orbital launch operations and answer briefly."
-}
-func privateHandleList() []string      { return []string{"SpaceX"} }
-func privateOtherHandleList() []string { return []string{"xai"} }
-func privateFromDate() string          { return "2026-01-01" }
-func privateToDate() string            { return "2026-09-20" }

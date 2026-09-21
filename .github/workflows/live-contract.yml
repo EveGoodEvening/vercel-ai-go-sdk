@@ -98,12 +98,18 @@ jobs:
         run: env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -tags=livecontract ./internal/livecontract -run '^TestGatewayEvaluationContract$' -count=1
 
   x-search-options:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     name: Authorized Gateway x_search options evidence
     runs-on: ubuntu-latest
     environment: live-evaluation
     env:
       AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
       AI_GATEWAY_X_SEARCH_LIVE_COST_ACK: I_ACCEPT_LIVE_X_SEARCH_COSTS
+      AI_GATEWAY_X_SEARCH_PROBE_INPUT: ${{ secrets.AI_GATEWAY_X_SEARCH_PROBE_INPUT }}
+      AI_GATEWAY_X_SEARCH_PROBE_HANDLE_A: ${{ secrets.AI_GATEWAY_X_SEARCH_PROBE_HANDLE_A }}
+      AI_GATEWAY_X_SEARCH_PROBE_HANDLE_B: ${{ secrets.AI_GATEWAY_X_SEARCH_PROBE_HANDLE_B }}
+      AI_GATEWAY_X_SEARCH_PROBE_FROM_DATE: ${{ secrets.AI_GATEWAY_X_SEARCH_PROBE_FROM_DATE }}
+      AI_GATEWAY_X_SEARCH_PROBE_TO_DATE: ${{ secrets.AI_GATEWAY_X_SEARCH_PROBE_TO_DATE }}
       GOTOOLCHAIN: local
     steps:
       - name: Check out source
@@ -135,6 +141,17 @@ jobs:
             echo 'Both general live acknowledgements must be unset.' >&2
             exit 1
           fi
+          for name in \
+            AI_GATEWAY_X_SEARCH_PROBE_INPUT \
+            AI_GATEWAY_X_SEARCH_PROBE_HANDLE_A \
+            AI_GATEWAY_X_SEARCH_PROBE_HANDLE_B \
+            AI_GATEWAY_X_SEARCH_PROBE_FROM_DATE \
+            AI_GATEWAY_X_SEARCH_PROBE_TO_DATE; do
+            if [[ ! ${!name:-} =~ [^[:space:]] ]]; then
+              echo "$name is not configured in the protected live-evaluation environment." >&2
+              exit 1
+            fi
+          done
 
       - name: Run paid Gateway x_search options evidence contract
         run: env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -tags=livecontract ./internal/livecontract -run '^TestGatewayXSearchOptionsContract$' -count=1
