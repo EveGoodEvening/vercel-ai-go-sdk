@@ -1777,16 +1777,25 @@ All three commands above passed against green draft `79137a6` with `AI_GATEWAY_A
 
 ### Chunk 27A — `x_search` external-consumer contract and strict audit
 
+**Current status:** `[-]` green external-contract/audit draft `f9cb666` is recorded with both exact credential-scrubbed gates passing. The exact fieldless `ResponseXSearchTool` export, shape, value/non-nil-pointer, and external-consumer inventory work is implemented. Independent review of the complete wrapper/two-method/two-tool contract and strict audit is the next gate; Chunk 27A remains intentionally incomplete until Chunk 30 closure.
+
 **Depends on:** Chunk 27 implementation, focused verification, committed accounting, and clean evidence/API rereview are recorded while earlier chunks remain intentionally incomplete.
 
 **Owned paths (exact three):** `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `planning/IMPLEMENTATION_PLAN.md`.
 
 **Draft commit boundary:** `test: audit gateway x search exports`. **Serialized accounting commit boundary:** `docs: record gateway x search audit`.
 
-- [ ] Extend the external compile contract and strict expected-export inventory for fieldless `ResponseXSearchTool` while retaining the wrapper, `ResponseWebSearchTool`, and both built-in-tool methods added by 26A.
-- [ ] Extend the temporary external-consumer compile exercise to construct both tool types in the wrapper and invoke both methods. Preserve bidirectional expected/export equality and reject configurable x-search fields, generic escape hatches, aliases, and typed search output/event APIs.
-- [ ] Run the focused external contract test and `./scripts/verify-local-consumer.sh` with all credentials and live-cost acknowledgements unset; independently review the complete wrapper/two-method/two-tool inventory and compile exercise, then cleanly rereview every fix.
-- [ ] Before Chunk 28 starts, commit to the tracker the draft/review-fix hashes, exact changed paths, focused command results, and clean rereview result. Chunk 27A belongs to the atomic `x_search` rollback group with Chunk 27 and the matching `x_search` claims/accounting; rollback restores the 26A web-search-only audit in the same commit that removes the fieldless API.
+**Recorded green draft (`f9cb666`):** commit `f9cb666` changed exactly `contract_external_test.go` and `scripts/verify-local-consumer.sh`. `gofmt` completed on `contract_external_test.go`. Both exact credential-scrubbed verification commands passed:
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'TestExternalContract' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK ./scripts/verify-local-consumer.sh
+```
+
+- [x] Extended the external compile contract and strict expected-export inventory for fieldless `ResponseXSearchTool` while retaining the wrapper, `ResponseWebSearchTool`, and both built-in-tool methods added by 26A. The contract locks the exact fieldless shape and both value and non-nil-pointer tool forms.
+- [x] Extended the temporary external-consumer compile exercise to construct both tool types in the wrapper and invoke both methods. Bidirectional expected/export equality remains enforced, including rejection of configurable x-search fields, generic escape hatches, aliases, and typed search output/event APIs.
+- [x] Ran the focused external contract test and `./scripts/verify-local-consumer.sh` with all credentials and live-cost acknowledgements unset; both exact commands recorded above passed. Independent review of the complete wrapper/two-method/two-tool inventory and compile exercise is the next gate, followed by clean rereview of any fixes.
+- [ ] Before Chunk 28 starts, independently review the complete external contract/audit, cleanly rereview every fix, and commit to the tracker the draft/review-fix hashes, exact changed paths, focused command results, and clean rereview result. Chunk 27A belongs to the atomic `x_search` rollback group with Chunk 27 and the matching `x_search` claims/accounting; rollback restores the 26A web-search-only audit in the same commit that removes the fieldless API.
 
 ### Chunk 28 — Public search request documentation and evidence record
 
