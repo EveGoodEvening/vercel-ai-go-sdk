@@ -241,7 +241,7 @@ func validateEmbeddingJSON(body []byte) *embeddingFailure {
 	}
 	return nil
 }
-func scanEmbeddingValue(d *json.Decoder, path string, depth int, limitCollection, metadataRoot bool) *embeddingFailure {
+func scanEmbeddingValue(d *json.Decoder, path string, depth int, limitCollection, limitChildren bool) *embeddingFailure {
 	if depth > maxJSONDepth {
 		return &embeddingFailure{path, "maximum depth is 64", nil}
 	}
@@ -287,9 +287,18 @@ func scanEmbeddingValue(d *json.Decoder, path string, depth int, limitCollection
 			}
 			seen[k] = true
 			count++
-			childMetadataRoot := !limitCollection && !metadataRoot && path == "$" && k == "providerMetadata"
-			childLimitCollection := limitCollection || metadataRoot
-			if f := scanEmbeddingValue(d, p, depth+1, childLimitCollection, childMetadataRoot); f != nil {
+			childLimitCollection, childLimitChildren := limitChildren, limitChildren
+			if path == "$" {
+				switch k {
+				case "embeddings", "warnings":
+					childLimitCollection = true
+					childLimitChildren = false
+				case "providerMetadata":
+					childLimitCollection = true
+					childLimitChildren = true
+				}
+			}
+			if f := scanEmbeddingValue(d, p, depth+1, childLimitCollection, childLimitChildren); f != nil {
 				return f
 			}
 		}
@@ -301,7 +310,7 @@ func scanEmbeddingValue(d *json.Decoder, path string, depth int, limitCollection
 			if limitCollection && i >= maxCollectionItems {
 				return &embeddingFailure{path, "array exceeds 4096 members", nil}
 			}
-			if f := scanEmbeddingValue(d, indexPath(path, i), depth+1, limitCollection, false); f != nil {
+			if f := scanEmbeddingValue(d, indexPath(path, i), depth+1, limitChildren, limitChildren); f != nil {
 				return f
 			}
 		}

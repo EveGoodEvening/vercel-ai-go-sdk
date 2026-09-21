@@ -228,6 +228,27 @@ func metadataObjectJSON(n int) string {
 	return b.String()
 }
 
+func repeatedJSON(value string, n int) string {
+	if n == 0 {
+		return "[]"
+	}
+	return "[" + strings.Repeat(value+",", n-1) + value + "]"
+}
+
+func providerMetadataJSON(n int) string {
+	var b strings.Builder
+	b.WriteByte('{')
+	for i := range n {
+		if i != 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(strconv.Quote(strconv.Itoa(i)))
+		b.WriteString(`:{}`)
+	}
+	b.WriteByte('}')
+	return b.String()
+}
+
 func TestEmbeddingMetadataCollectionBounds(t *testing.T) {
 	object := metadataObjectJSON(maxCollectionItems)
 	array := vectorJSON(maxCollectionItems)
@@ -243,6 +264,29 @@ func TestEmbeddingMetadataCollectionBounds(t *testing.T) {
 
 	requireEmbeddingFailure(t, `{"embeddings":[[1]],"providerMetadata":{"p":{"nestedObject":`+metadataObjectJSON(maxCollectionItems+1)+`}}}`, 1, `$["providerMetadata"]["p"]["nestedObject"]`, "object exceeds 4096 members")
 	requireEmbeddingFailure(t, `{"embeddings":[[1]],"providerMetadata":{"p":{"nestedArray":`+vectorJSON(maxCollectionItems+1)+`}}}`, 1, `$["providerMetadata"]["p"]["nestedArray"]`, "array exceeds 4096 members")
+}
+
+func TestEmbeddingResponseCollectionBounds(t *testing.T) {
+	embeddings := repeatedJSON(`[0]`, maxCollectionItems)
+	r, err := decodeEmbeddingResult("p/m", maxCollectionItems, rawProviderResponse{body: []byte(`{"embeddings":` + embeddings + `}`)})
+	if err != nil || len(r.Embeddings) != maxCollectionItems {
+		t.Fatalf("embeddings boundary: len=%d err=%v", len(r.Embeddings), err)
+	}
+	requireEmbeddingFailure(t, `{"embeddings":`+repeatedJSON(`[0]`, maxCollectionItems+1)+`}`, maxCollectionItems+1, `$["embeddings"]`, "array exceeds 4096 members")
+
+	warnings := repeatedJSON(`{"type":"other","message":"x"}`, maxCollectionItems)
+	r, err = decodeEmbeddingResult("p/m", 1, rawProviderResponse{body: []byte(`{"embeddings":[[0]],"warnings":` + warnings + `}`)})
+	if err != nil || len(r.Warnings) != maxCollectionItems {
+		t.Fatalf("warnings boundary: len=%d err=%v", len(r.Warnings), err)
+	}
+	requireEmbeddingFailure(t, `{"embeddings":[[0]],"warnings":`+repeatedJSON(`{"type":"other","message":"x"}`, maxCollectionItems+1)+`}`, 1, `$["warnings"]`, "array exceeds 4096 members")
+
+	metadata := providerMetadataJSON(maxCollectionItems)
+	r, err = decodeEmbeddingResult("p/m", 1, rawProviderResponse{body: []byte(`{"embeddings":[[0]],"providerMetadata":` + metadata + `}`)})
+	if err != nil || len(r.ProviderMetadata) != maxCollectionItems {
+		t.Fatalf("providerMetadata boundary: len=%d err=%v", len(r.ProviderMetadata), err)
+	}
+	requireEmbeddingFailure(t, `{"embeddings":[[0]],"providerMetadata":`+providerMetadataJSON(maxCollectionItems+1)+`}`, 1, `$["providerMetadata"]`, "object exceeds 4096 members")
 }
 
 func vectorJSON(n int) string {
