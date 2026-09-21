@@ -19,12 +19,14 @@ import (
 )
 
 const (
-	xSearchOptionsEndpoint = "https://ai-gateway.vercel.sh/v1/responses"
-	xSearchOptionsModel    = "spacexai/grok-4.6"
-	xSearchOptionsAckEnv   = "AI_GATEWAY_X_SEARCH_LIVE_COST_ACK"
-	xSearchOptionsAck      = "I_ACCEPT_LIVE_X_SEARCH_COSTS"
-	xSearchOptionsBodyMax  = 1 << 20
-	xSearchOptionsMaxCalls = 14
+	xSearchOptionsEndpoint       = "https://ai-gateway.vercel.sh/v1/responses"
+	xSearchOptionsModel          = "spacexai/grok-4.6"
+	xSearchOptionsAckEnv         = "AI_GATEWAY_X_SEARCH_LIVE_COST_ACK"
+	xSearchOptionsAck            = "I_ACCEPT_LIVE_X_SEARCH_COSTS"
+	xSearchOptionsBodyMax        = 1 << 20
+	xSearchOptionsMaxCalls       = 14
+	xSearchOptionsRequestTimeout = 30 * time.Second
+	xSearchOptionsOverallTimeout = 8 * time.Minute
 )
 
 var xSearchGeneralAckEnvs = [...]string{"AI_GATEWAY_LIVE_COST_ACK", "AI_GATEWAY_PUBLIC_LIVE_COST_ACK"}
@@ -54,10 +56,11 @@ type xSearchPrerequisites struct {
 }
 
 type xSearchProbeCase struct {
-	label         string
-	options       map[string]any
-	wantSuccess   bool
-	optionClasses []string
+	label          string
+	options        map[string]any
+	wantSuccess    bool
+	optionClasses  []string
+	wrongKindCount int
 }
 
 type xSearchProbeRecord struct {
@@ -65,10 +68,12 @@ type xSearchProbeRecord struct {
 	optionClasses  []string
 	optionCount    int
 	httpStatus     int
+	wrongKindCount int
 	objectClass    string
 	statusClass    string
 	outputTypes    []string
 	outputStatuses []string
+	errorPresent   bool
 	errorCategory  string
 	errorCode      string
 }
@@ -80,10 +85,7 @@ type xSearchResponseEnvelope struct {
 		Type   string `json:"type"`
 		Status string `json:"status"`
 	} `json:"output"`
-	Error *struct {
-		Type string `json:"type"`
-		Code string `json:"code"`
-	} `json:"error"`
+	Error json.RawMessage `json:"error"`
 }
 
 type countingRoundTripper struct {
@@ -101,36 +103,53 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	overallCtx, cancelOverall := context.WithTimeout(t.Context(), xSearchOptionsOverallTimeout)
+	defer cancelOverall()
 	client := &http.Client{
 		Transport: http.DefaultTransport,
-		Timeout:   45 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	baseCases := []xSearchProbeCase{
-		{label: "fieldless-control", wantSuccess: true},
+	controlCase := xSearchProbeCase{label: "fieldless-control", wantSuccess: true}
+	configurableCases := []xSearchProbeCase{
 		{label: "canonical-all-six", options: canonicalXSearchOptions(prerequisites.private), wantSuccess: true, optionClasses: []string{"boolean", "date", "handle-list"}},
 		{label: "explicit-empty-and-false", options: emptyXSearchOptions(), wantSuccess: true, optionClasses: []string{"boolean", "handle-list"}},
 		{label: "from-only", options: map[string]any{"from_date": prerequisites.private.fromDate}, wantSuccess: true, optionClasses: []string{"date"}},
 		{label: "to-only", options: map[string]any{"to_date": prerequisites.private.toDate}, wantSuccess: true, optionClasses: []string{"date"}},
-		{label: "wrong-handle-list-family", options: map[string]any{"allowed_x_handles": true, "excluded_x_handles": true}, optionClasses: []string{"wrong-handle-list"}},
-		{label: "wrong-date-family", options: map[string]any{"from_date": false, "to_date": false}, optionClasses: []string{"wrong-date"}},
-		{label: "wrong-boolean-family", options: map[string]any{"enable_image_understanding": []string{prerequisites.private.handleA}, "enable_video_understanding": []string{prerequisites.private.handleA}}, optionClasses: []string{"wrong-boolean"}},
+		{label: "wrong-handle-list-family", options: map[string]any{"allowed_x_handles": true, "excluded_x_handles": []string{prerequisites.private.handleB}}, optionClasses: []string{"wrong-handle-list"}, wrongKindCount: 1},
+		{label: "wrong-date-family", options: map[string]any{"from_date": false, "to_date": prerequisites.private.toDate}, optionClasses: []string{"wrong-date"}, wrongKindCount: 1},
+		{label: "wrong-boolean-family", options: map[string]any{"enable_image_understanding": []string{prerequisites.private.handleA}, "enable_video_understanding": true}, optionClasses: []string{"wrong-boolean"}, wrongKindCount: 1},
 	}
-	if len(baseCases)+len(individualXSearchOptionDiagnostics(prerequisites.private)) > xSearchOptionsMaxCalls {
+	diagnostics := individualXSearchOptionDiagnostics(prerequisites.private)
+	if 1+len(configurableCases)+len(diagnostics) > xSearchOptionsMaxCalls {
 		t.Fatal("x_search options probe matrix exceeds its hard request cap")
 	}
 
 	calls := 0
-	canonicalSucceeded := false
-	failures := make([]string, 0)
-	for _, probeCase := range baseCases {
+	runProbe := func(probeCase xSearchProbeCase) (xSearchProbeRecord, error) {
 		if calls >= xSearchOptionsMaxCalls {
 			t.Fatal("x_search options probe reached its hard request cap")
 		}
-		record, probeErr := runXSearchOptionsProbe(context.Background(), client, prerequisites, probeCase)
+		requestCtx, cancelRequest := context.WithTimeout(overallCtx, xSearchOptionsRequestTimeout)
+		defer cancelRequest()
 		calls++
+		return runXSearchOptionsProbe(requestCtx, client, prerequisites, probeCase)
+	}
+
+	controlRecord, controlErr := runProbe(controlCase)
+	if controlErr != nil {
+		t.Fatalf("fieldless-control failed before configurable probes: %s", controlErr)
+	}
+	logXSearchProbeRecord(t, controlRecord)
+	if controlRecord.httpStatus < 200 || controlRecord.httpStatus >= 300 {
+		t.Fatal("fieldless-control failed before configurable probes: unexpected HTTP status class")
+	}
+
+	canonicalSucceeded := false
+	failures := make([]string, 0)
+	for _, probeCase := range configurableCases {
+		record, probeErr := runProbe(probeCase)
 		if probeErr != nil {
 			failures = append(failures, probeCase.label+": "+probeErr.Error())
 			continue
@@ -141,7 +160,9 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 			canonicalSucceeded = succeeded
 		}
 		if probeCase.wantSuccess {
-			if !succeeded {
+			ambiguousCanonicalRejection := probeCase.label == "canonical-all-six" &&
+				(record.httpStatus == http.StatusBadRequest || record.httpStatus == http.StatusUnprocessableEntity)
+			if !succeeded && !ambiguousCanonicalRejection {
 				failures = append(failures, probeCase.label+": unexpected HTTP status class")
 			}
 		} else if !isAttributableXSearchValidationRejection(record) {
@@ -150,17 +171,16 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 	}
 
 	if !canonicalSucceeded {
-		for _, probeCase := range individualXSearchOptionDiagnostics(prerequisites.private) {
-			if calls >= xSearchOptionsMaxCalls {
-				t.Fatal("x_search options probe reached its hard request cap")
-			}
-			record, probeErr := runXSearchOptionsProbe(context.Background(), client, prerequisites, probeCase)
-			calls++
+		for _, probeCase := range diagnostics {
+			record, probeErr := runProbe(probeCase)
 			if probeErr != nil {
 				failures = append(failures, probeCase.label+": "+probeErr.Error())
 				continue
 			}
 			logXSearchProbeRecord(t, record)
+			if record.httpStatus < 200 || record.httpStatus >= 300 {
+				failures = append(failures, probeCase.label+": unexpected HTTP status class")
+			}
 		}
 	}
 	if calls > xSearchOptionsMaxCalls {
@@ -317,12 +337,15 @@ func runXSearchOptionsProbe(ctx context.Context, client *http.Client, prerequisi
 	body = nil
 
 	record := xSearchProbeRecord{
-		caseLabel:     probeCase.label,
-		optionClasses: append([]string(nil), probeCase.optionClasses...),
-		optionCount:   len(probeCase.options),
-		httpStatus:    resp.StatusCode,
-		objectClass:   safeObjectClass(envelope.Object),
-		statusClass:   safeStatusClass(envelope.Status),
+		caseLabel:      probeCase.label,
+		optionClasses:  append([]string(nil), probeCase.optionClasses...),
+		optionCount:    len(probeCase.options),
+		httpStatus:     resp.StatusCode,
+		wrongKindCount: probeCase.wrongKindCount,
+		objectClass:    safeObjectClass(envelope.Object),
+		statusClass:    safeStatusClass(envelope.Status),
+		errorCategory:  "absent",
+		errorCode:      "absent",
 	}
 	for _, item := range envelope.Output {
 		record.outputTypes = append(record.outputTypes, safeOutputType(item.Type))
@@ -330,9 +353,10 @@ func runXSearchOptionsProbe(ctx context.Context, client *http.Client, prerequisi
 	}
 	record.outputTypes = uniqueSorted(record.outputTypes)
 	record.outputStatuses = uniqueSorted(record.outputStatuses)
-	if envelope.Error != nil {
-		record.errorCategory = safeErrorCategory(envelope.Error.Type)
-		record.errorCode = safeErrorCode(envelope.Error.Code)
+	if category, code, present := classifyXSearchError(envelope.Error); present {
+		record.errorPresent = true
+		record.errorCategory = category
+		record.errorCode = code
 	}
 	return record, nil
 }
@@ -379,28 +403,28 @@ func individualXSearchOptionDiagnostics(private xSearchPrivateInputs) []xSearchP
 }
 
 func isAttributableXSearchValidationRejection(record xSearchProbeRecord) bool {
+	if record.wrongKindCount != 1 || !record.errorPresent {
+		return false
+	}
 	if record.httpStatus != http.StatusBadRequest && record.httpStatus != http.StatusUnprocessableEntity {
 		return false
 	}
-	validCategory := record.errorCategory == "absent" || record.errorCategory == "invalid_request_error"
-	if !validCategory {
+	switch record.errorCategory {
+	case "authentication_error", "permission_error", "rate_limit_error", "server_error":
 		return false
 	}
 	switch record.errorCode {
-	case "invalid_request", "invalid_tool", "invalid_argument":
-		return true
-	case "absent":
-		return record.errorCategory == "invalid_request_error"
-	default:
+	case "model_not_found", "unauthorized", "forbidden", "rate_limit_exceeded":
 		return false
 	}
+	return true
 }
 
 func logXSearchProbeRecord(t *testing.T, record xSearchProbeRecord) {
 	t.Helper()
-	t.Logf("case=%s option_classes=%v option_count=%d http_status=%d object=%s status=%s output_types=%v output_statuses=%v error_category=%s error_code=%s",
+	t.Logf("case=%s option_classes=%v option_count=%d http_status=%d object=%s status=%s output_types=%v output_statuses=%v error_present=%t error_category=%s error_code=%s",
 		record.caseLabel, record.optionClasses, record.optionCount, record.httpStatus, record.objectClass, record.statusClass,
-		record.outputTypes, record.outputStatuses, record.errorCategory, record.errorCode)
+		record.outputTypes, record.outputStatuses, record.errorPresent, record.errorCategory, record.errorCode)
 }
 
 func safeObjectClass(value string) string {
@@ -433,6 +457,30 @@ func safeOutputType(value string) string {
 	default:
 		return "other"
 	}
+}
+
+func classifyXSearchError(raw json.RawMessage) (category string, code string, present bool) {
+	category, code = "absent", "absent"
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) || trimmed[0] != '{' {
+		return category, code, false
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(trimmed, &fields); err != nil {
+		return category, code, false
+	}
+	return safeErrorJSONClass(fields["type"], safeErrorCategory), safeErrorJSONClass(fields["code"], safeErrorCode), true
+}
+
+func safeErrorJSONClass(raw json.RawMessage, classify func(string) string) string {
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return "absent"
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "other"
+	}
+	return classify(value)
 }
 
 func safeErrorCategory(value string) string {

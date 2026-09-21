@@ -101,6 +101,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     name: Authorized Gateway x_search options evidence
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: live-evaluation
     env:
       AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}

@@ -6,9 +6,9 @@
 | --- | --- | --- |
 | Public generation | **NOT RUN** | Buffered and streaming Responses; buffered and streaming Chat |
 | Provider evaluation | **NOT RUN** | `Evaluate` with boolean, choice, and score questions |
-| Configurable Gateway `x_search` options | **IMPLEMENTED / NOT RUN** | Dedicated fail-closed prerequisite gate plus bounded structural option matrix |
+| Configurable Gateway `x_search` options | **IMPLEMENTED; FIRST ATTEMPT INCONCLUSIVE / CANCELLED** | Corrected fail-closed prerequisite gate plus bounded structural option matrix; rerun pending |
 
-No owner-authorized public-generation or provider-evaluation paid live-contract run or sanitized hosted result is recorded; those protected records remain **PENDING LIVE RUN**. The owner has separately authorized the dedicated configurable Gateway `x_search` evidence run and accepted its bounded cost, but that selector is **NOT RUN** and no option field is cleared. Hermetic tests, successful compilation, credential-gate failures, and search probe/harness implementation are not live results and do not clear any live-contract gate.
+No owner-authorized public-generation or provider-evaluation paid live-contract run or sanitized hosted result is recorded; those protected records remain **PENDING LIVE RUN**. The owner separately authorized the dedicated configurable Gateway `x_search` evidence run and accepted its bounded cost. Its first paid attempt on 2026-09-21 is **INCONCLUSIVE / CANCELLED** after one sanitized canonical record; it cleared or rejected no option field. Hermetic tests, successful compilation, credential-gate failures, search probe/harness implementation, and this inconclusive attempt do not clear any live-contract gate.
 
 ### Narrow Responses search evidence
 
@@ -17,17 +17,17 @@ Owner-authorized public Gateway probes on 2026-09-21 structurally corroborated o
 The durable repository evidence retains only sanitized structural facts. A non-publishable internal orchestration artifact is excluded because it contains exact prompt inputs; this record does not reproduce or paraphrase them. No credentials, authorization data, prompts, generated prose, full bodies, headers, identifiers, or raw payloads are retained here.
 ### Configurable Gateway `x_search` option evidence gate
 
-The dedicated Gate A harness is implemented but **NOT RUN**. Owner authorization and cost acceptance are recorded without retaining any credential or credential value. It is a third, separate live-evidence path: it does not run in, replace, or clear either the general `public-generation` or `provider-evaluation` job.
+The dedicated Gate A harness is implemented. Owner authorization and cost acceptance are recorded without retaining any credential or credential value. The first paid attempt is **INCONCLUSIVE / CANCELLED** and cleared no option field; the corrected verification and authorized rerun remain pending. This is a third, separate live-evidence path: it does not run in, replace, or clear either the general `public-generation` or `provider-evaluation` job.
 
-The paid selector is exactly `^TestGatewayXSearchOptionsContract$`. It sends serial, buffered requests with `-count=1` to `POST https://ai-gateway.vercel.sh/v1/responses` using only `spacexai/grok-4.6`. It makes no retry and performs no fallback. Its static eight-case matrix contains a fieldless control; one combined canonical request with all six candidate fields present; explicit empty-list and explicit-false forms; `from_date` alone; `to_date` alone; and grouped wrong-type attribution cases for handle lists, dates, and booleans. Only if the combined canonical case fails may six one-field valid diagnostics run. The hard-coded ceiling is 14 requests.
+The paid selector is exactly `^TestGatewayXSearchOptionsContract$`. It sends serial, buffered requests with `-count=1` to `POST https://ai-gateway.vercel.sh/v1/responses` using only `spacexai/grok-4.6`. It makes no retry and performs no fallback. Every request has a strict 30-second deadline derived from one 8-minute overall test deadline; the protected workflow job has `timeout-minutes: 10`, so worst-case test time remains below the workflow bound. The corrected sequence sends the fieldless control first and aborts before every option-bearing case unless that control succeeds. Its static option matrix contains one combined canonical request with all six candidate fields present; explicit empty-list and explicit-false forms; `from_date` alone; `to_date` alone; and grouped wrong-type attribution cases for handle lists, dates, and booleans. Only if the combined canonical case fails may six independently controlled one-field valid diagnostics run; that canonical failure does not itself clear, reject, or attribute any field. The hard-coded ceiling remains 14 requests.
 
 Execution fails closed unless exactly one nonblank `AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` is present, the dedicated acknowledgement is exactly `AI_GATEWAY_X_SEARCH_LIVE_COST_ACK=I_ACCEPT_LIVE_X_SEARCH_COSTS`, both `AI_GATEWAY_PUBLIC_LIVE_COST_ACK` and `AI_GATEWAY_LIVE_COST_ACK` are absent, and all five runtime-only private inputs are nonblank: `AI_GATEWAY_X_SEARCH_PROBE_INPUT`, `AI_GATEWAY_X_SEARCH_PROBE_HANDLE_A`, `AI_GATEWAY_X_SEARCH_PROBE_HANDLE_B`, `AI_GATEWAY_X_SEARCH_PROBE_FROM_DATE`, and `AI_GATEWAY_X_SEARCH_PROBE_TO_DATE`. The protected workflow supplies those variables only from GitHub secrets with the same exact names; it never accepts workflow-dispatch values. The credential-free selector `^TestGatewayXSearchOptionsPrerequisiteMismatchesZeroDispatch$` covers missing or wrong dedicated acknowledgement, either forbidden general acknowledgement, zero credentials, multiple credentials, and each private input missing or blank on an otherwise authorized configuration; every mismatch must fail before HTTP client or request construction and record zero `RoundTrip` calls.
 
-The wrong-type cases pass only when their attributable request validation response has HTTP status 400 or 422. Authentication/authorization failures (401/403), timeout/conflict/rate-limit responses (408/409/429), all 5xx responses, transport failures, and errors attributable to another category fail the evidence case rather than being treated as option rejection.
+An isolated wrong-type case may count as attributable request rejection only after the fieldless control succeeded, exactly one option has a different JSON kind, the response is HTTP 400 or 422, and a structurally present error object is observed. Authentication/authorization failures (401/403), timeout/conflict/rate-limit responses (408/409/429), all 5xx responses, transport failures, and known errors attributable to another category fail the evidence case; transient or service results never satisfy wrong-type rejection.
 
-Retained output is allowlisted to the case label; structural option class set/count; HTTP status; safe top-level object/status classification; safe output discriminator/status sets; and sanitized error category/code. Missing values map to `absent` and unknown/raw provider values map to `other` rather than being copied. The harness and retained output must exclude credentials; prompts and queries; handle and date literals; request/response bodies and headers; request/response or provider IDs; generated prose; tool arguments/results; provider metadata; usage; raw events; and raw errors.
+Retained output is allowlisted to the case label; structural option class set/count; HTTP status; safe top-level object/status classification; safe output discriminator/status sets; an `error_present` boolean; and sanitized error category/code classes initialized explicitly to `absent`. Missing values remain `absent` and unknown/raw provider values map to `other` rather than being copied. The harness and retained output must exclude credentials; prompts and queries; handle and date literals; request/response bodies and headers; request/response or provider IDs; generated prose; tool arguments/results; provider metadata; usage; raw events; and raw errors.
 
-Gate A remains blocked pending prerequisite verification, the owner-authorized paid selector, sanitation review, and independent evidence review. Results may clear only the exact request fields and exact presence forms actually observed. A successful combined case must not silently clear an unisolated field, omitted/null behavior, an untested value class, validation rule, cross-field interaction, other model, fallback route, typed output/event contract, or direct-xAI behavior.
+Gate A remains blocked pending corrected prerequisite verification, an owner-authorized rerun of the corrected paid selector, sanitation review, and independent evidence review. Results may clear only the exact request fields and exact presence forms actually observed. A canonical combined failure must not clear, reject, or attribute any individual field; its independently controlled one-field valid diagnostics may still run. No result may silently clear an unisolated field, omitted/null behavior, an untested value class, validation rule, cross-field interaction, other model, fallback route, typed output/event contract, or direct-xAI behavior.
 
 ## Pinned contracts
 
@@ -63,7 +63,7 @@ env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK \
   -run '^TestGatewayEvaluationContract$' -count=1
 ```
 
-Configurable Gateway `x_search` options (**authorized, cost accepted, NOT RUN**):
+Configurable Gateway `x_search` options (**authorized; first attempt INCONCLUSIVE / CANCELLED; corrected rerun pending**):
 
 ```sh
 env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_LIVE_COST_ACK \
@@ -110,20 +110,21 @@ Complete only from actual runs of [evaluation_test.go](../internal/livecontract/
 
 ## Sanitized configurable `x_search` option record
 
-Complete only from the dedicated paid selector after the prerequisite selector passes.
+Complete only from the dedicated paid selector after the prerequisite selector passes. The first paid attempt below is retained solely as sanitized inconclusive accounting; it is not field evidence.
 
 | Field | Result | Retain only |
 | --- | --- | --- |
-| Authorization / cost acceptance | **RECORDED; NOT RUN** | Boolean authorization and acceptance state; never a credential value |
-| Route | **PINNED; NOT RUN** | Exact endpoint and model already stated above |
-| Prerequisite gate | **PENDING VERIFICATION** | Pass/fail and zero `RoundTrip` count only |
-| Paid bounded matrix | **PENDING LIVE RUN** | Case label, structural option classes/counts, and request-count-versus-cap |
-| HTTP / top-level shape | **PENDING LIVE RUN** | HTTP status and safe top-level object/status classification |
-| Output shape | **PENDING LIVE RUN** | Structural discriminator/status sets only |
-| Error shape | **PENDING LIVE RUN** | Fixed sanitized category/code; unknown/raw values collapse to safe categories |
-| Cleared request surface | **NONE** | Only exact fields and presence forms proven by reviewed results |
+| Authorization / cost acceptance | **RECORDED** | Boolean authorization and acceptance state; never a credential value |
+| First paid attempt | **2026-09-21 — INCONCLUSIVE / CANCELLED** | One sanitized record only; the remaining serial diagnostic matrix was cancelled |
+| Route | `POST https://ai-gateway.vercel.sh/v1/responses`; `spacexai/grok-4.6` | Exact endpoint and model only |
+| Case | `canonical-all-six` | Case label only; no option values |
+| HTTP / top-level shape | HTTP 400; object `absent`; status `absent` | Status and safe structural classes only |
+| Output shape | No outputs | Presence only; no generated content |
+| Error shape | Error category `other`; code `absent` | Safe classes only; no unknown/raw value or body |
+| Cleared or rejected request surface | **NONE** | The ambiguous canonical 400 does not attribute, clear, or reject any field |
+| Next action | **Corrected verification, then owner-authorized rerun** | Run the fieldless control first under the corrected bounds before option expansion |
 
-Do not add an execution date, operator/run reference, literal option values, or any excluded content to this record.
+No private input value, credential, body, header, ID, raw error, or generated content was retained or reconstructed. Do not add an operator/run reference, literal option value, or any excluded content to this record.
 
 Stop release-candidate promotion on protocol drift. Never infer missing observations or reconstruct them from fixtures.
 
