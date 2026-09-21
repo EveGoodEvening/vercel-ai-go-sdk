@@ -22,6 +22,7 @@ func compilePublicContract() {
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseStream, error) = (*gateway.Client).StreamResponse
 	var _ func(string) gateway.Option = gateway.WithAPIKey
 	var _ func(*gateway.Client, context.Context, gateway.ChatCompletionRequest) (*gateway.ChatCompletionResult, error) = (*gateway.Client).CreateChatCompletion
+	var _ func(*gateway.Client, context.Context, gateway.ChatCompletionRequest) (*gateway.ChatCompletionStream, error) = (*gateway.Client).StreamChatCompletion
 	var _ func(string) gateway.Option = gateway.WithOIDCToken
 	var _ func(gateway.TokenSource) gateway.Option = gateway.WithOIDCTokenSource
 	var _ func(string) gateway.Option = gateway.WithBaseURL
@@ -91,6 +92,14 @@ func compilePublicContract() {
 	_ = gateway.ChatToolCall{}
 	_ = gateway.ChatFunctionCall{}
 	_ = gateway.ChatUsage{}
+	var chatStream *gateway.ChatCompletionStream
+	var chatChunk *gateway.ChatCompletionChunk
+	_ = chatStream.Next()
+	chatChunk = chatStream.Event()
+	_, _ = chatStream.Err(), chatStream.Close()
+	_ = chatChunk.Object
+	_ = []gateway.ChatCompletionChunkChoice{{Index: 0, Delta: gateway.ChatCompletionChunkDelta{Content: "text"}}}
+	_ = chatChunk.RawJSON()
 	_ = []gateway.ResponseTextFormatType{gateway.ResponseTextFormatText, gateway.ResponseTextFormatJSONObject}
 	var responseResult *gateway.ResponseResult
 	_ = responseResult.RawJSON()
