@@ -60,13 +60,26 @@ func compilePublicContract() {
 	var webSearchToolPointer gateway.ResponseBuiltInTool = &gateway.ResponseWebSearchTool{}
 	var xSearchTool gateway.ResponseBuiltInTool = gateway.ResponseXSearchTool{}
 	var xSearchToolPointer gateway.ResponseBuiltInTool = &gateway.ResponseXSearchTool{}
-	_, _, _, _ = webSearchTool, webSearchToolPointer, xSearchTool, xSearchToolPointer
-	_ = gateway.ResponsesBuiltInToolsRequest{
-		Request: gateway.ResponsesRequest{Model: "provider/model", Input: gateway.ResponseTextInput("hello")},
-		Tools:   []gateway.ResponseBuiltInTool{webSearchTool, xSearchTool},
+	var xSearchOptionsTool gateway.ResponseBuiltInTool = gateway.ResponseXSearchOptionsTool{}
+	var xSearchOptionsToolPointer gateway.ResponseBuiltInTool = &gateway.ResponseXSearchOptionsTool{}
+	_, _, _, _, _, _ = webSearchTool, webSearchToolPointer, xSearchTool, xSearchToolPointer, xSearchOptionsTool, xSearchOptionsToolPointer
+	falseValue := false
+	fromDate, toDate := "2026-01-02", "2026-03-04"
+	optionForms := []gateway.ResponseBuiltInTool{
+		gateway.ResponseXSearchOptionsTool{},
+		gateway.ResponseXSearchOptionsTool{AllowedXHandles: []string{}, ExcludedXHandles: []string{}, EnableImageUnderstanding: &falseValue, EnableVideoUnderstanding: &falseValue},
+		gateway.ResponseXSearchOptionsTool{FromDate: &fromDate, ToDate: &toDate},
+		gateway.ResponseXSearchOptionsTool{AllowedXHandles: []string{"alice", "alice"}, FromDate: &fromDate, ToDate: &toDate, EnableImageUnderstanding: new(true), EnableVideoUnderstanding: new(true)},
+		&gateway.ResponseXSearchOptionsTool{ExcludedXHandles: []string{"blocked", "blocked"}, FromDate: &fromDate, ToDate: &toDate, EnableImageUnderstanding: new(true), EnableVideoUnderstanding: new(true)},
 	}
+	builtInRequest := gateway.ResponsesBuiltInToolsRequest{
+		Request: gateway.ResponsesRequest{Model: "provider/model", Input: gateway.ResponseTextInput("hello")},
+		Tools:   append([]gateway.ResponseBuiltInTool{webSearchTool, xSearchTool}, optionForms...),
+	}
+	_, _ = (*gateway.Client).CreateResponseWithBuiltInTools(nil, context.Background(), builtInRequest)
+	_, _ = (*gateway.Client).StreamResponseWithBuiltInTools(nil, context.Background(), builtInRequest)
 	// Keep an external unkeyed literal as an exact wrapper-field compile check.
-	_ = gateway.ResponsesBuiltInToolsRequest{gateway.ResponsesRequest{}, []gateway.ResponseBuiltInTool{gateway.ResponseWebSearchTool{}, gateway.ResponseXSearchTool{}}}
+	_ = gateway.ResponsesBuiltInToolsRequest{gateway.ResponsesRequest{}, []gateway.ResponseBuiltInTool{gateway.ResponseWebSearchTool{}, gateway.ResponseXSearchTool{}, gateway.ResponseXSearchOptionsTool{}}}
 	_ = []gateway.ResponseToolChoiceMode{gateway.ResponseToolChoiceAuto, gateway.ResponseToolChoiceRequired, gateway.ResponseToolChoiceNone}
 	description = "description"
 	strict = true
@@ -322,6 +335,31 @@ func TestExternalContractResponseWebSearchToolIsFieldless(t *testing.T) {
 func TestExternalContractResponseXSearchToolIsFieldless(t *testing.T) {
 	if got := reflect.TypeOf(gateway.ResponseXSearchTool{}).NumField(); got != 0 {
 		t.Fatalf("ResponseXSearchTool field count = %d, want 0", got)
+	}
+}
+
+func TestExternalContractResponseXSearchOptionsToolFields(t *testing.T) {
+	want := []struct {
+		name string
+		typ  reflect.Type
+	}{
+		{"AllowedXHandles", reflect.TypeOf([]string(nil))},
+		{"ExcludedXHandles", reflect.TypeOf([]string(nil))},
+		{"FromDate", reflect.TypeOf((*string)(nil))},
+		{"ToDate", reflect.TypeOf((*string)(nil))},
+		{"EnableImageUnderstanding", reflect.TypeOf((*bool)(nil))},
+		{"EnableVideoUnderstanding", reflect.TypeOf((*bool)(nil))},
+	}
+
+	typ := reflect.TypeOf(gateway.ResponseXSearchOptionsTool{})
+	if typ.NumField() != len(want) {
+		t.Fatalf("ResponseXSearchOptionsTool field count = %d, want %d", typ.NumField(), len(want))
+	}
+	for i := range want {
+		field := typ.Field(i)
+		if !field.IsExported() || field.Name != want[i].name || field.Type != want[i].typ {
+			t.Fatalf("ResponseXSearchOptionsTool field %d = %s %s, want exported %s %s", i, field.Name, field.Type, want[i].name, want[i].typ)
+		}
 	}
 }
 

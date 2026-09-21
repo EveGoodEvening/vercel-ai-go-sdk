@@ -88,9 +88,25 @@ func compileResponses(client *gateway.Client) {
 	webSearchToolPointer := gateway.ResponseBuiltInTool(&gateway.ResponseWebSearchTool{})
 	xSearchTool := gateway.ResponseBuiltInTool(gateway.ResponseXSearchTool{})
 	xSearchToolPointer := gateway.ResponseBuiltInTool(&gateway.ResponseXSearchTool{})
+	xSearchOptionsTool := gateway.ResponseBuiltInTool(gateway.ResponseXSearchOptionsTool{})
+	xSearchOptionsToolPointer := gateway.ResponseBuiltInTool(&gateway.ResponseXSearchOptionsTool{})
+	falseValue := false
+	fromDate, toDate := "2026-01-02", "2026-03-04"
+	optionForms := []gateway.ResponseBuiltInTool{
+		gateway.ResponseXSearchOptionsTool{},
+		gateway.ResponseXSearchOptionsTool{AllowedXHandles: []string{}, ExcludedXHandles: []string{}, EnableImageUnderstanding: &falseValue, EnableVideoUnderstanding: &falseValue},
+		gateway.ResponseXSearchOptionsTool{FromDate: &fromDate, ToDate: &toDate},
+		gateway.ResponseXSearchOptionsTool{AllowedXHandles: []string{"alice", "alice"}, FromDate: &fromDate, ToDate: &toDate, EnableImageUnderstanding: new(true), EnableVideoUnderstanding: new(true)},
+		&gateway.ResponseXSearchOptionsTool{ExcludedXHandles: []string{"blocked", "blocked"}, FromDate: &fromDate, ToDate: &toDate, EnableImageUnderstanding: new(true), EnableVideoUnderstanding: new(true)},
+	}
 	builtInRequest := gateway.ResponsesBuiltInToolsRequest{
 		Request: request,
-		Tools:   []gateway.ResponseBuiltInTool{webSearchTool, webSearchToolPointer, xSearchTool, xSearchToolPointer},
+		Tools:   append([]gateway.ResponseBuiltInTool{webSearchTool, webSearchToolPointer, xSearchTool, xSearchToolPointer, xSearchOptionsTool, xSearchOptionsToolPointer}, optionForms...),
+	}
+	for _, form := range optionForms {
+		formRequest := gateway.ResponsesBuiltInToolsRequest{Request: request, Tools: []gateway.ResponseBuiltInTool{form}}
+		_, _ = client.CreateResponseWithBuiltInTools(context.Background(), formRequest)
+		_, _ = client.StreamResponseWithBuiltInTools(context.Background(), formRequest)
 	}
 	builtInResult, _ := client.CreateResponseWithBuiltInTools(context.Background(), builtInRequest)
 	_ = builtInResult.RawJSON()
@@ -247,7 +263,7 @@ var allowedTypes = names(
 	"Client", "Option", "TokenSource", "RetryPolicy",
 	"ConfigurationError", "ValidationError", "TransportError", "ResponseError", "ResponseValidationError",
 	"EvaluationRequest", "Question", "BooleanQuestion", "ChoiceQuestion", "ScoreQuestion", "OptionalJSON", "BooleanCriteria", "EvaluationResult", "Rounding", "Usage", "WarningType", "Warning", "ResponseMetadata", "Answer", "BooleanAnswer", "ChoiceAnswer", "ScoreAnswer",
-	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseXSearchTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
+	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseXSearchTool", "ResponseXSearchOptionsTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
 	"ChatCompletionRequest", "ChatServerToolsRequest", "ChatServerTool", "ChatExaSearchTool", "ChatParallelSearchTool", "ChatPerplexitySearchTool", "ChatTakoSearchTool",
 	"ChatExaSearchType", "ChatExaCategory", "ChatExaVerbosity", "ChatExaSection", "ChatExaText", "ChatExaTextEnabled", "ChatExaTextOptions", "ChatExaHighlights", "ChatExaHighlightsEnabled", "ChatExaHighlightsOptions", "ChatExaExtras", "ChatExaSubpageTarget", "ChatExaSubpageTargetString", "ChatExaSubpageTargetStrings", "ChatExaContents", "ChatExaSearchConfig",
 	"ChatParallelMode", "ChatParallelSourcePolicy", "ChatParallelExcerpts", "ChatParallelFetchPolicy", "ChatParallelSearchConfig",
@@ -288,6 +304,11 @@ var expectedInterfaceMethods = map[string]map[string]string{
 	"ChatStop":                {"chatStop": "func()"},
 	"ChatToolChoice":          {"chatToolChoice": "func()"},
 	"ChatResponseFormat":      {"chatResponseFormat": "func()"},
+}
+var expectedStructFields = map[string][]string{
+	"ResponseWebSearchTool":     {},
+	"ResponseXSearchTool":       {},
+	"ResponseXSearchOptionsTool": {"AllowedXHandles []string", "ExcludedXHandles []string", "FromDate *string", "ToDate *string", "EnableImageUnderstanding *bool", "EnableVideoUnderstanding *bool"},
 }
 var allowedValues = names(
 	"WarningUnsupported", "WarningCompatibility", "WarningDeprecated", "WarningOther", "ResponseToolChoiceAuto", "ResponseToolChoiceRequired", "ResponseToolChoiceNone", "ResponseTextFormatText", "ResponseTextFormatJSONObject",
@@ -439,6 +460,29 @@ func inspectInterfaceMethods(interfaceName string, interfaceType *ast.InterfaceT
 	return nil
 }
 
+func inspectStructFields(structName string, structType *ast.StructType, expected []string) error {
+	got := make([]string, 0, len(structType.Fields.List))
+	for _, field := range structType.Fields.List {
+		if len(field.Names) != 1 || !ast.IsExported(field.Names[0].Name) {
+			return fmt.Errorf("unexpected field shape found: %s", structName)
+		}
+		typ, err := methodSignature(field.Type)
+		if err != nil {
+			return fmt.Errorf("inspect field type for %s.%s: %w", structName, field.Names[0].Name, err)
+		}
+		got = append(got, field.Names[0].Name+" "+typ)
+	}
+	if len(got) != len(expected) {
+		return fmt.Errorf("unexpected field count for %s: got %d, want %d", structName, len(got), len(expected))
+	}
+	for i := range expected {
+		if got[i] != expected[i] {
+			return fmt.Errorf("unexpected field %d for %s: got %s, want %s", i, structName, got[i], expected[i])
+		}
+	}
+	return nil
+}
+
 func parseInterface(expression string) *ast.InterfaceType {
 	parsed, err := parser.ParseExpr(expression)
 	if err != nil {
@@ -481,6 +525,7 @@ func main() {
 	seenFunctions := make(map[string]bool, len(allowedFunctions))
 	seenMethods := make(map[string]bool, len(allowedMethods))
 	seenValues := make(map[string]bool, len(allowedValues))
+	seenStructs := make(map[string]bool, len(expectedStructFields))
 	seenInterfaces := make(map[string]bool, len(expectedInterfaceMethods))
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
@@ -516,6 +561,16 @@ func main() {
 							}
 							seenInterfaces[spec.Name.Name] = true
 						}
+						if structType, modeled := spec.Type.(*ast.StructType); modeled {
+							expected, exact := expectedStructFields[spec.Name.Name]
+							if exact {
+								if err := inspectStructFields(spec.Name.Name, structType, expected); err != nil {
+									fmt.Fprintln(os.Stderr, err)
+									os.Exit(1)
+								}
+								seenStructs[spec.Name.Name] = true
+							}
+						}
 					case *ast.ValueSpec:
 						for _, name := range spec.Names {
 							if ast.IsExported(name.Name) {
@@ -541,6 +596,12 @@ func main() {
 	for interfaceName := range expectedInterfaceMethods {
 		if !seenInterfaces[interfaceName] {
 			fmt.Fprintf(os.Stderr, "expected exported interface not found: %s\n", interfaceName)
+			os.Exit(1)
+		}
+	}
+	for structName := range expectedStructFields {
+		if !seenStructs[structName] {
+			fmt.Fprintf(os.Stderr, "expected exact struct not found: %s\n", structName)
 			os.Exit(1)
 		}
 	}
