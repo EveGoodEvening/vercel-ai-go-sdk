@@ -152,9 +152,9 @@ Both `RawResponseBody` methods return nil if nothing was retained and otherwise 
 ```go
 var responseErr *gateway.ResponseError
 if errors.As(err, &responseErr) {
-    log.Printf("gateway status=%d type=%q code=%q request_id=%q retryable=%t",
+    log.Printf("gateway status=%d type=%q code=%q request_id_present=%t retryable=%t",
         responseErr.StatusCode(), responseErr.Type(), responseErr.Code(),
-        responseErr.RequestID(), responseErr.Retryable())
+        responseErr.RequestID() != "", responseErr.Retryable())
 }
 ```
 
