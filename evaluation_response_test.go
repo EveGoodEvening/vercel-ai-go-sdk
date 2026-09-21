@@ -408,6 +408,84 @@ func TestComposeEvaluationResultValidationDiagnostics(t *testing.T) {
 	}
 }
 
+func TestComposeEvaluationResultResourceLimits(t *testing.T) {
+	metadataBody := func(value string) []byte {
+		return []byte(`{"answers":{},"providerMetadata":{"acme":{"v":` + value + `}}}`)
+	}
+	deepValue := func(arrays int) string {
+		return strings.Repeat("[", arrays) + "null" + strings.Repeat("]", arrays)
+	}
+	arrayValue := func(members int) string {
+		if members == 0 {
+			return "[]"
+		}
+		return "[" + strings.Repeat("null,", members-1) + "null]"
+	}
+	objectValue := func(members int) string {
+		var builder strings.Builder
+		builder.WriteByte('{')
+		for index := range members {
+			if index != 0 {
+				builder.WriteByte(',')
+			}
+			fmt.Fprintf(&builder, `%q:null`, strconv.Itoa(index))
+		}
+		builder.WriteByte('}')
+		return builder.String()
+	}
+	longKeyValue := func(size int) string {
+		return `{"` + strings.Repeat("k", size) + `":null}`
+	}
+	longStringValue := func(size int) string {
+		return `"` + strings.Repeat("v", size) + `"`
+	}
+	depthPath := `$["providerMetadata"]["acme"]["v"]` + strings.Repeat("[0]", 61)
+
+	tests := []struct {
+		name       string
+		body       []byte
+		wantPath   string
+		wantReason string
+	}{
+		{name: "depth exact", body: metadataBody(deepValue(60))},
+		{name: "depth limit plus one", body: metadataBody(deepValue(61)), wantPath: depthPath, wantReason: "maximum depth is 64"},
+		{name: "array members exact", body: metadataBody(arrayValue(maxResponseMembers))},
+		{name: "array members limit plus one", body: metadataBody(arrayValue(maxResponseMembers + 1)), wantPath: `$["providerMetadata"]["acme"]["v"]`, wantReason: "array exceeds 10000 members"},
+		{name: "object members exact", body: metadataBody(objectValue(maxResponseMembers))},
+		{name: "object members limit plus one", body: metadataBody(objectValue(maxResponseMembers + 1)), wantPath: `$["providerMetadata"]["acme"]["v"]`, wantReason: "object exceeds 10000 members"},
+		{name: "decoded value exact", body: metadataBody(longStringValue(maxResponseValueBytes))},
+		{name: "decoded value limit plus one", body: metadataBody(longStringValue(maxResponseValueBytes + 1)), wantPath: `$["providerMetadata"]["acme"]["v"]`, wantReason: "string exceeds 1 MiB"},
+		{name: "decoded key exact", body: metadataBody(longKeyValue(maxResponseValueBytes))},
+		{name: "decoded key limit plus one", body: metadataBody(longKeyValue(maxResponseValueBytes + 1)), wantPath: `$["providerMetadata"]["acme"]["v"]`, wantReason: "object key exceeds 1 MiB"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := composeEvaluationResult("model", map[string]Question{}, rawEvaluationResponse{statusCode: http.StatusOK, body: test.body})
+			if test.wantReason == "" {
+				if err != nil {
+					t.Fatalf("exact limit rejected: %v", err)
+				}
+				if result == nil || result.Response.ModelID != "model" {
+					t.Fatalf("unexpected result: %#v", result)
+				}
+				return
+			}
+
+			var validation *ResponseValidationError
+			if !errors.As(err, &validation) {
+				t.Fatalf("got %T %v", err, err)
+			}
+			if validation.StatusCode() != http.StatusOK || validation.Path() != test.wantPath || validation.Reason() != test.wantReason {
+				t.Fatalf("status/path/reason = %d %q %q; want %d %q %q", validation.StatusCode(), validation.Path(), validation.Reason(), http.StatusOK, test.wantPath, test.wantReason)
+			}
+			if diagnostic := validation.Error(); len(diagnostic) > 512 || strings.Contains(diagnostic, strings.Repeat("k", 64)) || strings.Contains(diagnostic, strings.Repeat("v", 64)) {
+				t.Fatalf("diagnostic is not defensively bounded: length=%d", len(diagnostic))
+			}
+		})
+	}
+}
+
 func TestComposeEvaluationResultToleranceBoundaries(t *testing.T) {
 	choice := map[string]Question{"q": ChoiceQuestion{Instructions: "pick", Criteria: map[string]any{"a": "A", "b": "B"}}}
 	choiceBody := func(choice string, a, b float64, probabilityDecimals string) string {

@@ -34,7 +34,7 @@ func (failure *responseDecodeFailure) Unwrap() error { return failure.cause }
 func decodeResponseNode(body []byte) (*responseNode, *responseDecodeFailure) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
-	node, failure := readResponseNode(decoder, "$")
+	node, failure := readResponseNode(decoder, "$", 1)
 	if failure != nil {
 		return nil, failure
 	}
@@ -46,7 +46,10 @@ func decodeResponseNode(body []byte) (*responseNode, *responseDecodeFailure) {
 	return node, nil
 }
 
-func readResponseNode(decoder *json.Decoder, path string) (*responseNode, *responseDecodeFailure) {
+func readResponseNode(decoder *json.Decoder, path string, depth int) (*responseNode, *responseDecodeFailure) {
+	if depth > maxResponseJSONDepth {
+		return nil, &responseDecodeFailure{path: path, reason: "maximum depth is 64"}
+	}
 	token, err := decoder.Token()
 	if err != nil {
 		return nil, &responseDecodeFailure{path: "$", reason: "malformed JSON", cause: err}
@@ -60,6 +63,9 @@ func readResponseNode(decoder *json.Decoder, path string) (*responseNode, *respo
 		}
 		return &responseNode{kind: 'f'}, nil
 	case string:
+		if len(token) > maxResponseValueBytes {
+			return nil, &responseDecodeFailure{path: path, reason: "string exceeds 1 MiB"}
+		}
 		return &responseNode{kind: 's', str: token}, nil
 	case json.Number:
 		return &responseNode{kind: '#', num: token}, nil
@@ -67,7 +73,11 @@ func readResponseNode(decoder *json.Decoder, path string) (*responseNode, *respo
 		switch token {
 		case '{':
 			object := make(map[string]*responseNode)
+			count := 0
 			for decoder.More() {
+				if count == maxResponseMembers {
+					return nil, &responseDecodeFailure{path: path, reason: "object exceeds 10000 members"}
+				}
 				keyToken, keyErr := decoder.Token()
 				if keyErr != nil {
 					return nil, &responseDecodeFailure{path: "$", reason: "malformed JSON", cause: keyErr}
@@ -76,15 +86,19 @@ func readResponseNode(decoder *json.Decoder, path string) (*responseNode, *respo
 				if !ok {
 					return nil, &responseDecodeFailure{path: "$", reason: "malformed JSON"}
 				}
+				if len(key) > maxResponseValueBytes {
+					return nil, &responseDecodeFailure{path: path, reason: "object key exceeds 1 MiB"}
+				}
 				childPath := memberPath(path, key)
 				if _, exists := object[key]; exists {
 					return nil, &responseDecodeFailure{path: childPath, reason: "duplicate field"}
 				}
-				child, childFailure := readResponseNode(decoder, childPath)
+				child, childFailure := readResponseNode(decoder, childPath, depth+1)
 				if childFailure != nil {
 					return nil, childFailure
 				}
 				object[key] = child
+				count++
 			}
 			if _, closeErr := decoder.Token(); closeErr != nil {
 				return nil, &responseDecodeFailure{path: "$", reason: "malformed JSON", cause: closeErr}
@@ -93,9 +107,24 @@ func readResponseNode(decoder *json.Decoder, path string) (*responseNode, *respo
 		case '[':
 			array := make([]*responseNode, 0)
 			for decoder.More() {
-				child, childFailure := readResponseNode(decoder, indexPath(path, len(array)))
+				if len(array) == maxResponseMembers {
+					return nil, &responseDecodeFailure{path: path, reason: "array exceeds 10000 members"}
+				}
+				child, childFailure := readResponseNode(decoder, indexPath(path, len(array)), depth+1)
 				if childFailure != nil {
 					return nil, childFailure
+				}
+				if len(array) == cap(array) {
+					capacity := 8
+					if cap(array) != 0 {
+						capacity = cap(array) * 2
+					}
+					if capacity > maxResponseMembers {
+						capacity = maxResponseMembers
+					}
+					grown := make([]*responseNode, len(array), capacity)
+					copy(grown, array)
+					array = grown
 				}
 				array = append(array, child)
 			}
@@ -107,6 +136,7 @@ func readResponseNode(decoder *json.Decoder, path string) (*responseNode, *respo
 	}
 	return nil, &responseDecodeFailure{path: "$", reason: "malformed JSON"}
 }
+
 func bestEffortResponseIDs(body []byte) (requestID, responseID string) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
@@ -114,16 +144,19 @@ func bestEffortResponseIDs(body []byte) (requestID, responseID string) {
 	if err != nil || token != json.Delim('{') {
 		return "", ""
 	}
-	for decoder.More() {
+	for count := 0; decoder.More(); count++ {
+		if count == maxResponseMembers {
+			break
+		}
 		keyToken, keyErr := decoder.Token()
 		if keyErr != nil {
 			break
 		}
 		key, ok := keyToken.(string)
-		if !ok {
+		if !ok || len(key) > maxResponseValueBytes {
 			break
 		}
-		value, valueErr := readResponseNode(decoder, memberPath("$", key))
+		value, valueErr := readResponseNode(decoder, memberPath("$", key), 2)
 		if valueErr != nil {
 			break
 		}
@@ -146,10 +179,10 @@ func bestEffortResponseIDs(body []byte) (requestID, responseID string) {
 
 func composeEvaluationResult(modelID string, questions map[string]Question, raw rawEvaluationResponse) (*EvaluationResult, error) {
 	body := append([]byte(nil), raw.body...)
-	requestID, responseID := bestEffortResponseIDs(body)
 	node, failure := decodeResponseNode(body)
-	if strictRequestID, strictResponseID := responseIDs(node); node != nil {
-		requestID, responseID = strictRequestID, strictResponseID
+	requestID, responseID := responseIDs(node)
+	if failure != nil {
+		requestID, responseID = bestEffortResponseIDs(body)
 	}
 	invalid := func(path, reason string, cause error) (*EvaluationResult, error) {
 		return nil, &ResponseValidationError{cause: cause, statusCode: http.StatusOK, path: path, reason: reason, requestID: requestID, responseID: responseID, bodyTruncated: raw.bodyTruncated, rawResponseBody: body}
