@@ -1665,7 +1665,7 @@ The test-only fix received two fresh CLEAN independent final rereviews; neither 
 
 **Depends on:** Chunk 26 implementation, focused verification, committed accounting, and clean code/API rereview are recorded while Chunk 26 remains intentionally incomplete.
 
-**Current status:** `[-]` the draft external compile contract and strict consumer audit are implemented, all three confirmed independent-review findings are fixed at `b902f48`, and the post-fix verification is green. Chunk 26A remains incomplete pending a clean independent rereview of the strengthened sealed-interface, legacy-request, and interface-member audit contracts.
+**Current status:** `[-]` the draft external compile contract and strict consumer audit are implemented, the first three confirmed independent-review findings are fixed at `b902f48`, and the selector-based exported interface embedding finding is fixed at `72aaae0`; both exact credential-scrubbed Chunk 26A gates pass after the latest fix. Chunk 26A remains incomplete pending another clean independent rereview of the strengthened sealed-interface, legacy-request, interface-member, and selector-embedding audit contracts.
 
 **Owned paths (exact three):** `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `planning/IMPLEMENTATION_PLAN.md`.
 
@@ -1679,6 +1679,13 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 ```
 
 **Recorded independent-review findings and green fix (`b902f48`):** the review confirmed three gaps: the external contract proved concrete assignability but did not lock `ResponseBuiltInTool` as an exactly single-method sealed interface; it did not lock the unchanged exported field order, names, and types of legacy `ResponsesRequest`; and the strict AST audit did not inspect exported methods declared inside exported interfaces. Commit `b902f48` fixed all three and changed exactly `contract_external_test.go` and `scripts/verify-local-consumer.sh`. The strengthened contract now reflection-locks `ResponseBuiltInTool` to the sole unexported zero-argument/zero-result `responseBuiltInTool` marker, reflection-locks the complete legacy `ResponsesRequest` field inventory/order/names/export status/types, and makes the strict expected/export audit inventory exported interface members (including the expected `TokenSource.Token`) while rejecting any exported member added to `ResponseBuiltInTool`. `gofmt` completed on `contract_external_test.go`. Both exact credential-scrubbed post-fix verification commands passed:
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'TestExternalContract' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK ./scripts/verify-local-consumer.sh
+```
+
+**Recorded selector-embedding rereview finding and green fix (`72aaae0`):** the rereview found that `scripts/verify-local-consumer.sh` did not reject selector-based exported interface embeddings because its interface-member audit did not recognize `*ast.SelectorExpr`, allowing qualified embeddings such as `io.Closer` to escape the claimed bidirectional export inventory. Commit `72aaae0` changed exactly `scripts/verify-local-consumer.sh`. The audit now rejects qualified exported interface embeddings and their pointer, indexed, multi-indexed, and parenthesized forms, preserves the qualified name in diagnostics, and includes a hermetic self-check covering qualified, pointer-qualified, and indexed-qualified embeddings. Both exact credential-scrubbed Chunk 26A gates passed afterward:
 
 ```sh
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'TestExternalContract' ./...
