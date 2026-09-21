@@ -1572,7 +1572,7 @@ The unchecked chunks below are sequential. **Chunk 26 is the first dependency-re
 
 **Draft commit boundary:** `feat: add responses web search request`. **Serialized accounting commit boundary:** `docs: record responses web search implementation`.
 
-**Current status:** `[-]` implementation and implementation-time verification are complete in draft commit `0295db6` (`feat: add responses web search request`); the confirmed pointer-form implementation finding is fixed in commit `25e9a08` (`fix: accept pointer web search tools`), and the subsequent rereview's public-path regression-test finding is fixed in test-only commit `d3dd182`. A fresh clean independent rereview is the next gate before Chunk 26A may begin. Chunk 26 remains intentionally incomplete pending that rereview/accounting gate and the final encompassing Chunk 30 closure.
+**Current status:** `[-]` implementation and implementation-time verification are complete; both final independent rereviews are CLEAN, the complete commit/path chain through `97942dc` is recorded below, and no actionable Chunk 26 finding remains. The local review/accounting gate is satisfied and Chunk 26 is dependency-ready for 26A. Chunk 26 remains intentionally incomplete until the final encompassing Chunk 30 closure.
 
 **Draft implementation changed paths (exact four):** `responses.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`.
 
@@ -1638,13 +1638,28 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test ./...
 ```
 
-This test-only fix requires a fresh clean independent rereview; the prior rereview finding is not a completion mark.
+The test-only fix received two fresh CLEAN independent final rereviews; neither found an actionable defect.
+
+**Complete commit/path chain through final pre-rereview accounting:**
+
+- [x] `f91352e` changed only `planning/IMPLEMENTATION_PLAN.md`.
+- [x] `0295db6` (`feat: add responses web search request`) changed exactly `responses.go`, `responses_wire.go`, `responses_validate.go`, and `responses_test.go`.
+- [x] `ca37703` changed only `planning/IMPLEMENTATION_PLAN.md`.
+- [x] `25e9a08` (`fix: accept pointer web search tools`) changed exactly `responses_validate.go`, `responses_wire.go`, and `responses_test.go`.
+- [x] `56da6b6` changed only `planning/IMPLEMENTATION_PLAN.md`.
+- [x] `d3dd182` changed exactly `responses_test.go`.
+- [x] `97942dc` changed only `planning/IMPLEMENTATION_PLAN.md`.
+
+**Recorded final clean rereviews:**
+
+- [x] `agent://chunk26-final-review-1` re-audited the complete Chunk 26 chain through `97942dc` across `responses.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`, and the current tracker accounting. It confirmed source compatibility, the sealed no-options built-in-tool surface, value/non-nil-pointer parity with nil and typed-nil rejection before credential/network access, exact ordering and low-context encoding, combined limits and canonical validation paths, unchanged raw buffered/SSE boundaries and legacy encoding, and sufficient focused regression coverage. It found no actionable patch-introduced defect.
+- [x] `agent://chunk26-final-review-2` independently re-audited the same complete chain and exact path inventory. It confirmed no security, API/wire, test, or accounting defect; no configurable or generic search escape hatch; public buffered and streaming pointer-path coverage; accurate credential-scrubbed verification accounting; and no skipped locally doable Chunk 26 task. It found no actionable finding and confirmed the clean independent rereview gate is satisfied.
 
 **Review/accounting gate:**
 
-- [ ] Clean independent API/wire rereview confirms the pointer-form fix plus the fixed low-context shape, source compatibility, zero undocumented knobs, validation-before-credential/network, unchanged raw output/event boundaries, and no direct-provider output inference.
-- [ ] After the clean rereview, commit to `planning/IMPLEMENTATION_PLAN.md` the draft and review-fix hashes, exact changed paths, exact focused verification results, and clean rereview result. That serialized accounting commit permits Chunk 26A to begin; Chunk 26 remains intentionally incomplete until Chunk 30 closure.
-- [ ] Rollback ownership is the wrapper, its two methods, encoder/validator branches, focused tests, Chunk 26A's external contract/audit, and the matching `web_search` portions of Chunks 28–29. These paths form the atomic `web_search` rollback group defined in Chunk 30: they are removed in one committed state only after the `x_search` group is gone, restoring the prior function-only Responses request surface and unsupported-status documentation without changing shared transport, results, or streams.
+- [x] Two clean independent API/wire final rereviews confirm the pointer-form fix plus the fixed low-context shape, source compatibility, zero undocumented knobs, validation-before-credential/network, unchanged raw output/event boundaries, no direct-provider output inference, and no remaining actionable finding.
+- [x] The tracker records the complete draft, review-fix, test-fix, and accounting hash/path chain through `97942dc`, the exact credential-scrubbed focused verification results, and both clean final rereviews. This satisfies the serialized local review/accounting gate and permits Chunk 26A to begin; Chunk 26 remains `[-]` and intentionally incomplete until Chunk 30 closure.
+- [x] Rollback ownership is the wrapper, its two methods, encoder/validator branches, focused tests, Chunk 26A's external contract/audit, and the matching `web_search` portions of Chunks 28–29. These paths form the atomic `web_search` rollback group defined in Chunk 30: they are removed in one committed state only after the `x_search` group is gone, restoring the prior function-only Responses request surface and unsupported-status documentation without changing shared transport, results, or streams.
 
 ### Chunk 26A — `web_search` external-consumer contract and strict audit
 
