@@ -64,11 +64,12 @@ func compilePublicContract() {
 	var xSearchOptionsToolPointer gateway.ResponseBuiltInTool = &gateway.ResponseXSearchOptionsTool{}
 	_, _, _, _, _, _ = webSearchTool, webSearchToolPointer, xSearchTool, xSearchToolPointer, xSearchOptionsTool, xSearchOptionsToolPointer
 	falseValue := false
-	fromDate, toDate := "2026-01-02", "2026-03-04"
+	fromDate, toDate, emptyDate := "2026-01-02", "2026-03-04", ""
 	optionForms := []gateway.ResponseBuiltInTool{
 		gateway.ResponseXSearchOptionsTool{},
 		gateway.ResponseXSearchOptionsTool{AllowedXHandles: []string{}, ExcludedXHandles: []string{}, EnableImageUnderstanding: &falseValue, EnableVideoUnderstanding: &falseValue},
 		gateway.ResponseXSearchOptionsTool{FromDate: &fromDate, ToDate: &toDate},
+		gateway.ResponseXSearchOptionsTool{FromDate: &emptyDate, ToDate: &emptyDate},
 		gateway.ResponseXSearchOptionsTool{AllowedXHandles: []string{"alice", "alice"}, FromDate: &fromDate, ToDate: &toDate, EnableImageUnderstanding: new(true), EnableVideoUnderstanding: new(true)},
 		&gateway.ResponseXSearchOptionsTool{ExcludedXHandles: []string{"blocked", "blocked"}, FromDate: &fromDate, ToDate: &toDate, EnableImageUnderstanding: new(true), EnableVideoUnderstanding: new(true)},
 	}

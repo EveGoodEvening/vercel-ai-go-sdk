@@ -91,11 +91,12 @@ func compileResponses(client *gateway.Client) {
 	xSearchOptionsTool := gateway.ResponseBuiltInTool(gateway.ResponseXSearchOptionsTool{})
 	xSearchOptionsToolPointer := gateway.ResponseBuiltInTool(&gateway.ResponseXSearchOptionsTool{})
 	falseValue := false
-	fromDate, toDate := "2026-01-02", "2026-03-04"
+	fromDate, toDate, emptyDate := "2026-01-02", "2026-03-04", ""
 	optionForms := []gateway.ResponseBuiltInTool{
 		gateway.ResponseXSearchOptionsTool{},
 		gateway.ResponseXSearchOptionsTool{AllowedXHandles: []string{}, ExcludedXHandles: []string{}, EnableImageUnderstanding: &falseValue, EnableVideoUnderstanding: &falseValue},
 		gateway.ResponseXSearchOptionsTool{FromDate: &fromDate, ToDate: &toDate},
+		gateway.ResponseXSearchOptionsTool{FromDate: &emptyDate, ToDate: &emptyDate},
 		gateway.ResponseXSearchOptionsTool{AllowedXHandles: []string{"alice", "alice"}, FromDate: &fromDate, ToDate: &toDate, EnableImageUnderstanding: new(true), EnableVideoUnderstanding: new(true)},
 		&gateway.ResponseXSearchOptionsTool{ExcludedXHandles: []string{"blocked", "blocked"}, FromDate: &fromDate, ToDate: &toDate, EnableImageUnderstanding: new(true), EnableVideoUnderstanding: new(true)},
 	}
@@ -611,7 +612,22 @@ func main() {
 }
 EOF
 
-env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK GOWORK=off GOPROXY=off go run "$consumer_dir/check_api.go" "$repo_root"
+run_with_scrubbed_gateway_env() {
+	env \
+		-u AI_GATEWAY_API_KEY \
+		-u VERCEL_OIDC_TOKEN \
+		-u AI_GATEWAY_LIVE_COST_ACK \
+		-u AI_GATEWAY_PUBLIC_LIVE_COST_ACK \
+		-u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK \
+		-u AI_GATEWAY_X_SEARCH_PROBE_INPUT \
+		-u AI_GATEWAY_X_SEARCH_PROBE_HANDLE_A \
+		-u AI_GATEWAY_X_SEARCH_PROBE_HANDLE_B \
+		-u AI_GATEWAY_X_SEARCH_PROBE_FROM_DATE \
+		-u AI_GATEWAY_X_SEARCH_PROBE_TO_DATE \
+		GOWORK=off GOPROXY=off "$@"
+}
+
+run_with_scrubbed_gateway_env go run "$consumer_dir/check_api.go" "$repo_root"
 
 cd "$consumer_dir"
-env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK GOWORK=off GOPROXY=off go build ./...
+run_with_scrubbed_gateway_env go build ./...
