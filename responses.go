@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"unicode/utf8"
 
 	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 )
@@ -199,6 +200,9 @@ func decodeResponseResult(body []byte) (*ResponseResult, error) {
 }
 
 func validateResponseJSON(body []byte) error {
+	if !utf8.Valid(body) {
+		return fmtError("invalid UTF-8")
+	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	first, err := decoder.Token()

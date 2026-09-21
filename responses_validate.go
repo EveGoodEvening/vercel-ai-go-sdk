@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -14,6 +15,9 @@ const (
 )
 
 func validateResponsesRequest(r ResponsesRequest) *ValidationError {
+	if err := stringBound(r.Model, memberPath("$", "model")); err != nil {
+		return err
+	}
 	if r.Model == "" || !validModelID(r.Model) {
 		return validationError(memberPath("$", "model"), "must be a nonempty provider/model string")
 	}
@@ -65,12 +69,18 @@ func validateResponsesRequest(r ResponsesRequest) *ValidationError {
 	if r.ToolChoice != nil {
 		switch c := r.ToolChoice.(type) {
 		case ResponseToolChoiceMode:
+			if err := stringBound(string(c), memberPath("$", "tool_choice")); err != nil {
+				return err
+			}
 			if c != "auto" && c != "required" && c != "none" {
 				return validationError(memberPath("$", "tool_choice"), "must be auto, required, or none")
 			}
 		case ResponseSpecificToolChoice:
 			if c.Name == "" {
 				return validationError(memberPath(memberPath("$", "tool_choice"), "name"), "must be nonempty")
+			}
+			if err := stringBound(c.Name, memberPath(memberPath("$", "tool_choice"), "name")); err != nil {
+				return err
 			}
 		default:
 			return validationError(memberPath("$", "tool_choice"), "tool choice type is unsupported")
@@ -89,8 +99,14 @@ func validateResponsesRequest(r ResponsesRequest) *ValidationError {
 	}
 	if r.Reasoning != nil {
 		allowed := map[string]bool{"none": true, "minimal": true, "low": true, "medium": true, "high": true, "xhigh": true, "max": true}
+		if err := stringBound(r.Reasoning.Effort, memberPath(memberPath("$", "reasoning"), "effort")); err != nil {
+			return err
+		}
 		if !allowed[r.Reasoning.Effort] {
 			return validationError(memberPath(memberPath("$", "reasoning"), "effort"), "unsupported value")
+		}
+		if err := stringPointer(r.Reasoning.Summary, memberPath(memberPath("$", "reasoning"), "summary")); err != nil {
+			return err
 		}
 		if r.Reasoning.Summary != nil && *r.Reasoning.Summary != "detailed" && *r.Reasoning.Summary != "auto" && *r.Reasoning.Summary != "concise" {
 			return validationError(memberPath(memberPath("$", "reasoning"), "summary"), "unsupported value")
@@ -102,6 +118,9 @@ func validateResponsesRequest(r ResponsesRequest) *ValidationError {
 		}
 		switch f := r.Text.Format.(type) {
 		case ResponseTextFormatType:
+			if err := stringBound(string(f), memberPath(memberPath("$", "text"), "format")); err != nil {
+				return err
+			}
 			if f != "text" && f != "json_object" {
 				return validationError(memberPath(memberPath("$", "text"), "format"), "unsupported format")
 			}
@@ -109,6 +128,9 @@ func validateResponsesRequest(r ResponsesRequest) *ValidationError {
 			p := memberPath(memberPath("$", "text"), "format")
 			if f.Name == "" {
 				return validationError(memberPath(p, "name"), "must be nonempty")
+			}
+			if err := stringBound(f.Name, memberPath(p, "name")); err != nil {
+				return err
 			}
 			if err := stringPointer(f.Description, memberPath(p, "description")); err != nil {
 				return err
@@ -123,6 +145,9 @@ func validateResponsesRequest(r ResponsesRequest) *ValidationError {
 			return validationError(memberPath(memberPath("$", "text"), "format"), "format type is unsupported")
 		}
 	}
+	if err := stringPointer(r.Truncation, memberPath("$", "truncation")); err != nil {
+		return err
+	}
 	if r.Truncation != nil && *r.Truncation != "auto" && *r.Truncation != "disabled" {
 		return validationError(memberPath("$", "truncation"), "must be auto or disabled")
 	}
@@ -134,8 +159,8 @@ func validateResponsesRequest(r ResponsesRequest) *ValidationError {
 			return err
 		}
 	}
-	if r.PromptCacheKey != nil && len(*r.PromptCacheKey) > 64 {
-		return validationError(memberPath("$", "prompt_cache_key"), "must contain at most 64 bytes")
+	if r.PromptCacheKey != nil && utf8.RuneCountInString(*r.PromptCacheKey) > 64 {
+		return validationError(memberPath("$", "prompt_cache_key"), "must contain at most 64 characters")
 	}
 	if len(r.Metadata) > 16 {
 		return validationError(memberPath("$", "metadata"), "must contain at most 16 members")
@@ -146,18 +171,31 @@ func validateResponsesRequest(r ResponsesRequest) *ValidationError {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		if len(k) > 64 {
-			return validationError(memberPath(memberPath("$", "metadata"), k), "key must contain at most 64 bytes")
+		p := memberPath(memberPath("$", "metadata"), k)
+		if err := stringBound(k, p); err != nil {
+			return err
 		}
-		if len(r.Metadata[k]) > 512 {
-			return validationError(memberPath(memberPath("$", "metadata"), k), "value must contain at most 512 bytes")
+		if err := stringBound(r.Metadata[k], p); err != nil {
+			return err
 		}
+		if utf8.RuneCountInString(k) > 64 {
+			return validationError(p, "key must contain at most 64 characters")
+		}
+		if utf8.RuneCountInString(r.Metadata[k]) > 512 {
+			return validationError(p, "value must contain at most 512 characters")
+		}
+	}
+	if err := stringPointer(r.Caching, memberPath("$", "caching")); err != nil {
+		return err
 	}
 	if r.Caching != nil && *r.Caching != "auto" {
 		return validationError(memberPath("$", "caching"), "must be auto")
 	}
 	if r.CacheAnchorItems != nil && *r.CacheAnchorItems < 0 {
 		return validationError(memberPath("$", "cache_anchor_items"), "must be non-negative")
+	}
+	if err := stringPointer(r.CacheTTL, memberPath("$", "cache_ttl")); err != nil {
+		return err
 	}
 	if r.CacheTTL != nil {
 		if *r.CacheTTL != "5m" && *r.CacheTTL != "1h" {
@@ -199,6 +237,9 @@ func validateResponseInput(input ResponseInput, path string) *ValidationError {
 			}
 			switch x := item.(type) {
 			case ResponseMessage:
+				if err := stringBound(x.Role, memberPath(p, "role")); err != nil {
+					return err
+				}
 				if x.Role != "user" && x.Role != "assistant" && x.Role != "system" && x.Role != "developer" {
 					return validationError(memberPath(p, "role"), "unsupported role")
 				}
@@ -273,11 +314,23 @@ func (b *boundedJSONValidator) walk(v reflect.Value, path string, depth int) *Va
 	if !v.IsValid() {
 		return nil
 	}
-	for v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer {
+	if v.Kind() == reflect.Interface {
 		if v.IsNil() {
 			return nil
 		}
-		v = v.Elem()
+		return b.walk(v.Elem(), path, depth+1)
+	}
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return nil
+		}
+		visit := jsonVisit{typ: v.Type(), ptr: unsafePointer(uintptr(v.UnsafePointer()))}
+		if b.active[visit] {
+			return validationError(path, "cycle detected")
+		}
+		b.active[visit] = true
+		defer delete(b.active, visit)
+		return b.walk(v.Elem(), path, depth+1)
 	}
 	switch v.Kind() {
 	case reflect.Bool:
@@ -323,7 +376,7 @@ func (b *boundedJSONValidator) walk(v reflect.Value, path string, depth int) *Va
 			b.active[visit] = true
 			defer delete(b.active, visit)
 		}
-		for i := 0; i < v.Len(); i++ {
+		for i := range v.Len() {
 			if err := b.walk(v.Index(i), indexPath(path, i), depth+1); err != nil {
 				return err
 			}

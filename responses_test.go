@@ -170,6 +170,92 @@ func TestResponsesRequestResourceLimits(t *testing.T) {
 	}
 }
 
+func TestResponsesRequestStringByteCeilings(t *testing.T) {
+	exactModel := "p/" + strings.Repeat("m", maxResponseValueBytes-2)
+	overModel := "p/" + strings.Repeat("m", maxResponseValueBytes-1)
+	exactName := strings.Repeat("n", maxResponseValueBytes)
+	overName := strings.Repeat("n", maxResponseValueBytes+1)
+	tests := []struct {
+		name    string
+		request ResponsesRequest
+		valid   bool
+	}{
+		{"model at limit", ResponsesRequest{Model: exactModel, Input: ResponseTextInput("x")}, true},
+		{"model over limit", ResponsesRequest{Model: overModel, Input: ResponseTextInput("x")}, false},
+		{"specific tool at limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), ToolChoice: ResponseSpecificToolChoice{Name: exactName}}, true},
+		{"specific tool over limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), ToolChoice: ResponseSpecificToolChoice{Name: overName}}, false},
+		{"schema name at limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Text: &ResponseText{Format: ResponseJSONSchemaFormat{Name: exactName, Schema: map[string]any{}}}}, true},
+		{"schema name over limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Text: &ResponseText{Format: ResponseJSONSchemaFormat{Name: overName, Schema: map[string]any{}}}}, false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateResponsesRequest(test.request)
+			if (err == nil) != test.valid {
+				t.Fatalf("validation error = %v, valid = %v", err, test.valid)
+			}
+		})
+	}
+}
+
+func TestResponsesRequestCharacterLimitsUseCodePoints(t *testing.T) {
+	promptAtLimit := strings.Repeat("界", 64)
+	promptOverLimit := promptAtLimit + "界"
+	keyAtLimit := strings.Repeat("鍵", 64)
+	keyOverLimit := keyAtLimit + "鍵"
+	valueAtLimit := strings.Repeat("値", 512)
+	valueOverLimit := valueAtLimit + "値"
+	tests := []struct {
+		name    string
+		request ResponsesRequest
+		valid   bool
+	}{
+		{"prompt cache key at limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), PromptCacheKey: &promptAtLimit}, true},
+		{"prompt cache key over limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), PromptCacheKey: &promptOverLimit}, false},
+		{"metadata key at limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Metadata: map[string]string{keyAtLimit: "x"}}, true},
+		{"metadata key over limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Metadata: map[string]string{keyOverLimit: "x"}}, false},
+		{"metadata value at limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Metadata: map[string]string{"k": valueAtLimit}}, true},
+		{"metadata value over limit", ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Metadata: map[string]string{"k": valueOverLimit}}, false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateResponsesRequest(test.request)
+			if (err == nil) != test.valid {
+				t.Fatalf("validation error = %v, valid = %v", err, test.valid)
+			}
+		})
+	}
+}
+
+func TestResponsesRequestPointerCyclesAndDepth(t *testing.T) {
+	var direct any
+	direct = &direct
+	var first, second any
+	first = &second
+	second = &first
+	chain := any("leaf")
+	for range 65 {
+		value := chain
+		chain = &value
+	}
+	tests := []struct {
+		name   string
+		value  any
+		reason string
+	}{
+		{"direct cycle", direct, "cycle detected"},
+		{"multi-pointer cycle", first, "cycle detected"},
+		{"pointer chain over depth limit", chain, "maximum depth is 64"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateResponsesRequest(ResponsesRequest{Model: "p/m", Input: ResponseTextInput("x"), Tools: []ResponseTool{{Name: "f", Parameters: test.value}}})
+			if err == nil || err.Path() != `$["tools"][0]["parameters"]` || err.Reason() != test.reason {
+				t.Fatalf("validation error = %#v", err)
+			}
+		})
+	}
+}
+
 func TestResponsesResultDecoderPolicy(t *testing.T) {
 	valid := []string{`{}`, " {\"a\":null,\"future\":{\"x\":[1,true,\"s\"]}} \n"}
 	for _, body := range valid {
@@ -204,6 +290,34 @@ func TestResponsesResultDecoderPolicy(t *testing.T) {
 				t.Fatalf("case %d raw body is not defensive", i)
 			}
 		}
+	}
+}
+
+func TestResponsesResultRejectsInvalidUTF8(t *testing.T) {
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{"top-level key", []byte{'{', '"', 0xff, '"', ':', '0', '}'}},
+		{"nested key", []byte{'{', '"', 'x', '"', ':', '{', '"', 0xff, '"', ':', '0', '}', '}'}},
+		{"string value", []byte{'{', '"', 'x', '"', ':', '"', 0xff, '"', '}'}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := decodeResponseResult(test.body)
+			var validation *ResponseValidationError
+			if !errors.As(err, &validation) || validation.StatusCode() != http.StatusOK || validation.Path() != "$" || validation.Reason() != "invalid UTF-8" {
+				t.Fatalf("error = %T %v", err, err)
+			}
+			if !bytes.Equal(validation.RawResponseBody(), test.body) {
+				t.Fatalf("raw body = %q, want %q", validation.RawResponseBody(), test.body)
+			}
+			raw := validation.RawResponseBody()
+			raw[0] ^= 0xff
+			if bytes.Equal(raw, validation.RawResponseBody()) {
+				t.Fatal("raw body is not defensive")
+			}
+		})
 	}
 }
 
