@@ -1572,7 +1572,7 @@ The unchecked chunks below are sequential. **Chunk 26 is the first dependency-re
 
 **Draft commit boundary:** `feat: add responses web search request`. **Serialized accounting commit boundary:** `docs: record responses web search implementation`.
 
-**Current status:** `[-]` implementation and implementation-time verification are complete in draft commit `0295db6` (`feat: add responses web search request`); the confirmed pointer-form review finding is fixed in commit `25e9a08` (`fix: accept pointer web search tools`). A clean independent rereview is the next gate before Chunk 26A may begin. Chunk 26 remains intentionally incomplete pending that rereview/accounting gate and the final encompassing Chunk 30 closure.
+**Current status:** `[-]` implementation and implementation-time verification are complete in draft commit `0295db6` (`feat: add responses web search request`); the confirmed pointer-form implementation finding is fixed in commit `25e9a08` (`fix: accept pointer web search tools`), and the subsequent rereview's public-path regression-test finding is fixed in test-only commit `d3dd182`. A fresh clean independent rereview is the next gate before Chunk 26A may begin. Chunk 26 remains intentionally incomplete pending that rereview/accounting gate and the final encompassing Chunk 30 closure.
 
 **Draft implementation changed paths (exact four):** `responses.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`.
 
@@ -1625,6 +1625,20 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 ```
 
 Go LSP diagnostics remain unavailable from the prior attempt because no Go language server is installed.
+
+**Recorded rereview finding and test-only fix (`d3dd182`):**
+
+- [x] The independent rereview confirmed the validator and encoder accept both value and non-nil pointer forms while preserving typed-nil rejection, the fixed low-context wire shape and ordering, unchanged raw buffered/SSE boundaries, and validation before credentials/network. It found that the non-nil pointer regression exercised only the internal encoder, so a future validator regression could still break both public methods without failing the test.
+- [x] Test-only fix commit `d3dd182` changed exactly `responses_test.go` and adds regression coverage that sends the non-nil pointer form through both public paths: `CreateResponseWithBuiltInTools` for buffered generation and `StreamResponseWithBuiltInTools` for streaming generation. This makes validation plus encoding observable for the fixed public behavior.
+- [x] Post-fix `gofmt` completed, and all three exact credential-scrubbed gates passed:
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -race -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test ./...
+```
+
+This test-only fix requires a fresh clean independent rereview; the prior rereview finding is not a completion mark.
 
 **Review/accounting gate:**
 
