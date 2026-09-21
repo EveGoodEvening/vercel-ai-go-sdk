@@ -262,16 +262,93 @@ func TestModalityTransportDistinctBodyLimitsAndSafeError(t *testing.T) {
 	}
 }
 
-type cancellationBody struct {
-	ctx    context.Context
-	once   sync.Once
-	closed chan struct{}
+type instrumentedBody struct {
+	reader io.Reader
 	mu     sync.Mutex
+	reads  int
 	closes int
 }
 
+func (body *instrumentedBody) Read(buffer []byte) (int, error) {
+	body.mu.Lock()
+	body.reads++
+	body.mu.Unlock()
+	return body.reader.Read(buffer)
+}
+
+func (body *instrumentedBody) Close() error {
+	body.mu.Lock()
+	body.closes++
+	body.mu.Unlock()
+	return nil
+}
+
+func (body *instrumentedBody) counts() (int, int) {
+	body.mu.Lock()
+	defer body.mu.Unlock()
+	return body.reads, body.closes
+}
+
+func TestModalityTransportSuccessBodyLimitResourceSafety(t *testing.T) {
+	clearCredentialEnvironment(t)
+	const limit int64 = 4
+	tests := []struct {
+		name          string
+		data          string
+		contentLength int64
+		wantErr       bool
+		wantReads     bool
+	}{
+		{name: "exactly limit bytes", data: "1234", contentLength: limit, wantReads: true},
+		{name: "unknown length overflow", data: "12345", contentLength: -1, wantErr: true, wantReads: true},
+		{name: "underreported length overflow", data: "12345", contentLength: limit, wantErr: true, wantReads: true},
+		{name: "declared length overflow", data: "12345", contentLength: limit + 1, wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body := &instrumentedBody{reader: strings.NewReader(test.data)}
+			client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: body, ContentLength: test.contentLength}, nil
+			})}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			outcome, err := client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return []byte("{}"), nil }, limit)
+			if test.wantErr {
+				var transportErr *TransportError
+				if !errors.As(err, &transportErr) || transportErr.Operation() != "read response body" || !errors.Is(err, httpx.ErrResponseBodyTooLarge) {
+					t.Fatalf("overflow error=%T %v", err, err)
+				}
+			} else if err != nil || string(outcome.body) != test.data {
+				t.Fatalf("outcome=%#v err=%v", outcome, err)
+			}
+			reads, closes := body.counts()
+			if test.wantReads && reads == 0 {
+				t.Fatal("body was not read")
+			}
+			if !test.wantReads && reads != 0 {
+				t.Fatalf("body reads=%d want 0", reads)
+			}
+			if closes != 1 {
+				t.Fatalf("body closes=%d want 1", closes)
+			}
+		})
+	}
+}
+
+type cancellationBody struct {
+	ctx         context.Context
+	once        sync.Once
+	startedOnce sync.Once
+	started     chan struct{}
+	closed      chan struct{}
+	mu          sync.Mutex
+	closes      int
+}
+
 func (body *cancellationBody) Read([]byte) (int, error) {
-	<-body.ctx.Done()
+	body.startedOnce.Do(func() { close(body.started) })
+	<-body.closed
 	return 0, body.ctx.Err()
 }
 
@@ -286,7 +363,7 @@ func (body *cancellationBody) Close() error {
 func TestModalityTransportCancellationClosesExactlyOnce(t *testing.T) {
 	clearCredentialEnvironment(t)
 	ctx, cancel := context.WithCancel(context.Background())
-	body := &cancellationBody{ctx: ctx, closed: make(chan struct{})}
+	body := &cancellationBody{ctx: ctx, started: make(chan struct{}), closed: make(chan struct{})}
 	client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: body, ContentLength: -1}, nil
 	})}))
@@ -298,6 +375,7 @@ func TestModalityTransportCancellationClosesExactlyOnce(t *testing.T) {
 		_, callErr := client.executeProviderRequest(ctx, providerRouteEmbedding, "model", func() ([]byte, error) { return []byte("{}"), nil }, 32)
 		done <- callErr
 	}()
+	<-body.started
 	cancel()
 	err = <-done
 	if !errors.Is(err, context.Canceled) {
