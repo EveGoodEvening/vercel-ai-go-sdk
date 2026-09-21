@@ -25,12 +25,12 @@ type sseEvent struct {
 }
 
 type sseParser struct {
-	reader  *bufio.Reader
-	name    string
-	id      string
-	data    []byte
-	pending bool
-	hasData bool
+	reader      *bufio.Reader
+	name        string
+	lastEventID string
+	data        []byte
+	pending     bool
+	hasData     bool
 }
 
 func newSSEParser(reader io.Reader) *sseParser {
@@ -53,9 +53,13 @@ func (p *sseParser) next() (sseEvent, error) {
 			if !p.pending {
 				continue
 			}
-			event := sseEvent{name: p.name, id: p.id, data: p.data}
+			name := p.name
+			if name == "" {
+				name = "message"
+			}
+			event := sseEvent{name: name, id: p.lastEventID, data: p.data}
 			hasData := p.hasData
-			p.name, p.id, p.data, p.pending, p.hasData = "", "", nil, false, false
+			p.name, p.data, p.pending, p.hasData = "", nil, false, false
 			if !hasData {
 				continue
 			}
@@ -77,7 +81,7 @@ func (p *sseParser) next() (sseEvent, error) {
 			p.name = string(value)
 		case "id":
 			if !bytes.ContainsRune(value, 0) {
-				p.id = string(value)
+				p.lastEventID = string(value)
 			}
 		case "data":
 			additional := len(value)

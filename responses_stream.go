@@ -250,17 +250,20 @@ func decodeResponseEvent(event sseEvent) (ResponseEvent, error) {
 		return nil, err
 	}
 	var header struct {
-		Type  string  `json:"type"`
+		Type  *string `json:"type"`
 		Delta *string `json:"delta"`
 	}
 	if err := json.Unmarshal(event.data, &header); err != nil {
 		return nil, err
 	}
-	if header.Type == "response.output_text.delta" {
+	if header.Type == nil || *header.Type == "" {
+		return nil, errors.New("response event is missing a nonempty type discriminator")
+	}
+	if *header.Type == "response.output_text.delta" {
 		if header.Delta == nil {
 			return nil, errors.New("response.output_text.delta event is missing delta")
 		}
-		return ResponseOutputTextDeltaEvent{Type: header.Type, Event: event.name, ID: event.id, Delta: *header.Delta}, nil
+		return ResponseOutputTextDeltaEvent{Type: *header.Type, Event: event.name, ID: event.id, Delta: *header.Delta}, nil
 	}
-	return RawResponseEvent{Type: header.Type, Event: event.name, ID: event.id, raw: append([]byte(nil), event.data...)}, nil
+	return RawResponseEvent{Type: *header.Type, Event: event.name, ID: event.id, raw: append([]byte(nil), event.data...)}, nil
 }

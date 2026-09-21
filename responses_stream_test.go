@@ -21,8 +21,19 @@ func TestSSEFramingAndLimits(t *testing.T) {
 			t.Fatalf("first = %#v, %v", first, err)
 		}
 		second, err := parser.next()
-		if err != nil || second.name != "second" || second.id != "" || string(second.data) != "{}" {
+		if err != nil || second.name != "second" || second.id != "one" || string(second.data) != "{}" {
 			t.Fatalf("second = %#v, %v", second, err)
+		}
+		if _, err := parser.next(); !errors.Is(err, io.EOF) {
+			t.Fatalf("EOF = %v", err)
+		}
+	})
+
+	t.Run("id-only block persists and omitted event defaults to message", func(t *testing.T) {
+		parser := newSSEParser(strings.NewReader("id: inherited\n\ndata: {}\n\n"))
+		event, err := parser.next()
+		if err != nil || event.name != "message" || event.id != "inherited" || string(event.data) != "{}" {
+			t.Fatalf("event = %#v, %v", event, err)
 		}
 		if _, err := parser.next(); !errors.Is(err, io.EOF) {
 			t.Fatalf("EOF = %v", err)
@@ -165,7 +176,7 @@ func TestStreamResponseNoBackgroundGoroutineBaseline(t *testing.T) {
 
 func TestStreamResponseRequestEventsAndCleanEOF(t *testing.T) {
 	clearCredentialEnvironment(t)
-	body := newCountedBlockingBody([]byte("event: gateway\r\nid: delta-1\r\ndata: {\"type\":\"response.output_text.delta\",\r\ndata: \"delta\":\"hello\"}\r\n\r\nevent: future\nid: raw-2\ndata: {\"type\":\"response.future\",\"value\":[1,true]}\n\n"), false)
+	body := newCountedBlockingBody([]byte("id: delta-1\r\ndata: {\"type\":\"response.output_text.delta\",\r\ndata: \"delta\":\"hello\"}\r\n\r\nevent: future\nid: raw-2\ndata: {\"type\":\"response.future\",\"value\":[1,true]}\n\n"), false)
 	var captured *http.Request
 	var capturedBody []byte
 	requests := 0
@@ -192,7 +203,7 @@ func TestStreamResponseRequestEventsAndCleanEOF(t *testing.T) {
 		t.Fatalf("first Next false: %v", stream.Err())
 	}
 	delta, ok := stream.Event().(ResponseOutputTextDeltaEvent)
-	if !ok || delta != (ResponseOutputTextDeltaEvent{Type: "response.output_text.delta", Event: "gateway", ID: "delta-1", Delta: "hello"}) {
+	if !ok || delta != (ResponseOutputTextDeltaEvent{Type: "response.output_text.delta", Event: "message", ID: "delta-1", Delta: "hello"}) {
 		t.Fatalf("delta = %#v", stream.Event())
 	}
 	if !stream.Next() {
@@ -245,6 +256,9 @@ func TestStreamResponseMalformedAndResourceLimits(t *testing.T) {
 		{"array member limit plus one", "data: {\"type\":\"future\",\"value\":[" + members + "]}\n\n"},
 		{"object member limit plus one", "data: {\"type\":\"future\",\"value\":{" + objectMembers.String() + "}}\n\n"},
 		{"typed delta missing delta", "data: {\"type\":\"response.output_text.delta\"}\n\n"},
+		{"missing type discriminator", "data: {}\n\n"},
+		{"null type discriminator", "data: {\"type\":null}\n\n"},
+		{"empty type discriminator", "data: {\"type\":\"\"}\n\n"},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
