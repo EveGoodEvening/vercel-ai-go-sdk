@@ -1,45 +1,42 @@
-# Native xAI `x_search` support decision
+# Search support and native xAI `x_search`
 
-**Evidence reviewed:** 2026-09-20
+Search support depends on the endpoint and tool contract—not just the model's generic tool capability.
 
-## Continuation release decision
+| Surface | SDK support |
+| --- | --- |
+| Chat `vercel:exa_search`, `vercel:parallel_search`, `vercel:perplexity_search`, `vercel:tako_search` | Request declarations through the two opt-in server-tools methods; no typed search outputs or metadata |
+| Responses built-in `web_search` / `web_search_preview` | Not implemented; Gateway wire evidence is insufficient |
+| Gateway-native xAI `x_search` | Not implemented or confirmed |
+| Direct xAI `x_search` | Documented by xAI, but this SDK provides no direct-xAI client |
 
-Gateway-native xAI `x_search` is unsupported in this SDK. The SDK exports no `x_search` API, sends no `x_search` request, and contains no live Gateway `x_search` probe. This decision does not deny that direct xAI supports the tool; it keeps a direct-xAI contract separate from the unconfirmed Vercel AI Gateway contract.
+For Chat usage and configuration rules, see [generation](generation.md#request-only-chat-server-search). Search execution/results stay behind the existing raw output boundary; inline citations are model text, not a typed citation contract. Hosted corroboration has not run.
 
-The implemented contracts are the provider [Evaluation Model V4 protocol](evaluation.md) plus the public Responses and Chat APIs in buffered and streaming forms. None provides, implies, or transports either Gateway-native or direct-xAI `x_search`.
+## Why native `x_search` is separate
 
-## Confirmed direct-xAI behavior
+The reviewed direct-xAI contract uses `POST https://api.x.ai/v1/responses` and a top-level tool with `type: "x_search"`. Its snake-case options include `allowed_x_handles`, `excluded_x_handles`, `from_date`, `to_date`, `enable_image_understanding`, and `enable_video_understanding`; provider-executed output can include `x_search_call`.
 
-The official xAI X Search contract documents the direct Responses API request: `POST https://api.x.ai/v1/responses`, with native X search supplied in the top-level `tools` array as an object with `type: "x_search"`. Its wire options use snake_case, including `allowed_x_handles`, `excluded_x_handles`, `from_date`, `to_date`, `enable_image_understanding`, and `enable_video_understanding`. xAI's separate tool-usage documentation identifies provider-executed response items with `type: "x_search_call"`.
+The direct-provider `@ai-sdk/xai@5.0.4` helper exposes corresponding camelCase options. Neither that helper nor the direct HTTP contract proves that Vercel AI Gateway accepts or preserves the same wire format.
 
-Separately, the pinned direct provider declaration, `@ai-sdk/xai@5.0.4`, documents only the JavaScript helper surface: an `xSearch` provider-executed tool with corresponding camelCase options. That helper declaration is not the source for the native wire-level facts above, and direct xAI support is not evidence that Vercel AI Gateway accepts or preserves the same native wire contract.
+At the repository's [pinned evidence baseline](evaluation-live-evidence.md#pinned-contracts), `@ai-sdk/gateway@4.0.87` has Exa, Parallel, Perplexity, and Tako helpers, but no `xSearch` helper. The reviewed Gateway docs and model metadata do not establish a native `x_search` request/result contract. This SDK therefore exports no native `x_search` API and contains no Gateway `x_search` live probe.
 
-## Why Gateway support remains unconfirmed
+## Evidence required to add support
 
-The evidence baseline for this repository is `ai@7.0.107`, `@ai-sdk/gateway@4.0.87`, `@ai-sdk/provider@4.0.17`, and `@ai-sdk/provider-utils@5.0.45`. At that baseline:
+Native Gateway `x_search` requires both:
 
-- `@ai-sdk/gateway@4.0.87` has Gateway helpers for Exa, Parallel, Perplexity, and Tako search, but no `xSearch` helper.
-- Public Gateway `/v1` documentation and model metadata do not establish a native xAI `x_search` endpoint, request schema, or native response evidence shape.
-- A model advertising generic tool capability is insufficient evidence for a provider-native tool. Generic tool calling does not prove that Gateway accepts `type: "x_search"` or returns native `x_search_call` evidence.
+1. First-party Gateway evidence for the exact endpoint, request fields/limits, suitable model ID, and native response/event shape.
+2. An authorized Gateway contract result demonstrating native `x_search_call` evidence—not merely generated prose.
 
-Accordingly, this Go SDK does not infer a Gateway contract, alias direct xAI behavior into Gateway, or add speculative API surface.
+A probe can be planned only after the schema evidence exists, with explicit credential inputs, cost acknowledgement, sanitization, and success criteria. Responses built-in search has its own request and output evidence gates; Chat request support clears neither. See the [current evidence decisions](../planning/IMPLEMENTATION_PLAN.md#2026-09-21-evidence-continuation--authoritative-current-disposition).
 
-## Evidence required to reconsider
+These unsupported surfaces are not prerequisites for releasing the implemented SDK. Do not add placeholder tests or infer support from OpenAI documentation, direct-provider SDKs, or generic model capabilities.
 
-Only a future reviewed implementation plan may change this decision. It must be backed by both:
+## Sources
 
-1. a first-party Gateway wire contract identifying the endpoint, protocol/request schema, native response evidence shape, and an explicit suitable model ID; and
-2. an authenticated contract result demonstrating native `x_search_call` evidence rather than merely generated text.
+Evidence reviewed 2026-09-20–21; these links record that baseline, not a promise about later upstream changes.
 
-Any future probe must separately define credential inputs, explicit cost acknowledgement, sanitization rules, and success criteria. Until all prerequisites exist, no placeholder test, skipped live test, invented request, exported API, or implementation claim belongs in this repository. The blocked probe is outside the current continuation release and is not a release prerequisite.
-
-## Reviewed sources
-
-- Official xAI X Search wire contract: <https://docs.x.ai/developers/tools/x-search>
-- Official xAI provider-executed output types: <https://docs.x.ai/developers/tools/tool-usage-details>
-- Direct-provider JavaScript helper declaration, `@ai-sdk/xai@5.0.4`: <https://unpkg.com/@ai-sdk/xai@5.0.4/dist/index.d.ts>
-- Gateway provider source, `ai@7.0.107`: <https://github.com/vercel/ai/blob/ai%407.0.107/packages/gateway/src/gateway-provider.ts>
-- Gateway tool registry, `ai@7.0.107`: <https://github.com/vercel/ai/blob/ai%407.0.107/packages/gateway/src/gateway-tools.ts>
-- Vercel AI Gateway documentation: <https://vercel.com/docs/ai-gateway>
-
-These citations record the pinned evidence used for the 2026-09-20 continuation release decision; later direct-provider or documentation changes do not silently broaden this SDK's supported surface.
+- [Gateway Chat web search](https://vercel.com/docs/ai-gateway/models-and-providers/web-search)
+- [Gateway Responses tool calling](https://vercel.com/docs/ai-gateway/sdks-and-apis/responses/tool-calling)
+- [xAI X Search wire contract](https://docs.x.ai/developers/tools/x-search)
+- [xAI provider-executed output types](https://docs.x.ai/developers/tools/tool-usage-details)
+- [Direct xAI helper declarations, 5.0.4](https://unpkg.com/@ai-sdk/xai@5.0.4/dist/index.d.ts)
+- [Gateway tool registry at ai@7.0.107](https://github.com/vercel/ai/blob/ai%407.0.107/packages/gateway/src/gateway-tools.ts)

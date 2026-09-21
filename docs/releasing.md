@@ -1,62 +1,61 @@
 # Release readiness and policy
 
-## Current pre-tag status
+## Current status
 
-No candidate tag may be created yet. Local `origin` is already `git@github.com:EveGoodEvening/vercel-ai-go-sdk.git`, matching the module path, so local remote configuration is not a blocker. The following external, hosted, or authorized prerequisites remain unresolved:
+**Unreleased; do not create a candidate tag yet.** Release is blocked on:
 
-- **Owner-selected license:** blocked; repository ownership has not selected a license, so no `LICENSE` is present. Do not infer or add one.
-- **Hosted repository metadata:** unverified; confirm that the repository hosted at the configured `origin` has the expected name, visibility, default branch, release settings, and other metadata before release. Do not treat the matching local URL as hosted verification.
-- **Authorized paid live contracts:** blocked; the sanitized evidence record remains **NOT RUN / PENDING LIVE RUN**. Authorized, isolated runs must cover all four public generation paths and provider Evaluation.
-- **Publication and provenance configuration:** blocked pending verification of the hosted repository, its release environment/protection policy, proxy visibility, and owner decisions. Review artifact attestations and any package-publication permissions; do not grant write or identity-token permissions to ordinary CI.
+- an owner-selected, committed license;
+- hosted repository metadata, protected CI/environment, and publication/provenance review;
+- separately authorized public-generation and provider-evaluation live results;
+- owner authorization to tag and publish.
 
-The pinned CI and local-consumer checks are configured but their results are not recorded here as passes. Run and record every pre-tag gate from a clean checkout before proceeding to release. This checklist must not create, move, delete, push, or publish a tag or release.
+The [live evidence record](evaluation-live-evidence.md) is still **NOT RUN / PENDING LIVE RUN**. Local fixtures and workflow definitions do not establish hosted success. A matching local remote URL is not verification of the hosted repository.
 
-## Pre-tag gate
+## Pre-tag checklist
 
-Before creating a prerelease tag, an operator must confirm all of the following:
+Record evidence from the release commit for each gate. This checklist does not itself authorize creating, moving, pushing, or publishing tags.
 
-- [ ] Ordinary CI passes on exactly Go 1.26.8 and Go 1.27.1 with both credential variables (`AI_GATEWAY_API_KEY` and `VERCEL_OIDC_TOKEN`) and both acknowledgement variables (`AI_GATEWAY_PUBLIC_LIVE_COST_ACK` and `AI_GATEWAY_LIVE_COST_ACK`) explicitly unset. The test-wide transport guard rejects every non-loopback destination while loopback fixtures remain usable.
-- [ ] Go 1.27.1 passes the race detector and `go vet`; both pinned versions pass the ordinary suite and example compile check.
-- [ ] The protected `public-generation` live job passes with exactly one authorized credential path and `AI_GATEWAY_PUBLIC_LIVE_COST_ACK=I_ACCEPT_LIVE_PUBLIC_API_COSTS`, while `AI_GATEWAY_LIVE_COST_ACK` is unset. The configured workflow injects `AI_GATEWAY_API_KEY` and rejects a nonblank `VERCEL_OIDC_TOKEN`; any separately authorized local run must likewise select exactly one of those credential variables.
-- [ ] The isolated public-generation run produces sanitized evidence for all four paths: buffered Responses (`CreateResponse`), streaming Responses (`StreamResponse`), buffered Chat Completions (`CreateChatCompletion`), and streaming Chat Completions (`StreamChatCompletion`).
-- [ ] The protected `provider-evaluation` live job passes with exactly one authorized credential path and `AI_GATEWAY_LIVE_COST_ACK=I_ACCEPT_LIVE_EVALUATION_COSTS`, while `AI_GATEWAY_PUBLIC_LIVE_COST_ACK` is unset. The configured workflow injects `AI_GATEWAY_API_KEY` and rejects a nonblank `VERCEL_OIDC_TOKEN`; any separately authorized local run must likewise select exactly one of those credential variables.
-- [ ] The isolated provider-evaluation run produces sanitized evidence for `Evaluate`; generation evidence and evaluation evidence are not interchangeable.
-- [ ] The exported continuation API, including Responses `PreviousResponseID` and any documented caller-managed Chat history, is audited against current first-party contract evidence and accurately described without inferring hosted acceptance from hermetic fixtures.
-- [ ] `./scripts/verify-local-consumer.sh` passes from a clean local checkout. It creates a temporary module outside the repository, uses a local `replace`, disables proxy access, compiles all supported request/result/metadata/retry/error use, and rejects `ConfigError`, exported retry hooks, and retry-hook aliases.
-- [ ] Exported API review matches the supported surface and contains exactly the five documented error types.
-- [ ] `CHANGELOG.md` and draft release notes describe supported behavior, non-goals, experimental risk, x_search status, and any v0 migration steps.
-- [ ] The repository owner has selected and committed `LICENSE`.
-- [ ] The local remote exists and matches the module path, and the hosted repository metadata has been independently verified.
-- [ ] Publication provenance, release-environment protection, proxy visibility, and least-privilege workflow permissions have been reviewed against the configured host.
-- [ ] Sanitized evidence contains no credentials, authorization headers, raw diagnostic bodies, raw live payloads, provider-metadata values, or cost-bearing answer content.
+### Offline verification
 
-A checked box must point to evidence produced after the release commit. A workflow definition or local script is not itself a passing result.
+The exact pins in [ci.yml](../.github/workflows/ci.yml) are:
 
-## v0 compatibility and migration policy
+| Go version | Required checks |
+| --- | --- |
+| 1.26.8 and 1.27.1 | Ordinary suite, including compilation of example packages |
+| 1.27.1 | Race detector, `go vet`, clean external-consumer check |
 
-Releases begin at `v0.x`. Evaluation remains experimental, and v1 compatibility is not promised while the upstream evaluation contract is unstable.
+For every ordinary command, unset `AI_GATEWAY_API_KEY`, `VERCEL_OIDC_TOKEN`, `AI_GATEWAY_PUBLIC_LIVE_COST_ACK`, and `AI_GATEWAY_LIVE_COST_ACK`. The test-wide transport guard rejects non-loopback destinations. Updating a Go pin requires reviewed plan/evidence changes; do not use floating versions.
 
-Every exported breaking change, including one made during v0, requires all of the following:
+- [ ] Protected hosted CI passes the matrix above from the release commit; local results alone are insufficient.
+- [ ] [`scripts/verify-local-consumer.sh`](../scripts/verify-local-consumer.sh) passes from a clean checkout. It builds an external module with a local `replace` and proxy access disabled, audits supported exports, and rejects obsolete `ConfigError` and exported retry hooks/aliases.
+- [ ] The API review covers every exported surface and exactly the five SDK error types. Audit Responses `PreviousResponseID` and caller-managed Chat history against current first-party evidence; do not infer hosted continuation support from fixtures.
+- [ ] Examples, guides, [changelog](../CHANGELOG.md), and release notes agree on supported behavior, experimental risk, unsupported APIs/search, and migration steps.
 
-1. an appropriate semantic version increment;
-2. a changelog entry naming every removed or changed API;
-3. a release-note **Migration** section naming those APIs and the exact caller actions needed; and
-4. updated examples and reference documentation in the same release.
+### Hosted contracts and publication
 
-A release with no breaking change still includes a Migration section stating that no caller action is required.
+- [ ] The isolated `public-generation` live job passes all four text paths: buffered/streaming Responses and buffered/streaming Chat.
+- [ ] The isolated `provider-evaluation` live job passes `Evaluate`. Neither job's evidence substitutes for the other. Use the exact authorization rules and commands in [live-contract evidence](evaluation-live-evidence.md), then independently review the sanitized results.
+- [ ] The owner has selected and committed `LICENSE`.
+- [ ] The local remote matches `github.com/EveGoodEvening/vercel-ai-go-sdk`, and hosted name, visibility, default branch, protection rules, and release settings are independently verified.
+- [ ] Release-environment protection, proxy visibility, artifact attestations/provenance, and publication permissions are reviewed. Ordinary CI stays read-only; do not grant it write or identity-token permissions.
+- [ ] Retained evidence passes the [sanitization checklist](evaluation-live-evidence.md#sanitization-review), and the owner authorizes publication.
+
+After these gates and authorization, follow the [continuation release sequence](../planning/IMPLEMENTATION_PLAN.md#chunk-24--continuation-release-verification): create the immutable candidate, verify direct-VCS and public-proxy imports, compile the fetched module, retain checksum/provenance evidence, and review before promotion/publication. None of those results is claimed here.
+
+## Live workflow boundary
+
+[`live-contract.yml`](../.github/workflows/live-contract.yml) is the only CI workflow permitted to make paid Gateway calls. It has manual and scheduled triggers, not pull-request triggers. Its two isolated jobs use the protected `live-evaluation` environment, the pinned Go 1.27.1 toolchain, and an API-key secret. Each requires its own exact cost acknowledgement and the opposite acknowledgement to be unset; a nonblank OIDC environment credential is rejected. Environment protection and authorization still require hosted review.
+
+Chat server-search request encoding is covered hermetically; optional live corroboration has not run and is not part of that feature's implementation acceptance. Unsupported public Evaluate, Responses built-in search, and native `x_search` are not prerequisites for releasing the implemented surface.
+
+## v0 compatibility and migration
+
+Releases begin at `v0.x`; no v1 stability is promised while evaluation remains experimental. Every exported breaking change, including during v0, requires a version increment, a changelog entry, updated examples/docs, and a release-note **Migration** section naming each changed API and exact caller action. A nonbreaking release still includes a Migration section stating that no action is required.
+
+Evaluation callers retain `Evaluate` and `WithBaseURL`. Generation is additive and uses explicit Responses/Chat methods plus `WithPublicBaseURL`; there are no compatibility aliases or endpoint auto-detection. Earlier checkouts using the old module path must follow the [changelog migration](../CHANGELOG.md#migration).
 
 ## Immutable tags and defective releases
 
-Published tags are immutable. Never move, delete as a rollback, or reuse a published tag, including a failed prerelease candidate.
+Never move, delete as a rollback, or reuse a published tag, including a failed prerelease candidate.
 
-Correct a defective published version by issuing a new patch version. The correction must add an appropriate `retract` directive to `go.mod` for the bad version or range with a concise rationale, mark the hosting release as affected rather than rewriting history, and publish corrected release notes. Issue a security advisory when the defect has security impact. Consumers must be directed to the new version; the old tag remains intact.
-
-Do not add a speculative `retract` directive before a real defective version exists. Its version/range and rationale must identify the actual immutable bad release.
-
-## Workflow boundary
-
-`.github/workflows/ci.yml` is the ordinary path. It has read-only repository permission, explicitly scrubs both credential variables (`AI_GATEWAY_API_KEY` and `VERCEL_OIDC_TOKEN`) and both acknowledgement variables (`AI_GATEWAY_PUBLIC_LIVE_COST_ACK` and `AI_GATEWAY_LIVE_COST_ACK`) for every command, and relies on the mandatory test-wide loopback-only transport guard. It must never receive service credentials or permission to contact non-loopback services.
-
-`.github/workflows/live-contract.yml` is the sole CI path permitted to contact a non-loopback service. It is manual/scheduled only, has no pull-request trigger, and contains two isolated jobs. `public-generation` fixes `AI_GATEWAY_PUBLIC_LIVE_COST_ACK=I_ACCEPT_LIVE_PUBLIC_API_COSTS`, requires the opposite acknowledgement to be unset, and exercises `CreateResponse`, `StreamResponse`, `CreateChatCompletion`, and `StreamChatCompletion`. `provider-evaluation` fixes `AI_GATEWAY_LIVE_COST_ACK=I_ACCEPT_LIVE_EVALUATION_COSTS`, requires the opposite acknowledgement to be unset, and exercises `Evaluate`. Each configured job reads `AI_GATEWAY_API_KEY` from the protected `live-evaluation` environment and rejects a nonblank `VERCEL_OIDC_TOKEN`, enforcing one credential path; the client also recognizes both credential variables, so an authorized local execution must select exactly one. Neither acknowledgement is a workflow input or repository variable. Forked pull requests cannot invoke this workflow or receive its environment secret. The workflow definition remains configuration only: live execution is explicitly **NOT RUN / PENDING LIVE RUN** until an authorized run produces reviewed, sanitized evidence.
-
-Updating either Go pin requires a reviewed plan and evidence update. Floating selectors such as `stable`, `oldstable`, `1.26.x`, and `1.27.x` are prohibited.
+Correct a defective version with a new patch release. Add an appropriate `retract` directive in `go.mod` naming the actual bad version/range and rationale, mark the hosted release as affected, publish corrected notes, and direct consumers to the new version. Issue a security advisory for security-impacting defects. Keep the old tag intact; never add speculative retractions.
