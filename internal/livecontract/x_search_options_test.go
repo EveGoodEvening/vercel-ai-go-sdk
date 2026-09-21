@@ -236,36 +236,50 @@ func TestGatewayXSearchOptionsInteractionContract(t *testing.T) {
 	}
 
 	calls := 0
-	for index, probeCase := range probeCases {
+	runProbe := func(probeCase xSearchProbeCase) (xSearchProbeRecord, error) {
 		if calls >= xSearchInteractionMaxCalls {
 			t.Fatal("x_search interaction probe reached its hard request cap")
 		}
 		requestCtx, cancelRequest := context.WithTimeout(overallCtx, xSearchOptionsRequestTimeout)
+		defer cancelRequest()
 		calls++
-		record, probeErr := runXSearchOptionsProbe(requestCtx, client, prerequisites, probeCase)
-		cancelRequest()
+		return runXSearchOptionsProbe(requestCtx, client, prerequisites, probeCase)
+	}
+
+	controlRecord, controlErr := runProbe(probeCases[0])
+	if controlErr != nil {
+		t.Fatal("fieldless-control failed before interaction probes: probe execution failed")
+	}
+	logXSearchProbeRecord(t, controlRecord)
+	if controlRecord.httpStatus < 200 || controlRecord.httpStatus >= 300 {
+		t.Fatal("fieldless-control failed before interaction probes: unexpected HTTP status class")
+	}
+
+	failures := make([]string, 0, len(probeCases)-1)
+	for index, probeCase := range probeCases[1:] {
+		record, probeErr := runProbe(probeCase)
 		if probeErr != nil {
-			t.Fatalf("%s failed: %s", probeCase.label, probeErr)
+			failures = append(failures, probeCase.label+": probe execution failed")
+			continue
 		}
 		logXSearchProbeRecord(t, record)
 
 		switch index {
-		case 0:
-			if record.httpStatus < 200 || record.httpStatus >= 300 {
-				t.Fatal("fieldless-control failed before interaction probes: unexpected HTTP status class")
-			}
-		case 1, 2:
+		case 0, 1:
 			if record.httpStatus != http.StatusOK {
-				t.Fatalf("%s: expected HTTP 200", probeCase.label)
+				failures = append(failures, probeCase.label+": expected HTTP 200")
 			}
-		case 3:
+		case 2:
 			if !isSafeXSearchAmbiguousRejection(record) {
-				t.Fatal("allowed-and-excluded-handles-only: expected safe structural HTTP 400/422 rejection")
+				failures = append(failures, probeCase.label+": expected safe structural HTTP 400/422 rejection")
 			}
 		}
 	}
 	if calls > xSearchInteractionMaxCalls {
 		t.Fatalf("x_search interaction probe dispatched %d requests, hard cap is %d", calls, xSearchInteractionMaxCalls)
+	}
+	if len(failures) != 0 {
+		t.Fatalf("x_search interaction contract failed in %d structurally identified case(s): %s", len(failures), strings.Join(failures, "; "))
 	}
 }
 
