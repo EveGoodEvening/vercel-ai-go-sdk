@@ -1,4 +1,4 @@
-name: Live evaluation contract
+name: Live contract
 
 on:
   workflow_dispatch:
@@ -9,12 +9,54 @@ permissions:
   contents: read
 
 concurrency:
-  group: live-evaluation-contract
+  group: live-contract
   cancel-in-progress: false
 
 jobs:
-  live-contract:
-    name: Authorized paid contract smoke
+  public-generation:
+    name: Authorized public generation smoke
+    runs-on: ubuntu-latest
+    environment: live-evaluation
+    env:
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+      AI_GATEWAY_PUBLIC_LIVE_COST_ACK: I_ACCEPT_LIVE_PUBLIC_API_COSTS
+      GOTOOLCHAIN: local
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install pinned primary Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.1
+          check-latest: false
+          cache: false
+
+      - name: Require isolated public-generation authorization
+        shell: bash
+        run: |
+          if [[ ! ${AI_GATEWAY_API_KEY:-} =~ [^[:space:]] ]]; then
+            echo 'AI_GATEWAY_API_KEY is not configured in the protected live-evaluation environment.' >&2
+            exit 1
+          fi
+          if [[ ${VERCEL_OIDC_TOKEN:-} =~ [^[:space:]] ]]; then
+            echo 'Exactly one credential is required; VERCEL_OIDC_TOKEN must be unset.' >&2
+            exit 1
+          fi
+          if [[ ${AI_GATEWAY_PUBLIC_LIVE_COST_ACK:-} != I_ACCEPT_LIVE_PUBLIC_API_COSTS ]]; then
+            echo 'The exact public-generation acknowledgement is required.' >&2
+            exit 1
+          fi
+          if [[ -v AI_GATEWAY_LIVE_COST_ACK ]]; then
+            echo 'The opposite provider-evaluation acknowledgement must be unset.' >&2
+            exit 1
+          fi
+
+      - name: Run paid public generation contracts
+        run: env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK go test -tags=livecontract ./internal/livecontract -run '^TestGateway(Responses|Chat)Contract$' -count=1
+
+  provider-evaluation:
+    name: Authorized provider evaluation smoke
     runs-on: ubuntu-latest
     environment: live-evaluation
     env:
@@ -32,17 +74,25 @@ jobs:
           check-latest: false
           cache: false
 
-      - name: Require exactly one authorized credential
+      - name: Require isolated provider-evaluation authorization
         shell: bash
         run: |
-          if [[ -z "${AI_GATEWAY_API_KEY:-}" ]]; then
+          if [[ ! ${AI_GATEWAY_API_KEY:-} =~ [^[:space:]] ]]; then
             echo 'AI_GATEWAY_API_KEY is not configured in the protected live-evaluation environment.' >&2
             exit 1
           fi
-          if [[ -n "${VERCEL_OIDC_TOKEN:-}" ]]; then
-            echo 'VERCEL_OIDC_TOKEN must not be supplied when AI_GATEWAY_API_KEY is selected.' >&2
+          if [[ ${VERCEL_OIDC_TOKEN:-} =~ [^[:space:]] ]]; then
+            echo 'Exactly one credential is required; VERCEL_OIDC_TOKEN must be unset.' >&2
+            exit 1
+          fi
+          if [[ ${AI_GATEWAY_LIVE_COST_ACK:-} != I_ACCEPT_LIVE_EVALUATION_COSTS ]]; then
+            echo 'The exact provider-evaluation acknowledgement is required.' >&2
+            exit 1
+          fi
+          if [[ -v AI_GATEWAY_PUBLIC_LIVE_COST_ACK ]]; then
+            echo 'The opposite public-generation acknowledgement must be unset.' >&2
             exit 1
           fi
 
-      - name: Run paid live evaluation contract
-        run: env -u VERCEL_OIDC_TOKEN go test -tags=livecontract ./internal/livecontract -run '^TestGatewayEvaluationContract$' -count=1
+      - name: Run paid provider evaluation contract
+        run: env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -tags=livecontract ./internal/livecontract -run '^TestGatewayEvaluationContract$' -count=1

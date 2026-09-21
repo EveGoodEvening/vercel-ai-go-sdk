@@ -13,15 +13,19 @@ import (
 )
 
 const (
-	liveModelID = "typesafe-ai/jev-latest"
-	costAck     = "I_ACCEPT_LIVE_EVALUATION_COSTS"
-	bodyLimit   = 1 << 20
+	liveModelID              = "typesafe-ai/jev-latest"
+	costAck                  = "I_ACCEPT_LIVE_EVALUATION_COSTS"
+	evaluationAckEnv         = "AI_GATEWAY_LIVE_COST_ACK"
+	evaluationOppositeAckEnv = "AI_GATEWAY_PUBLIC_LIVE_COST_ACK"
+	evaluationAPIKeyEnv      = "AI_GATEWAY_API_KEY"
+	evaluationOIDCTokenEnv   = "VERCEL_OIDC_TOKEN"
+	bodyLimit                = 1 << 20
 )
 
 func TestGatewayEvaluationContract(t *testing.T) {
-	requireLivePrerequisites(t)
+	credential := requireLivePrerequisites(t)
 
-	client, err := gateway.NewClient()
+	client, err := gateway.NewClient(credential)
 	if err != nil {
 		t.Fatalf("construct live Gateway client: %v", err)
 	}
@@ -102,16 +106,26 @@ func TestGatewayEvaluationContract(t *testing.T) {
 	}
 }
 
-func requireLivePrerequisites(t *testing.T) {
+func requireLivePrerequisites(t *testing.T) gateway.Option {
 	t.Helper()
-	hasAPIKey := strings.TrimSpace(os.Getenv("AI_GATEWAY_API_KEY")) != ""
-	hasOIDCToken := strings.TrimSpace(os.Getenv("VERCEL_OIDC_TOKEN")) != ""
-	if !hasAPIKey && !hasOIDCToken {
-		t.Skip("live Gateway evaluation contract requires a non-empty AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN")
+	if os.Getenv(evaluationAckEnv) != costAck {
+		t.Fatalf("live Gateway evaluation contract requires %s=%s exactly", evaluationAckEnv, costAck)
 	}
-	if os.Getenv("AI_GATEWAY_LIVE_COST_ACK") != costAck {
-		t.Skip("live Gateway evaluation contract requires AI_GATEWAY_LIVE_COST_ACK=I_ACCEPT_LIVE_EVALUATION_COSTS exactly")
+	if _, present := os.LookupEnv(evaluationOppositeAckEnv); present {
+		t.Fatalf("live Gateway evaluation contract requires opposite acknowledgement %s to be unset", evaluationOppositeAckEnv)
 	}
+
+	apiKey := os.Getenv(evaluationAPIKeyEnv)
+	oidcToken := os.Getenv(evaluationOIDCTokenEnv)
+	hasAPIKey := strings.TrimSpace(apiKey) != ""
+	hasOIDCToken := strings.TrimSpace(oidcToken) != ""
+	if hasAPIKey == hasOIDCToken {
+		t.Fatalf("live Gateway evaluation contract requires exactly one non-empty credential across %s and %s", evaluationAPIKeyEnv, evaluationOIDCTokenEnv)
+	}
+	if hasAPIKey {
+		return gateway.WithAPIKey(apiKey)
+	}
+	return gateway.WithOIDCToken(oidcToken)
 }
 
 func assertProbability(t *testing.T, name string, probability float64) {

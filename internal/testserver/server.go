@@ -18,12 +18,15 @@ type Request struct {
 	Body   []byte
 }
 
-// Response describes the fixture response returned for every request.
+// Response describes a fixture response.
 type Response struct {
 	Status int
 	Header http.Header
 	Body   []byte
 }
+
+// Responder selects a response from a defensive request snapshot.
+type Responder func(Request) Response
 
 // Server is a loopback fixture server with concurrency-safe request capture.
 type Server struct {
@@ -35,18 +38,34 @@ type Server struct {
 
 // New starts a loopback server returning response for every captured request.
 func New(response Response) *Server {
+	return NewResponder(func(Request) Response { return response })
+}
+
+// NewResponder starts a loopback server whose response may depend on the
+// captured request. The responder receives its own defensive snapshot.
+func NewResponder(responder Responder) *Server {
+	if responder == nil {
+		panic("testserver: nil responder")
+	}
 	server := &Server{}
 	server.Server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		body, _ := io.ReadAll(request.Body)
 		_ = request.Body.Close()
-		server.mu.Lock()
-		server.requests = append(server.requests, Request{
+		snapshot := Request{
 			Method: request.Method,
 			URL:    request.URL.RequestURI(),
 			Header: request.Header.Clone(),
 			Body:   bytes.Clone(body),
-		})
+		}
+		server.mu.Lock()
+		server.requests = append(server.requests, snapshot)
 		server.mu.Unlock()
+		response := responder(Request{
+			Method: snapshot.Method,
+			URL:    snapshot.URL,
+			Header: snapshot.Header.Clone(),
+			Body:   bytes.Clone(snapshot.Body),
+		})
 		for name, values := range response.Header {
 			for _, value := range values {
 				writer.Header().Add(name, value)

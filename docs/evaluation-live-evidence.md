@@ -1,14 +1,22 @@
-# Evaluation live-contract evidence
+# Live-contract evidence
 
 ## Current status
 
-**Live execution:** NOT RUN
+**Public generation live execution:** NOT RUN
 
-**Blocker:** This implementation task did not have an authorized live-run context: network access was prohibited, and no credential or cost-acknowledgement value was inspected. The release-candidate live-run checklist remains incomplete until an authorized operator runs the exact command below with one production credential already present and the exact cost sentinel.
+**Provider evaluation live execution:** NOT RUN
 
-This file is the sole record for the Chunk 09 live evaluation run. Do not paste credentials, authorization headers, raw response headers, raw response bodies, request state, provider-option values, or provider-metadata values into this file or CI artifacts.
+**Blocker:** No owner-authorized paid-network execution, protected-environment run, or sanitized live result exists. No credential or acknowledgement value was inspected while preparing this template. All records below remain **PENDING LIVE RUN** until an authorized operator runs the isolated contracts.
 
-## Pinned contract
+This file is the sole sanitized record for the live contracts. Never paste credentials, authorization headers, prompts, evaluation state, generated output, tool arguments or results, raw request or response payloads, raw headers, provider-option values, or provider-metadata values into this file or CI artifacts.
+
+## Pinned public generation contract
+
+- Model: `openai/gpt-5-nano`
+- Responses endpoint: default `POST https://ai-gateway.vercel.sh/v1/responses`
+- Chat endpoint: default `POST https://ai-gateway.vercel.sh/v1/chat/completions`
+
+## Pinned provider evaluation contract
 
 - Model: `typesafe-ai/jev-latest`
 - Endpoint: default `POST https://ai-gateway.vercel.sh/v4/ai/evaluation-model`
@@ -18,19 +26,42 @@ This file is the sole record for the Chunk 09 live evaluation run. Do not paste 
 - `@ai-sdk/provider`: `4.0.17`
 - `@ai-sdk/provider-utils`: `5.0.45`
 
-## Authorized command
+## Authorized isolated commands
 
-Run with exactly one authorized production credential (`AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN`) already present in the environment:
+Each command requires exactly one nonblank production credential across `AI_GATEWAY_API_KEY` and `VERCEL_OIDC_TOKEN`. The test gate fails before network if its acknowledgement is not the sole exact sentinel, if the opposite acknowledgement is present at any value, or if zero or multiple credentials are available. The selected credential is passed explicitly to the client.
+
+Public generation, covering Responses non-stream/stream and Chat non-stream/stream with minimal prompts:
 
 ```sh
-AI_GATEWAY_LIVE_COST_ACK=I_ACCEPT_LIVE_EVALUATION_COSTS go test -tags=livecontract ./internal/livecontract -run TestGatewayEvaluationContract
+env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK AI_GATEWAY_PUBLIC_LIVE_COST_ACK=I_ACCEPT_LIVE_PUBLIC_API_COSTS go test -tags=livecontract ./internal/livecontract -run '^TestGateway(Responses|Chat)Contract$' -count=1
 ```
 
-The test skips without sending a request unless a credential variable is present and `AI_GATEWAY_LIVE_COST_ACK` exactly equals `I_ACCEPT_LIVE_EVALUATION_COSTS`. It never substitutes a mock and never sends an error-provoking request.
+Provider evaluation:
 
-## Sanitized run record template
+```sh
+env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK AI_GATEWAY_LIVE_COST_ACK=I_ACCEPT_LIVE_EVALUATION_COSTS go test -tags=livecontract ./internal/livecontract -run '^TestGatewayEvaluationContract$' -count=1
+```
 
-Complete this section only from a real successful run. Never infer or invent values.
+These examples select an already-present `AI_GATEWAY_API_KEY`. For an authorized OIDC run, invert the credential selection by unsetting `AI_GATEWAY_API_KEY` and retaining only `VERCEL_OIDC_TOKEN`. Never run both contracts in one process or set both acknowledgements.
+
+## Sanitized public generation record
+
+Complete only from real successful runs. Record structural facts, never content.
+
+- Execution date (UTC): **PENDING LIVE RUN**
+- Operator/run reference (non-secret): **PENDING LIVE RUN**
+- Model ID observed: **PENDING LIVE RUN** (must exactly match `openai/gpt-5-nano`)
+- Responses non-stream result: **PENDING LIVE RUN** (record pass/fail and structural item types only)
+- Responses stream result: **PENDING LIVE RUN** (record pass/fail and structural event types plus terminal completion presence only)
+- Chat non-stream result: **PENDING LIVE RUN** (record pass/fail and finish-reason presence only)
+- Chat stream result: **PENDING LIVE RUN** (record pass/fail and terminal completion presence only)
+- Usage shape: **PENDING LIVE RUN** (record absent/present and field names only; omit counts)
+- Response metadata shape: **PENDING LIVE RUN** (record model-ID match and metadata presence only; omit IDs, headers, and body bytes)
+- Protocol drift: **PENDING LIVE RUN** (record `none observed` only after every applicable generation smoke succeeds; otherwise record only the sanitized structural difference)
+
+## Sanitized provider evaluation record
+
+Complete only from a real successful run. Never infer or invent values.
 
 - Execution date (UTC): **PENDING LIVE RUN**
 - Operator/run reference (non-secret): **PENDING LIVE RUN**
@@ -42,15 +73,15 @@ Complete this section only from a real successful run. Never infer or invent val
 - Warning shape: **PENDING LIVE RUN** (record only warning discriminators; omit feature, setting, details, and message values)
 - Provider metadata shape: **PENDING LIVE RUN** (record only absent/present and provider names after confirming names contain no sensitive data; omit all values)
 - Response metadata shape: **PENDING LIVE RUN** (record only exact model-ID match, non-nil headers, non-nil body, and body byte length; omit header names/values and body bytes)
-- Protocol drift: **PENDING LIVE RUN** (record `none observed` only after a successful run, otherwise describe the sanitized structural difference and stop release-candidate promotion)
+- Protocol drift: **PENDING LIVE RUN** (record `none observed` only after a successful run; otherwise describe only the sanitized structural difference and stop release-candidate promotion)
 
 ## Sanitization review
 
 Before retaining evidence, confirm all of the following:
 
-- [ ] No credential or authorization value is present.
-- [ ] No raw request state or provider-option value is present.
-- [ ] No raw response header or body is present.
-- [ ] No provider-metadata value is present.
-- [ ] No subjective answer text, selected choice, score, probability, token count, warning payload, request ID, or response ID is present.
-- [ ] The recorded result came from the exact authorized command and was not reconstructed from a mock or fixture.
+- [ ] No credential, acknowledgement, authorization value, request ID, or response ID is present.
+- [ ] No prompt, evaluation state, generated output, selected choice, score, probability, tool argument, or tool result is present.
+- [ ] No raw request, response header, response body, provider-option value, or provider-metadata value is present.
+- [ ] No token count, warning payload, or other billable-content detail is present.
+- [ ] Each recorded result came from its exact isolated authorized command and was not reconstructed from a mock or fixture.
+- [ ] Public generation and provider evaluation evidence remain independently attributable; neither run inherited the opposite acknowledgement.
