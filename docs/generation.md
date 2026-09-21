@@ -1,6 +1,6 @@
 # Public generation guide
 
-The public generation APIs are experimental. They use the public `/v1` base URL and are separate from the provider-protocol [`Evaluate`](evaluation.md) endpoint. Authorized paid generation evidence is still **NOT RUN / PENDING LIVE RUN**; see [`evaluation-live-evidence.md`](evaluation-live-evidence.md).
+The public generation APIs are experimental. They use the public `/v1` base URL and are separate from the provider-protocol [`Evaluate`](evaluation.md) endpoint. The full authorized paid generation contract suite remains **NOT RUN / PENDING LIVE RUN**; only the narrow sanitized Responses search-request corroboration recorded in [`x-search.md`](x-search.md#sanitized-structural-evidence) has run, and it does not establish general buffered/streaming generation compatibility.
 
 Examples below are independent snippets inside a function returning `error`, with a configured `client` and live `ctx`. See [client configuration](client.md) for shared authentication, HTTP, retry, error, and privacy behavior.
 
@@ -40,7 +40,7 @@ Supported request areas are:
 - reasoning effort/summary and text, JSON-object, or JSON-schema output formats;
 - truncation, previous-response linkage, storage, metadata, and Gateway cache controls.
 
-For exhaustive fields and variants, see [Responses types](../responses.go). Function tools are serialized but never executed by the SDK. Responses built-in `web_search` and `web_search_preview` are not exported; see [search support](x-search.md).
+For exhaustive fields and variants, see [Responses types](../responses.go). Function tools are serialized but never executed by the SDK. The opt-in built-in-tools methods additionally support only fixed low-context `web_search` and fieldless `x_search` request declarations; see [Responses server search](#request-only-responses-server-search) and [search support](x-search.md).
 
 ### Streaming
 
@@ -74,6 +74,97 @@ fmt.Printf("text_delta_events=%d other_events=%d\n", textDeltas, otherEvents)
 `StreamResponse` sends `stream:true`. Only `response.output_text.delta` is typed as `ResponseOutputTextDeltaEvent`; every other valid event object is a `RawResponseEvent` with a defensive `RawJSON()` accessor. The stream retains no transcript and starts no producer goroutine.
 
 A clean, completely framed HTTP EOF is successful for Responses; no application terminal event is required. Malformed/truncated framing, invalid event JSON, a missing type discriminator, cancellation, limits, or body read/close failure makes `Err()` non-nil.
+
+## Request-only Responses server search
+
+Responses search is an opt-in **request serialization** surface. Use `ResponsesBuiltInToolsRequest` with `CreateResponseWithBuiltInTools` or `StreamResponseWithBuiltInTools`; the existing `ResponsesRequest`, `CreateResponse`, and `StreamResponse` contracts are unchanged. Gateway/provider infrastructure executes the declared search tools server-side. The Go SDK neither executes tools nor turns search calls, results, sources, or lifecycle events into typed values.
+
+The only supported declarations are exact and fieldless:
+
+- `ResponseWebSearchTool{}` emits `{"type":"web_search","search_context_size":"low"}`. Omitting `search_context_size`, choosing another size, and using `web_search_preview` or another current/preview form are unsupported.
+- `ResponseXSearchTool{}` emits exactly `{"type":"x_search"}`. It has no configurable fields.
+
+Ordinary function tools remain in `ResponsesRequest.Tools` and may coexist with built-in tools. The encoder emits function tools first, then built-in tools in caller order.
+
+### Buffered search request
+
+```go
+request := gateway.ResponsesBuiltInToolsRequest{
+    Request: gateway.ResponsesRequest{
+        Model: "openai/gpt-5.4-mini",
+        Input: gateway.ResponseTextInput("Find current public information."),
+        Tools: []gateway.ResponseTool{
+            {Name: "lookup_local", Parameters: map[string]any{"type": "object"}},
+        },
+    },
+    Tools: []gateway.ResponseBuiltInTool{
+        gateway.ResponseWebSearchTool{},
+    },
+}
+
+result, err := client.CreateResponseWithBuiltInTools(ctx, request)
+if err != nil {
+    return err
+}
+fmt.Printf("response_bytes=%d\n", len(result.RawJSON()))
+```
+
+For fieldless X search, use the positively probed route and replace the built-in tool:
+
+```go
+request.Request.Model = "spacexai/grok-4.6"
+request.Tools = []gateway.ResponseBuiltInTool{gateway.ResponseXSearchTool{}}
+```
+
+`ResponseResult.RawJSON()` remains the complete buffered search-output boundary. Inspect only structural properties appropriate for your application; the bytes are not sanitized and may contain sensitive input, generated prose, tool data, sources, identifiers, usage, costs, or provider extensions.
+
+### Streaming search request
+
+```go
+request := gateway.ResponsesBuiltInToolsRequest{
+    Request: gateway.ResponsesRequest{
+        Model: "spacexai/grok-4.6",
+        Input: gateway.ResponseTextInput("Find current public information."),
+        Tools: []gateway.ResponseTool{
+            {Name: "lookup_local", Parameters: map[string]any{"type": "object"}},
+        },
+    },
+    Tools: []gateway.ResponseBuiltInTool{
+        gateway.ResponseXSearchTool{},
+    },
+}
+
+stream, err := client.StreamResponseWithBuiltInTools(ctx, request)
+if err != nil {
+    return err
+}
+defer stream.Close()
+
+textDeltas, rawEvents := 0, 0
+for stream.Next() {
+    switch stream.Event().(type) {
+    case gateway.ResponseOutputTextDeltaEvent:
+        textDeltas++
+    case gateway.RawResponseEvent:
+        rawEvents++
+    }
+}
+if err := stream.Err(); err != nil {
+    return err
+}
+fmt.Printf("text_delta_events=%d raw_events=%d\n", textDeltas, rawEvents)
+```
+
+The same streaming method accepts `ResponseWebSearchTool{}` with `openai/gpt-5.4-mini`. Only text deltas are typed; search-call and all other valid event objects fall back to `RawResponseEvent`. No search-specific event names, ordering, status, completion, error, citation, or terminal semantics are promised.
+
+Model compatibility is evidence-bounded:
+
+| Declaration | Exact evidenced route | Boundary |
+| --- | --- | --- |
+| fixed low-context `web_search` | `openai/gpt-5.4-mini` | Documented by Vercel and structurally corroborated through public Gateway Responses |
+| fieldless `x_search` | `spacexai/grok-4.6` | Positively probed through public Gateway Responses |
+
+The Gateway catalog is dynamic. These rows do not promise universal OpenAI, SpaceXAI, or cross-provider support; the SDK has no model allowlist, automatic fallback, or routing compatibility guarantee, so unsupported model/tool combinations may fail server-side. Configurable `x_search` options, search-specific tool choice and `allowed_tools`, and all typed search calls/results/actions/posts/sources/citations/annotations/refusals/provider errors/usage/cost remain blocked. This surface is not a direct-xAI client and imports no direct-xAI option or output contract.
 
 ## Chat Completions
 
@@ -151,7 +242,7 @@ Both stream types accept at most 10,000 events. An explicit `Close()` ends readi
 
 ## Request-only Chat server search
 
-Gateway server search is an opt-in **request serialization** extension. It does not type search results, lifecycle events, citations, offsets, costs, refusals, or provider errors. Server execution remains behind the ordinary typed/raw Chat result boundary. It does not imply Responses built-in search, public `/v1/evaluate`, or Gateway-native xAI `x_search` support.
+Gateway Chat server search is a separate opt-in **request serialization** extension. It does not type search results, lifecycle events, citations, offsets, costs, refusals, or provider errors. Server execution remains behind the ordinary typed/raw Chat result boundary. It does not imply support for Responses search forms beyond the exact fixed declarations documented above, public `/v1/evaluate`, or any direct-xAI client.
 
 The four concrete wire declarations are:
 

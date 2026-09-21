@@ -1,42 +1,65 @@
 # Search support and native xAI `x_search`
 
-Search support depends on the endpoint and tool contract—not just the model's generic tool capability.
+Search support depends on the endpoint, exact request declaration, and model—not merely a model's generic tool capability.
 
 | Surface | SDK support |
 | --- | --- |
-| Chat `vercel:exa_search`, `vercel:parallel_search`, `vercel:perplexity_search`, `vercel:tako_search` | Request declarations through the two opt-in server-tools methods; no typed search outputs or metadata |
-| Responses built-in `web_search` / `web_search_preview` | Not implemented; Gateway wire evidence is insufficient |
-| Gateway-native xAI `x_search` | Not implemented or confirmed |
-| Direct xAI `x_search` | Documented by xAI, but this SDK provides no direct-xAI client |
+| Chat `vercel:exa_search`, `vercel:parallel_search`, `vercel:perplexity_search`, `vercel:tako_search` | Request declarations through the two opt-in server-tools methods; separate Chat contract and no typed search outputs or metadata |
+| Responses fixed low-context `web_search` | `ResponseWebSearchTool{}` through the two opt-in built-in-tools methods |
+| Responses fieldless Gateway `x_search` | `ResponseXSearchTool{}` through the two opt-in built-in-tools methods |
+| Responses `web_search_preview`, other current/preview forms, and configurable search options | Not supported |
+| Direct xAI `x_search` | Not supported; this SDK has no direct-xAI client |
 
-For Chat usage and configuration rules, see [generation](generation.md#request-only-chat-server-search). Search execution/results stay behind the existing raw output boundary; inline citations are model text, not a typed citation contract. Hosted corroboration has not run.
+For code examples, see [request-only Responses server search](generation.md#request-only-responses-server-search) and [request-only Chat server search](generation.md#request-only-chat-server-search).
 
-## Why native `x_search` is separate
+## Exact Responses request boundary
 
-The reviewed direct-xAI contract uses `POST https://api.x.ai/v1/responses` and a top-level tool with `type: "x_search"`. Its snake-case options include `allowed_x_handles`, `excluded_x_handles`, `from_date`, `to_date`, `enable_image_understanding`, and `enable_video_understanding`; provider-executed output can include `x_search_call`.
+Both supported Responses declarations use `ResponsesBuiltInToolsRequest` with `CreateResponseWithBuiltInTools` or `StreamResponseWithBuiltInTools`. They are additive opt-in methods: existing `ResponsesRequest`, `CreateResponse`, and `StreamResponse` calls are unchanged. Gateway/provider infrastructure executes the tools server-side; the SDK performs no automatic client tool execution.
 
-The direct-provider `@ai-sdk/xai@5.0.4` helper exposes corresponding camelCase options. Neither that helper nor the direct HTTP contract proves that Vercel AI Gateway accepts or preserves the same wire format.
+| Go declaration | Encoded tool object | Exact evidenced model route |
+| --- | --- | --- |
+| `ResponseWebSearchTool{}` | `{"type":"web_search","search_context_size":"low"}` | `openai/gpt-5.4-mini` |
+| `ResponseXSearchTool{}` | `{"type":"x_search"}` | `spacexai/grok-4.6` |
 
-At the repository's [pinned evidence baseline](evaluation-live-evidence.md#pinned-contracts), `@ai-sdk/gateway@4.0.87` has Exa, Parallel, Perplexity, and Tako helpers, but no `xSearch` helper. The reviewed Gateway docs and model metadata do not establish a native `x_search` request/result contract. This SDK therefore exports no native `x_search` API and contains no Gateway `x_search` live probe.
+The model catalog is dynamic and the implementation intentionally has no closed model enum. These exact routes do not establish universal OpenAI, SpaceXAI, or Gateway-model compatibility. There is no automatic Gateway fallback or cross-provider portability promise; an unsupported model/tool combination may fail server-side.
 
-## Evidence required to add support
+Ordinary Responses function tools may coexist with either declaration. Function tools are encoded first, followed by built-in tools in caller order. This coexistence does not make the SDK execute any function or built-in tool.
 
-Native Gateway `x_search` requires both:
+## Result and event boundary
 
-1. First-party Gateway evidence for the exact endpoint, request fields/limits, suitable model ID, and native response/event shape.
-2. An authorized Gateway contract result demonstrating native `x_search_call` evidence—not merely generated prose.
+Support is request-only. Buffered responses remain `ResponseResult.RawJSON()`; streaming still types only `response.output_text.delta` as `ResponseOutputTextDeltaEvent` and preserves every other valid event object as `RawResponseEvent`. Raw bytes are defensive copies, not sanitized content.
 
-A probe can be planned only after the schema evidence exists, with explicit credential inputs, cost acknowledgement, sanitization, and success criteria. Responses built-in search has its own request and output evidence gates; Chat request support clears neither. See the [current evidence decisions](../planning/IMPLEMENTATION_PLAN.md#2026-09-21-evidence-continuation--authoritative-current-disposition).
+The structural evidence below proves server-side execution of the exact declarations only. It does **not** define typed search calls, results, actions, posts, source lists, citations, annotations or offsets, refusals, provider errors, usage, cost, unknown variants, retention behavior, or buffered field requiredness/nullability. It also does not define search lifecycle event names, payloads, ordering, deltas, completion/failure effects, or terminal semantics.
 
-These unsupported surfaces are not prerequisites for releasing the implemented SDK. Do not add placeholder tests or infer support from OpenAI documentation, direct-provider SDKs, or generic model capabilities.
+## Sanitized structural evidence
+
+Evidence was reviewed and exercised on 2026-09-21. Only structural facts are retained here:
+
+| Tool | Endpoint | Model | Exercised tool/options | HTTP/status structure | Observed output discriminator/status set |
+| --- | --- | --- | --- | --- | --- |
+| `web_search` | `POST https://ai-gateway.vercel.sh/v1/responses` | `openai/gpt-5.4-mini` | `{"type":"web_search","search_context_size":"low"}` only | HTTP 200; top-level `object:"response"`; response status `incomplete` under a low output-token cap | `web_search_call`, `message` |
+| `x_search` | `POST https://ai-gateway.vercel.sh/v1/responses` | `spacexai/grok-4.6` | `{"type":"x_search"}` plus general `tool_choice:"required"`; no `x_search` option fields | HTTP 200; top-level `object:"response"`; response status `completed` | completed `x_search_call`; reasoning items; completed message |
+
+This durable public evidence is limited to the structural fields in the table; credentials, authorization data, input text, generated prose, bodies, headers, identifiers, and raw payloads are excluded. Future reruns require explicit owner authorization and must append a dated structural record rather than replace this history.
+
+## Remaining blocked surfaces
+
+- Configurable `x_search` fields are blocked, including direct-xAI candidate names such as handle filters, date ranges, and image/video understanding flags. Direct-xAI limits, defaults, mutual-exclusion rules, validation, and presence/null behavior are not Gateway evidence.
+- For `web_search`, omitting `search_context_size`, any value other than exact `"low"`, `web_search_preview`, external-web-access flags, filters/domains, approximate location, and other current/preview forms are blocked.
+- Search-specific tool choice, `allowed_tools`, function/built-in precedence semantics beyond deterministic request ordering, Gateway fallback, routing behavior, and wider model/provider compatibility are blocked.
+- Typed buffered search output and typed search lifecycle events remain blocked as detailed above. Raw buffered and streaming fallback is the supported observation boundary.
+
+## Direct xAI and Chat remain distinct
+
+Direct xAI documents `POST https://api.x.ai/v1/responses`, configurable `x_search` options, and provider-specific output forms. The direct `@ai-sdk/xai` helper likewise describes a direct-provider contract. Neither is imported into this SDK's Gateway validation or compatibility promises, and this SDK does not provide direct-xAI authentication, base URLs, or a direct client.
+
+Chat's four `vercel:...` server-search declarations are a separate `/v1/chat/completions` request contract with their own configuration types. They neither alias the Responses declarations nor clear any Responses output/event blocker.
 
 ## Sources
 
-Evidence reviewed 2026-09-20–21; these links record that baseline, not a promise about later upstream changes.
-
-- [Gateway Chat web search](https://vercel.com/docs/ai-gateway/models-and-providers/web-search)
-- [Gateway Responses tool calling](https://vercel.com/docs/ai-gateway/sdks-and-apis/responses/tool-calling)
-- [xAI X Search wire contract](https://docs.x.ai/developers/tools/x-search)
-- [xAI provider-executed output types](https://docs.x.ai/developers/tools/tool-usage-details)
-- [Direct xAI helper declarations, 5.0.4](https://unpkg.com/@ai-sdk/xai@5.0.4/dist/index.d.ts)
-- [Gateway tool registry at ai@7.0.107](https://github.com/vercel/ai/blob/ai%407.0.107/packages/gateway/src/gateway-tools.ts)
+- [Vercel Gateway web search](https://vercel.com/docs/ai-gateway/models-and-providers/web-search), inspected 2026-09-21; source for the exact fixed `web_search` request and documented model route.
+- [Vercel Gateway Responses tool calling](https://vercel.com/docs/ai-gateway/sdks-and-apis/responses/tool-calling), inspected 2026-09-21; endpoint/tool context only.
+- [xAI X Search wire contract](https://docs.x.ai/developers/tools/x-search), direct-xAI comparison only.
+- [xAI provider-executed output types](https://docs.x.ai/developers/tools/tool-usage-details), direct-xAI comparison only.
+- [Direct xAI helper declarations, 5.0.4](https://unpkg.com/@ai-sdk/xai@5.0.4/dist/index.d.ts), direct-provider comparison only.
+- [Gateway tool registry at ai@7.0.107](https://github.com/vercel/ai/blob/ai%407.0.107/packages/gateway/src/gateway-tools.ts), historical package comparison only.
