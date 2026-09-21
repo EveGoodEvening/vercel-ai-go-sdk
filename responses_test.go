@@ -1,0 +1,319 @@
+package gateway
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
+	"math"
+	"net/http"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
+	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/testserver"
+)
+
+func validResponsesRequest() ResponsesRequest {
+	return ResponsesRequest{Model: "provider/model", Input: ResponseTextInput("hello")}
+}
+
+func TestResponsesRequestExactJSONAndInventory(t *testing.T) {
+	description, instructions, summary := "description", "be concise", "detailed"
+	strict, parallel, store := true, false, true
+	maxTokens, anchor := 123, 2
+	temperature, topP, presence, frequency := 0.25, 0.75, -0.5, 0.5
+	truncation, previous, caching, ttl, cacheKey := "disabled", "resp_previous", "auto", "1h", "cache-key"
+	request := ResponsesRequest{
+		Model: "provider/model",
+		Input: ResponseItemsInput{
+			ResponseMessage{Role: "user", Content: "hello"},
+			ResponseFunctionCall{ID: "item-1", CallID: "call-1", Name: "weather", Arguments: `{"city":"Paris"}`},
+			ResponseFunctionCallOutput{CallID: "call-1", Output: `{"temp":21}`},
+		},
+		MaxOutputTokens: &maxTokens, Temperature: &temperature, TopP: &topP,
+		PresencePenalty: &presence, FrequencyPenalty: &frequency, Instructions: &instructions,
+		Tools:      []ResponseTool{{Name: "weather", Description: &description, Parameters: map[string]any{"type": "object", "properties": map[string]any{"city": map[string]any{"type": "string"}}}, Strict: &strict}},
+		ToolChoice: ResponseSpecificToolChoice{Name: "weather"}, ParallelToolCalls: &parallel,
+		AllowedTools: []string{"weather"}, Reasoning: &ResponseReasoning{Effort: "high", Summary: &summary},
+		Text:       &ResponseText{Format: ResponseJSONSchemaFormat{Name: "answer", Description: &description, Schema: map[string]any{"type": "object"}, Strict: &strict}},
+		Truncation: &truncation, PreviousResponseID: &previous, Store: &store,
+		Metadata: map[string]string{"trace": "abc"}, Caching: &caching, CacheAnchorItems: &anchor,
+		CacheTTL: &ttl, PromptCacheKey: &cacheKey,
+	}
+	got, err := encodeResponsesRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"allowed_tools":["weather"],"cache_anchor_items":2,"cache_ttl":"1h","caching":"auto","frequency_penalty":0.5,"input":[{"content":"hello","role":"user"},{"arguments":"{\"city\":\"Paris\"}","call_id":"call-1","id":"item-1","name":"weather","type":"function_call"},{"call_id":"call-1","output":"{\"temp\":21}","type":"function_call_output"}],"instructions":"be concise","max_output_tokens":123,"metadata":{"trace":"abc"},"model":"provider/model","parallel_tool_calls":false,"presence_penalty":-0.5,"previous_response_id":"resp_previous","prompt_cache_key":"cache-key","reasoning":{"effort":"high","summary":"detailed"},"store":true,"stream":false,"temperature":0.25,"text":{"format":{"description":"description","name":"answer","schema":{"type":"object"},"strict":true,"type":"json_schema"}},"tool_choice":{"name":"weather","type":"function"},"tools":[{"description":"description","name":"weather","parameters":{"properties":{"city":{"type":"string"}},"type":"object"},"strict":true,"type":"function"}],"top_p":0.75,"truncation":"disabled"}`
+	if string(got) != want {
+		t.Fatalf("encoded request\n got: %s\nwant: %s", got, want)
+	}
+}
+
+func TestResponsesRequestOmissionAndAlternateForms(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		request ResponsesRequest
+		want    string
+	}{
+		{"minimal", validResponsesRequest(), `{"input":"hello","model":"provider/model","stream":false}`},
+		{"empty arrays retained", ResponsesRequest{Model: "provider/model", Input: ResponseItemsInput{}, Tools: []ResponseTool{}, AllowedTools: []string{}, Metadata: map[string]string{}}, `{"allowed_tools":[],"input":[],"metadata":{},"model":"provider/model","stream":false,"tools":[]}`},
+		{"mode choice and text", ResponsesRequest{Model: "provider/model", Input: ResponseTextInput("x"), ToolChoice: ResponseToolChoiceNone, Text: &ResponseText{Format: ResponseTextFormatJSONObject}}, `{"input":"x","model":"provider/model","stream":false,"text":{"format":{"type":"json_object"}},"tool_choice":"none"}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := encodeResponsesRequest(test.request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != test.want {
+				t.Fatalf("got %s, want %s", got, test.want)
+			}
+		})
+	}
+}
+
+func TestCreateResponseEndpointHeadersAndRawResult(t *testing.T) {
+	clearCredentialEnvironment(t)
+	raw := []byte(" {\n  \"unknown\": [null, {\"variant\":\"future\"}]\n} \t")
+	fixture := testserver.New(testserver.Response{Status: http.StatusOK, Body: raw})
+	defer fixture.Close()
+	client, err := NewClient(WithAPIKey("secret"), WithPublicBaseURL(fixture.URL+"/v1///"), WithHeaders(http.Header{"X-Custom": {"one", "two"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := client.CreateResponse(context.Background(), validResponsesRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := fixture.Requests()
+	if len(requests) != 1 {
+		t.Fatalf("requests = %d", len(requests))
+	}
+	got := requests[0]
+	if got.Method != http.MethodPost || got.URL != "/v1/responses" || string(got.Body) != `{"input":"hello","model":"provider/model","stream":false}` {
+		t.Fatalf("request = %#v", got)
+	}
+	if got.Header.Get("Authorization") != "Bearer secret" || got.Header.Get("Content-Type") != "application/json" || !reflect.DeepEqual(got.Header.Values("X-Custom"), []string{"one", "two"}) {
+		t.Fatalf("headers = %#v", got.Header)
+	}
+	if !bytes.Equal(result.RawJSON(), raw) {
+		t.Fatalf("raw = %q", result.RawJSON())
+	}
+	first := result.RawJSON()
+	first[0] = 'x'
+	if bytes.Equal(first, result.RawJSON()) {
+		t.Fatal("RawJSON did not return a defensive copy")
+	}
+	if got := (*ResponseResult)(nil).RawJSON(); got != nil {
+		t.Fatalf("nil receiver RawJSON = %q", got)
+	}
+}
+
+func TestCreateResponseValidationBeforeCredentialAndNetwork(t *testing.T) {
+	clearCredentialEnvironment(t)
+	source := &transportTokenSource{token: "token"}
+	calls := 0
+	client, err := NewClient(WithOIDCTokenSource(source), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { calls++; return nil, errors.New("must not send") })}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	invalid := []ResponsesRequest{
+		{},
+		{Model: "provider/model", Input: ResponseTextInput("")},
+		{Model: "provider", Input: ResponseTextInput("x")},
+		{Model: "provider/model", Input: ResponseItemsInput(nil)},
+		{Model: "provider/model", Input: ResponseTextInput("x"), Temperature: new(math.NaN())},
+		{Model: "provider/model", Input: ResponseTextInput("x"), TopP: new(1.01)},
+	}
+	for i, request := range invalid {
+		_, err := client.CreateResponse(context.Background(), request)
+		var validation *ValidationError
+		if !errors.As(err, &validation) {
+			t.Fatalf("case %d error = %T %v, want ValidationError", i, err, err)
+		}
+	}
+	if _, err := client.CreateResponse(nil, validResponsesRequest()); err == nil {
+		t.Fatal("nil context accepted")
+	}
+	if calls != 0 || source.callCount() != 0 {
+		t.Fatalf("network calls=%d credential calls=%d", calls, source.callCount())
+	}
+}
+
+func TestResponsesRequestResourceLimits(t *testing.T) {
+	tooDeep := any("leaf")
+	for range 65 {
+		tooDeep = []any{tooDeep}
+	}
+	tooMany := make([]ResponseInputItem, 10001)
+	for i := range tooMany {
+		tooMany[i] = ResponseMessage{Role: "user", Content: "x"}
+	}
+	tooManyMembers := make(map[string]any, 10001)
+	for i := range 10001 {
+		tooManyMembers[string(rune(0x1000+i))] = true
+	}
+	cases := []ResponsesRequest{
+		{Model: "provider/model", Input: ResponseTextInput(strings.Repeat("x", (1<<20)+1))},
+		{Model: "provider/model", Input: ResponseItemsInput(tooMany)},
+		{Model: "provider/model", Input: ResponseTextInput("x"), Tools: make([]ResponseTool, 10001)},
+		{Model: "provider/model", Input: ResponseTextInput("x"), Tools: []ResponseTool{{Name: "f", Parameters: tooDeep}}},
+		{Model: "provider/model", Input: ResponseTextInput("x"), Tools: []ResponseTool{{Name: "f", Parameters: tooManyMembers}}},
+	}
+	for i, request := range cases {
+		if err := validateResponsesRequest(request); err == nil {
+			t.Fatalf("case %d accepted", i)
+		}
+	}
+}
+
+func TestResponsesResultDecoderPolicy(t *testing.T) {
+	valid := []string{`{}`, " {\"a\":null,\"future\":{\"x\":[1,true,\"s\"]}} \n"}
+	for _, body := range valid {
+		result, err := decodeResponseResult([]byte(body))
+		if err != nil {
+			t.Fatalf("valid %q: %v", body, err)
+		}
+		if string(result.RawJSON()) != body {
+			t.Fatalf("raw changed: %q", result.RawJSON())
+		}
+	}
+	deep := strings.Repeat("{\"x\":", 65) + "0" + strings.Repeat("}", 65)
+	members := make([]string, 10001)
+	for i := range members {
+		members[i] = "0"
+	}
+	objectMembers := make([]string, 10001)
+	for i := range objectMembers {
+		objectMembers[i] = `"` + string(rune(0x1000+i)) + `":0`
+	}
+	invalid := []string{"", `null`, `[]`, `true`, `1`, `{"x":`, `{} {}`, `{"a":1,"a":2}`, `{"nested":{"a":1,"a":2}}`, deep, `{"s":"` + strings.Repeat("x", (1<<20)+1) + `"}`, `{"a":[` + strings.Join(members, ",") + `]}`, `{` + strings.Join(objectMembers, ",") + `}`}
+	for i, body := range invalid {
+		_, err := decodeResponseResult([]byte(body))
+		var validation *ResponseValidationError
+		if !errors.As(err, &validation) || validation.StatusCode() != http.StatusOK || validation.Path() != "$" {
+			t.Fatalf("case %d error = %T %v", i, err, err)
+		}
+		raw := validation.RawResponseBody()
+		if len(raw) > 0 {
+			raw[0] ^= 0xff
+			if bytes.Equal(raw, validation.RawResponseBody()) {
+				t.Fatalf("case %d raw body is not defensive", i)
+			}
+		}
+	}
+}
+
+func TestCreateResponseSuccessBodyOverflowAndNon200(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		status       int
+		body         []byte
+		wantResponse bool
+	}{
+		{"success overflow", 200, bytes.Repeat([]byte("x"), (1<<20)+1), false},
+		{"created is not success", 201, []byte(`{"future":true}`), true},
+		{"gateway error", 429, []byte(`{"error":{"message":"limited","type":"rate_limit"},"requestId":"req"}`), true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client, err := NewClient(WithAPIKey("key"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: test.status, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(test.body)), Request: request}, nil
+			})}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = client.CreateResponse(context.Background(), validResponsesRequest())
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			var responseErr *ResponseError
+			if errors.As(err, &responseErr) != test.wantResponse {
+				t.Fatalf("ResponseError presence=%v error=%T %v", errors.As(err, &responseErr), err, err)
+			}
+			if test.status == 200 && !errors.Is(err, httpx.ErrResponseBodyTooLarge) {
+				t.Fatalf("overflow error=%v", err)
+			}
+			if responseErr != nil && responseErr.StatusCode() != test.status {
+				t.Fatalf("status=%d", responseErr.StatusCode())
+			}
+		})
+	}
+}
+
+func TestCreateResponseCancellationInterruptsSendAndRead(t *testing.T) {
+	t.Run("send", func(t *testing.T) {
+		started := make(chan struct{})
+		client, err := NewClient(WithAPIKey("key"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			close(started)
+			<-request.Context().Done()
+			return nil, request.Context().Err()
+		})}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() { _, err := client.CreateResponse(ctx, validResponsesRequest()); done <- err }()
+		<-started
+		cancel()
+		select {
+		case err := <-done:
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("error=%v", err)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("send did not stop")
+		}
+	})
+	t.Run("read", func(t *testing.T) {
+		reader, writer := io.Pipe()
+		started := make(chan struct{})
+		client, err := NewClient(WithAPIKey("key"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			close(started)
+			go func() { <-request.Context().Done(); _ = writer.CloseWithError(request.Context().Err()) }()
+			return &http.Response{StatusCode: 200, Header: make(http.Header), Body: reader, Request: request}, nil
+		})}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() { _, err := client.CreateResponse(ctx, validResponsesRequest()); done <- err }()
+		<-started
+		cancel()
+		select {
+		case err := <-done:
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("error=%v", err)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("read did not stop")
+		}
+	})
+}
+
+func TestCreateResponseUsesPublicBaseWithoutChangingEvaluate(t *testing.T) {
+	public := testserver.New(testserver.Response{Body: []byte(`{}`)})
+	defer public.Close()
+	provider := testserver.New(testserver.Response{Body: []byte(`{"answers":{"q":{"type":"boolean","probability":1}}}`)})
+	defer provider.Close()
+	client, err := NewClient(WithAPIKey("key"), WithPublicBaseURL(public.URL+"/v1"), WithBaseURL(provider.URL+"/v4/ai"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = client.CreateResponse(context.Background(), validResponsesRequest()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = client.Evaluate(context.Background(), "provider/model", EvaluationRequest{State: "x", Questions: map[string]Question{"q": BooleanQuestion{Instructions: "yes?"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := public.Requests()[0].URL; got != "/v1/responses" {
+		t.Fatalf("public URL=%q", got)
+	}
+	if got := provider.Requests()[0].URL; got != "/v4/ai/evaluation-model" {
+		t.Fatalf("provider URL=%q", got)
+	}
+}

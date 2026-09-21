@@ -18,6 +18,7 @@ func compilePublicContract() {
 	var _ gateway.TokenSource = tokenSource{}
 	var _ func(...gateway.Option) (*gateway.Client, error) = gateway.NewClient
 	var _ func(*gateway.Client, context.Context, string, gateway.EvaluationRequest) (*gateway.EvaluationResult, error) = (*gateway.Client).Evaluate
+	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponse
 	var _ func(string) gateway.Option = gateway.WithAPIKey
 	var _ func(string) gateway.Option = gateway.WithOIDCToken
 	var _ func(gateway.TokenSource) gateway.Option = gateway.WithOIDCTokenSource
@@ -27,6 +28,29 @@ func compilePublicContract() {
 	var _ func(string) gateway.Option = gateway.WithTeam
 	var _ func(http.Header) gateway.Option = gateway.WithHeaders
 	var _ func(gateway.RetryPolicy) gateway.Option = gateway.WithRetryPolicy
+	description := "description"
+	strict := true
+	_ = gateway.ResponsesRequest{
+		Model: "provider/model",
+		Input: gateway.ResponseItemsInput{
+			gateway.ResponseMessage{Role: "user", Content: "hello"},
+			gateway.ResponseFunctionCall{ID: "item", CallID: "call", Name: "tool", Arguments: `{}`},
+			gateway.ResponseFunctionCallOutput{CallID: "call", Output: `{}`},
+		},
+		MaxOutputTokens: new(128), Temperature: new(0.5), TopP: new(0.9),
+		PresencePenalty: new(0.1), FrequencyPenalty: new(-0.1), Instructions: new("instruction"),
+		Tools:      []gateway.ResponseTool{{Name: "tool", Description: &description, Parameters: map[string]any{"type": "object"}, Strict: &strict}},
+		ToolChoice: gateway.ResponseSpecificToolChoice{Name: "tool"}, ParallelToolCalls: new(true),
+		AllowedTools: []string{"tool"}, Reasoning: &gateway.ResponseReasoning{Effort: "high", Summary: new("auto")},
+		Text:       &gateway.ResponseText{Format: gateway.ResponseJSONSchemaFormat{Name: "answer", Description: &description, Schema: map[string]any{"type": "object"}, Strict: &strict}},
+		Truncation: new("disabled"), PreviousResponseID: new("response"), Store: new(true),
+		Metadata: map[string]string{"key": "value"}, Caching: new("auto"), CacheAnchorItems: new(1), CacheTTL: new("5m"), PromptCacheKey: new("cache"),
+	}
+	_ = gateway.ResponsesRequest{Model: "provider/model", Input: gateway.ResponseTextInput("hello"), ToolChoice: gateway.ResponseToolChoiceAuto, Text: &gateway.ResponseText{Format: gateway.ResponseTextFormatText}}
+	_ = []gateway.ResponseToolChoiceMode{gateway.ResponseToolChoiceAuto, gateway.ResponseToolChoiceRequired, gateway.ResponseToolChoiceNone}
+	_ = []gateway.ResponseTextFormatType{gateway.ResponseTextFormatText, gateway.ResponseTextFormatJSONObject}
+	var responseResult *gateway.ResponseResult
+	_ = responseResult.RawJSON()
 
 	probabilityDecimals := 2
 	scoreDecimals := 3
