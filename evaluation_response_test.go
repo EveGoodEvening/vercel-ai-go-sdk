@@ -486,6 +486,40 @@ func TestComposeEvaluationResultResourceLimits(t *testing.T) {
 	}
 }
 
+func TestComposeEvaluationResultUnknownKeyDiagnosticIsBounded(t *testing.T) {
+	const (
+		marker              = "secret-response-marker"
+		maxDiagnosticLength = 128
+	)
+	key := marker + strings.Repeat("k", maxResponseValueBytes-len(marker))
+	body := []byte(`{"answers":{},"` + key + `":null}`)
+
+	_, err := composeEvaluationResult("model", map[string]Question{}, rawEvaluationResponse{statusCode: http.StatusOK, body: body})
+	var validation *ResponseValidationError
+	if !errors.As(err, &validation) {
+		t.Fatalf("got %T, want *ResponseValidationError", err)
+	}
+	wantPath := `$[` + strconv.Quote(key) + `]`
+	if validation.Path() != wantPath {
+		t.Fatalf("path was not preserved losslessly: got length %d, want length %d", len(validation.Path()), len(wantPath))
+	}
+
+	formatted := []string{
+		validation.Error(),
+		fmt.Sprintf("%v", validation),
+		fmt.Sprintf("%s", validation),
+		fmt.Errorf("wrapped: %w", validation).Error(),
+	}
+	for _, diagnostic := range formatted {
+		if strings.Contains(diagnostic, marker) {
+			t.Fatalf("diagnostic disclosed response key: %q", diagnostic)
+		}
+		if len(diagnostic) > maxDiagnosticLength {
+			t.Fatalf("diagnostic length = %d, want at most %d", len(diagnostic), maxDiagnosticLength)
+		}
+	}
+}
+
 func TestComposeEvaluationResultToleranceBoundaries(t *testing.T) {
 	choice := map[string]Question{"q": ChoiceQuestion{Instructions: "pick", Criteria: map[string]any{"a": "A", "b": "B"}}}
 	choiceBody := func(choice string, a, b float64, probabilityDecimals string) string {

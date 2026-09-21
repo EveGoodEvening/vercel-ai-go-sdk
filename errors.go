@@ -266,16 +266,11 @@ type ResponseValidationError struct {
 	rawResponseBody []byte
 }
 
-// Error returns a safe diagnostic that never contains raw response bytes,
-// request data, headers, or credentials.
+// Error returns a bounded diagnostic that never contains response paths,
+// reasons, raw response bytes, request data, headers, or credentials. Detailed
+// validation state remains available through the typed accessors.
 func (e *ResponseValidationError) Error() string {
-	if e == nil {
-		return "gateway response validation error"
-	}
-	if e.path == "" && e.reason == "" {
-		return "gateway response validation error"
-	}
-	return fmt.Sprintf("gateway response validation error: %s: %s", e.path, e.reason)
+	return "gateway response validation error"
 }
 
 // Unwrap returns the underlying decoding or validation cause, if any.
