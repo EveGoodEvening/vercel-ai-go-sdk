@@ -96,10 +96,10 @@ func printError(err error) {
 	case errors.As(err, &configurationErr):
 		log.Printf("configuration error: option=%q", configurationErr.Option())
 	case errors.As(err, &validationErr):
-		log.Printf("validation error: path=%q", validationErr.Path())
+		log.Printf("validation error: path_present=%t", validationErr.Path() != "")
 	case errors.As(err, &responseValidationErr):
-		log.Printf("response validation error: status=%d path=%q request_id_present=%t response_id_present=%t truncated=%t",
-			responseValidationErr.StatusCode(), responseValidationErr.Path(), responseValidationErr.RequestID() != "",
+		log.Printf("response validation error: status=%d path_present=%t request_id_present=%t response_id_present=%t truncated=%t",
+			responseValidationErr.StatusCode(), responseValidationErr.Path() != "", responseValidationErr.RequestID() != "",
 			responseValidationErr.ResponseID() != "", responseValidationErr.BodyTruncated())
 	case errors.As(err, &responseErr):
 		_, hasRetryAfter := responseErr.RetryAfter()

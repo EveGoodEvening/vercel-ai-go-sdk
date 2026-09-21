@@ -16,7 +16,8 @@ const (
 	defaultPublicBaseURL = "https://ai-gateway.vercel.sh/v1"
 )
 
-// Client is an evaluation-only Vercel AI Gateway client.
+// Client accesses the Vercel AI Gateway public Responses and Chat Completions
+// generation APIs and the provider Evaluation Model API.
 type Client struct {
 	config clientConfig
 }
