@@ -201,7 +201,11 @@ func encodeChatExaSearchConfig(c ChatExaSearchConfig) map[string]any {
 		case *ChatExaSubpageTargetString:
 			contents["subpage_target"] = string(*value)
 		case ChatExaSubpageTargetStrings:
-			contents["subpage_target"] = []string(value)
+			if value == nil {
+				contents["subpage_target"] = []string{}
+			} else {
+				contents["subpage_target"] = []string(value)
+			}
 		case *ChatExaSubpageTargetStrings:
 			if *value == nil {
 				contents["subpage_target"] = []string{}

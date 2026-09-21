@@ -512,6 +512,7 @@ func TestCreateChatCompletionDoesNotLeakAcrossSurfaces(t *testing.T) {
 
 func TestChatGatewaySearchMinimumExactJSON(t *testing.T) {
 	var nilSubpageTargets ChatExaSubpageTargetStrings
+	const nilSubpageTargetsJSON = `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"contents":{"subpage_target":[]},"query":"q"},"type":"vercel:exa_search"}]}`
 	tests := []struct {
 		name string
 		tool ChatServerTool
@@ -522,7 +523,8 @@ func TestChatGatewaySearchMinimumExactJSON(t *testing.T) {
 		{"perplexity string", ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString("q")}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":"q"},"type":"vercel:perplexity_search"}]}`},
 		{"perplexity strings", ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryStrings{"q1", "q2"}}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":["q1","q2"]},"type":"vercel:perplexity_search"}]}`},
 		{"tako", ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q"}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":"q"},"type":"vercel:tako_search"}]}`},
-		{"exa nil subpage target slice pointer", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: &nilSubpageTargets}}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"contents":{"subpage_target":[]},"query":"q"},"type":"vercel:exa_search"}]}`},
+		{"exa nil subpage target slice value", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: nilSubpageTargets}}}, nilSubpageTargetsJSON},
+		{"exa nil subpage target slice pointer", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: &nilSubpageTargets}}}, nilSubpageTargetsJSON},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -901,7 +903,7 @@ func TestChatGatewaySearchInvalidBeforeCredentialOrDispatch(t *testing.T) {
 	cases := []ChatServerToolsRequest{
 		{Request: validChatRequest(), ServerTools: []ChatServerTool{nil}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{nilTool}},
 		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Type: &badExaType}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Category: &badCategory}}}},
-		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: nilText}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Highlights: nilHighlights}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: nilTarget}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: ChatExaTextOptions{Verbosity: &badVerbosity}}}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: nilText}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Highlights: nilHighlights}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: nilTarget}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: &ChatExaTextOptions{Verbosity: &badVerbosity}}}}}},
 		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: invalidChatExaText{}}}}}},
 		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Highlights: invalidChatExaHighlights{}}}}}},
 		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: invalidChatExaSubpageTarget{}}}}}},

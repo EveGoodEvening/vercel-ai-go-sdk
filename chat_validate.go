@@ -357,16 +357,19 @@ func validateChatExaSearchConfig(c ChatExaSearchConfig, path string) *Validation
 			return validationError(memberPath(contentsPath, "highlights"), "highlights type is unsupported")
 		}
 	}
-	if nilValue(c.Contents.SubpageTarget) {
-		if c.Contents.SubpageTarget != nil {
+	switch value := c.Contents.SubpageTarget.(type) {
+	case nil:
+	case ChatExaSubpageTargetString, ChatExaSubpageTargetStrings:
+	case *ChatExaSubpageTargetString:
+		if value == nil {
 			return validationError(memberPath(contentsPath, "subpage_target"), "must be a non-nil subpage target")
 		}
-	} else {
-		switch c.Contents.SubpageTarget.(type) {
-		case ChatExaSubpageTargetString, *ChatExaSubpageTargetString, ChatExaSubpageTargetStrings, *ChatExaSubpageTargetStrings:
-		default:
-			return validationError(memberPath(contentsPath, "subpage_target"), "subpage target type is unsupported")
+	case *ChatExaSubpageTargetStrings:
+		if value == nil {
+			return validationError(memberPath(contentsPath, "subpage_target"), "must be a non-nil subpage target")
 		}
+	default:
+		return validationError(memberPath(contentsPath, "subpage_target"), "subpage target type is unsupported")
 	}
 	return nil
 }
