@@ -19,15 +19,16 @@ import (
 )
 
 const (
-	xSearchOptionsEndpoint       = "https://ai-gateway.vercel.sh/v1/responses"
-	xSearchOptionsModel          = "spacexai/grok-4.6"
-	xSearchOptionsAckEnv         = "AI_GATEWAY_X_SEARCH_LIVE_COST_ACK"
-	xSearchOptionsAck            = "I_ACCEPT_LIVE_X_SEARCH_COSTS"
-	xSearchOptionsBodyMax        = 1 << 20
-	xSearchOptionsMaxCalls       = 14
-	xSearchOptionsRequestTimeout = 90 * time.Second
-	xSearchOptionsOverallTimeout = 22 * time.Minute
-	xSearchInteractionMaxCalls   = 4
+	xSearchOptionsEndpoint             = "https://ai-gateway.vercel.sh/v1/responses"
+	xSearchOptionsModel                = "spacexai/grok-4.6"
+	xSearchOptionsAckEnv               = "AI_GATEWAY_X_SEARCH_LIVE_COST_ACK"
+	xSearchOptionsAck                  = "I_ACCEPT_LIVE_X_SEARCH_COSTS"
+	xSearchOptionsBodyMax              = 1 << 20
+	xSearchOptionsMaxCalls             = 14
+	xSearchOptionsRequestTimeout       = 90 * time.Second
+	xSearchOptionsOverallTimeout       = 22 * time.Minute
+	xSearchInteractionMaxCalls         = 4
+	xSearchExcludedInteractionMaxCalls = 2
 )
 
 var xSearchGeneralAckEnvs = [...]string{"AI_GATEWAY_LIVE_COST_ACK", "AI_GATEWAY_PUBLIC_LIVE_COST_ACK"}
@@ -280,6 +281,56 @@ func TestGatewayXSearchOptionsInteractionContract(t *testing.T) {
 	}
 	if len(failures) != 0 {
 		t.Fatalf("x_search interaction contract failed in %d structurally identified case(s): %s", len(failures), strings.Join(failures, "; "))
+	}
+}
+
+func TestGatewayXSearchOptionsExcludedInteractionContract(t *testing.T) {
+	prerequisites, err := resolveXSearchOptionsPrerequisites(os.LookupEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	overallCtx, cancelOverall := context.WithTimeout(t.Context(), xSearchOptionsOverallTimeout)
+	defer cancelOverall()
+	client := newXSearchOptionsClient()
+	probeCases := []xSearchProbeCase{
+		{label: "fieldless-control", wantSuccess: true},
+		{
+			label: "excluded-with-dates-and-understanding",
+			options: map[string]any{
+				"excluded_x_handles":         []string{prerequisites.private.handleB},
+				"from_date":                  prerequisites.private.fromDate,
+				"to_date":                    prerequisites.private.toDate,
+				"enable_image_understanding": true,
+				"enable_video_understanding": true,
+			},
+			wantSuccess:   true,
+			optionClasses: []string{"boolean", "date", "handle-list"},
+		},
+	}
+	if len(probeCases) > xSearchExcludedInteractionMaxCalls {
+		t.Fatal("x_search excluded interaction probe exceeds its hard request cap")
+	}
+
+	calls := 0
+	for _, probeCase := range probeCases {
+		if calls >= xSearchExcludedInteractionMaxCalls {
+			t.Fatal("x_search excluded interaction probe reached its hard request cap")
+		}
+		requestCtx, cancelRequest := context.WithTimeout(overallCtx, xSearchOptionsRequestTimeout)
+		record, probeErr := runXSearchOptionsProbe(requestCtx, client, prerequisites, probeCase)
+		cancelRequest()
+		calls++
+		if probeErr != nil {
+			t.Fatalf("%s failed: probe execution failed", probeCase.label)
+		}
+		logXSearchProbeRecord(t, record)
+		if record.httpStatus != http.StatusOK {
+			t.Fatalf("%s failed: expected HTTP 200", probeCase.label)
+		}
+	}
+	if calls > xSearchExcludedInteractionMaxCalls {
+		t.Fatalf("x_search excluded interaction probe dispatched %d requests, hard cap is %d", calls, xSearchExcludedInteractionMaxCalls)
 	}
 }
 
