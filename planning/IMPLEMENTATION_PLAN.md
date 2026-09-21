@@ -7,7 +7,7 @@
 - `[x]` implemented, reviewed, and accepted with the listed checks
 - `[!]` blocked; the item must include the blocker, evidence, and the decision needed to unblock it
 
-Only mark a chunk complete after its code, tests, documentation changes, and acceptance checks are in the same reviewable commit. Execute locally actionable chunks in order and do not combine them. A later independently approved feature chunk may begin when every earlier chunk is either complete or locally complete with only explicitly named external release/publication gates remaining; that exception does not mark the externally blocked chunk complete, clear any gate, or authorize release/publication work. Under this rule Chunks 01–23 are complete, Chunk 24 remains externally blocked, and Chunk 25 is executable now.
+Only mark a standalone chunk complete after its code, tests, documentation changes, and acceptance checks are in the same reviewable completion boundary. An explicitly named encompassing feature item may use sequential focused commits for code subchunks, review fixes, and public documentation, but every subchunk remains incomplete until the encompassing boundary contains all required code, tests, docs, changelog/status accounting, and clean acceptance review; no committed state may be marked complete while its public documentation still says unsupported. Execute locally actionable chunks in order and do not combine unrelated work. A later independently approved feature chunk may begin when every earlier chunk is either complete, an explicitly incomplete subchunk of the same encompassing feature under the rule above, or locally complete with only explicitly named external release/publication gates remaining; those exceptions do not mark the incomplete or externally blocked chunk complete, clear any gate, or authorize release/publication work. Under this rule Chunks 01–23 and 25 are complete, Chunk 24 remains externally blocked, and the 2026-09-21 search-request continuation at the end of this plan defines the next dependency-ready sequence beginning with Chunk 26.
 
 ## Goal
 
@@ -1543,3 +1543,206 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 - [!] Optional Chat paid corroboration: outside implementation acceptance and not locally actionable; no live test, workflow, evidence file, sentinel, approved model, protected job, or owner authorization is owned by Chunk 25.
 - [!] Gateway-native xAI `x_search`: blocked before probe and implementation on a first-party Gateway request/output/event contract and observable native-success discriminator; direct-xAI schemas and model capability are insufficient, and no inferred paid probe is authorized.
 - [x] Historical Chunks 01–23 and every locally doable continuation item are complete. [!] Chunk 24 and release remain blocked, unchanged, on protected hosted CI/environment evidence, both owner-authorized paid live contracts, owner-selected license, hosted repository metadata/provenance/permissions/publication review, hosting authorization, immutable continuation tagging, direct-VCS/public-proxy/checksum evidence, and final promotion/publication. No locally doable requested implementation remains, and no release gate is marked closed.
+
+## 2026-09-21 search-request continuation — superseding current authority
+
+This section supersedes every earlier current-status statement in this plan that says Responses built-in search or Gateway-native `x_search` is wholly unimplemented, wholly unsupported, or wholly evidence-blocked. Earlier rows remain preserved history and must not be deleted or rewritten as if their evidence had existed when they closed. In particular, the historical continuation at lines 814–820, historical `x_search` stages at lines 919–923, Gate B at lines 1155–1164, Gate D at lines 1531–1535, and the corresponding completion-accounting rows are superseded for **request support only**. They remain authoritative blockers for every typed search output, citation, annotation, search-call lifecycle event, and streaming interpretation not expressly cleared below. This continuation does not reopen Chunks 01–25, alter Chunk 24's external release blockers, or broaden the SDK into direct xAI client support or generic OpenAI SDK parity.
+
+### Evidence reconciliation and exact cleared boundary
+
+- [x] **Responses `web_search` request gate is narrowly cleared.** The current first-party Vercel page <https://vercel.com/docs/ai-gateway/models-and-providers/web-search> (page front matter `last_updated: 2026-09-08`; freshly inspected 2026-09-21) now gives an exact public `POST https://ai-gateway.vercel.sh/v1/responses` example using model `openai/gpt-5.4-mini` and tool `{"type":"web_search","search_context_size":"low"}`. Because the mutable page retained its prior date while its reviewed content changed, record the canonical URL, inspection date, and exact request rather than claiming a reliable publication/change date or immutable upstream version.
+- [x] **Owner-authorized `web_search` live corroboration is positive, with one retained-artifact sanitation exception.** On 2026-09-21, a minimal authenticated Gateway probe sent only the documented tool form above. Sanitized structural result: HTTP 200; top-level `object:"response"`; response status `incomplete` under the deliberately low output-token cap; output item discriminators included `web_search_call` and `message`; no API error. The credential, Authorization value, generated prose, complete body, IDs, and raw response were not retained. However, `agent://search-evidence-1` retains the exact probe input text in `sanitized_request.body.input` for both the `web_search` and `x_search` probes. That agent report is therefore non-publishable internal orchestration evidence, not a repository evidence record. No prompt text from it may be copied, quoted, paraphrased, or otherwise transferred into repository evidence. This proves current request acceptance/execution, but it does not define a typed `web_search_call`, citation, annotation, result, error, or event contract.
+- [x] **Gateway-native `x_search` request discriminator is narrowly cleared for SpaceXAI Responses.** On 2026-09-21, an owner-authorized minimal authenticated probe sent exactly `{"type":"x_search"}` to public Gateway `/v1/responses` with `spacexai/grok-4.6` and general `tool_choice:"required"`. Sanitized structural result: HTTP 200; top-level `object:"response"`; response status `completed`; output item discriminators included a completed `x_search_call`, reasoning items, and a completed message; no API error. Subject to the retained-prompt exception above, this supersedes the former Gate D claim that no authorized Gateway discriminator probe existed and clears only the fieldless request declaration.
+- [!] **Configurable `x_search` options remain blocked.** Direct `@ai-sdk/xai@5.0.4` source and <https://docs.x.ai/developers/tools/x-search> provide candidate direct-xAI vocabulary only; they do not prove the public Gateway request contract. Do not expose `allowed_x_handles`, `excluded_x_handles`, `from_date`, `to_date`, `enable_image_understanding`, `enable_video_understanding`, or any validation, limits, mutual-exclusion rule, date rule, null/presence behavior, or compatibility promise for them. Unblock an exact field or inseparable option family only with Gateway-specific first-party documentation/schema/source/test, or an owner-authorized sanitized Gateway probe that exercises that exact field, presence form, accepted and rejected boundary, and relevant model route. Evidence and invariants from different direct-xAI contract versions must remain separate and must never be blended into a Gateway contract.
+- [!] Direct-xAI handle limits and invariants are specifically non-authoritative for Gateway: pinned SDK source says 10 handles and does not encode mutual exclusion, while current xAI prose says 20 and forbids combining allowed and excluded lists. Neither version authorizes a Gateway limit or local invariant, and fail-closed local invention is not a substitute for Gateway evidence.
+- [!] `web_search_preview`; omission of `search_context_size`; values other than exact `"low"`; external-web-access flags; filters/domains; approximate location; search-specific tool-choice or `allowed_tools` selectors; fallback/routing promises; and current/preview coexistence remain blocked until exact first-party Gateway request evidence clears each field or behavior.
+- [!] Typed buffered outputs remain blocked. `ResponseResult.RawJSON()` remains the complete buffered output boundary. The structural live discriminators prove execution only; they do not establish complete fields, requiredness, nullability, unknown-field/variant behavior, citations, annotations, actions, source lists, refusals, provider errors, usage/cost, or retention semantics.
+- [!] Typed streaming search lifecycle remains blocked. `ResponseOutputTextDeltaEvent` and `RawResponseEvent` remain the complete streaming boundary. Do not add `response.web_search_call.*`, `response.x_search_call.*`, citation/source events, ordering rules, completion effects, or terminal/error interpretations without exact Gateway SSE evidence.
+- [!] Direct `https://api.x.ai/v1/responses` client support, direct-xAI authentication/base URLs, AI SDK provider-tool result normalization, and generic OpenAI-compatible tool parity remain out of scope.
+
+### Dependency and commit sequence
+
+The unchecked chunks below are sequential. **Chunk 26 is the first dependency-ready chunk.** Chunks 26–29, including the narrowly split 26A and 27A external-contract/audit subchunks, form one encompassing Responses search-request feature item. Every substantive chunk owns `planning/IMPLEMENTATION_PLAN.md` as its serialized writable accounting path and must commit its draft/documentation hash, exact changed-path inventory, focused verification, review-fix hashes, and clean local rereview result there before its successor starts. Each remains `[ ]` while queued and `[-]` after work begins; none is marked `[x]` until Chunk 30's final closure commit. The acyclic chain is 26 → 26A → 27 → 27A → 28 → 29 → 30. Chunk 30 consumes already-durable prerequisite records and adds only final-gate/closure accounting; it does not retroactively create any prerequisite record.
+
+### Chunk 26 — Responses `web_search` low-context request declaration
+
+**Depends on:** Chunks 15–16 and 25 `[x]`; evidence reconciliation above `[x]`. Chunk 24's external release gates may remain `[!]` under the established sequence exception.
+
+**Owned paths (exact five):** `responses.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`, `planning/IMPLEMENTATION_PLAN.md`.
+
+**Draft commit boundary:** `feat: add responses web search request`. **Serialized accounting commit boundary:** `docs: record responses web search implementation`.
+
+**Exported API decision:** preserve the exact exported field order and types of `ResponsesRequest` so external unkeyed literals remain source-compatible. Add an opt-in wrapper and distinct methods rather than adding a field to the existing struct:
+
+```go
+type ResponsesBuiltInToolsRequest struct {
+    Request ResponsesRequest
+    Tools   []ResponseBuiltInTool
+}
+
+type ResponseBuiltInTool interface{ responseBuiltInTool() }
+
+// ResponseWebSearchTool has no configurable fields. It always emits the only
+// proven Gateway form: {"type":"web_search","search_context_size":"low"}.
+type ResponseWebSearchTool struct{}
+
+func (c *Client) CreateResponseWithBuiltInTools(context.Context, ResponsesBuiltInToolsRequest) (*ResponseResult, error)
+func (c *Client) StreamResponseWithBuiltInTools(context.Context, ResponsesBuiltInToolsRequest) (*ResponseStream, error)
+```
+
+- [ ] Implement the sealed Responses-only declaration above. `ResponseWebSearchTool{}` must be the sole public web-search configuration; do not export a free string, option map, `SearchContextSize` enum, preview type, or generic built-in-tool escape hatch.
+- [ ] Encode existing function tools first and wrapper built-in tools second, each in caller order. The exact web-search JSON is `{"type":"web_search","search_context_size":"low"}`. Preserve existing omission behavior when both tool collections are empty and preserve the existing SDK-owned `stream:false`/`stream:true` distinction.
+- [ ] Reuse existing `ResponsesRequest` validation unchanged, then validate wrapper tools before credentials/network. Reject nil and typed-nil interface elements, unsupported private variants, and a combined function-plus-built-in tool count above the existing 10,000-member ceiling with canonical `ValidationError` paths. Duplicate declarations remain caller-visible and serialize in order; do not silently deduplicate.
+- [ ] Preserve existing generic Responses `tool_choice` and `allowed_tools` request behavior only as already exported; do not add a search-specific selector, name, or compatibility promise. Focused web-search examples and tests must omit both because their search-specific semantics are unproven.
+- [ ] Keep buffered and streaming output APIs byte-for-byte unchanged. Hermetic fixtures may include raw `web_search_call` JSON only to prove it remains accessible through `RawJSON`/`RawResponseEvent`; tests must not decode or assert undocumented child fields.
+- [ ] Add exact minimum JSON, mixed function+built-in ordering, duplicate ordering, buffered/stream request parity, nil/typed-nil/unsupported/combined-limit zero-dispatch failures, raw-output preservation, and unchanged legacy request tests. Compile-lock the wrapper, marker implementation, both method signatures, unchanged `ResponsesRequest` field inventory/order, and unchanged result/event APIs in the owned implementation tests; Chunk 26A owns the independent external-consumer compile lock and strict export audit.
+- [ ] Document in Go comments that the first-party public-HTTP compatibility evidence is OpenAI-provider native search and names `openai/gpt-5.4-mini`; do not hard-code a model catalog or reject future model IDs locally. State that callers must choose a compatible OpenAI model and that Gateway routing/fallback compatibility is not promised.
+
+**Implementation-time verification commands:**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -race -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test ./...
+```
+
+**Review/accounting gate:**
+
+- [ ] Independent API/wire review confirms the fixed low-context shape, source compatibility, zero undocumented knobs, validation-before-credential/network, unchanged raw output/event boundaries, and no direct-provider output inference.
+- [ ] After the clean rereview, commit to `planning/IMPLEMENTATION_PLAN.md` the draft and review-fix hashes, exact changed paths, exact focused verification results, and clean rereview result. That serialized accounting commit permits Chunk 26A to begin; Chunk 26 remains intentionally incomplete until Chunk 30 closure.
+- [ ] Rollback ownership is the wrapper, its two methods, encoder/validator branches, focused tests, Chunk 26A's external contract/audit, and the matching `web_search` portions of Chunks 28–29. These paths form the atomic `web_search` rollback group defined in Chunk 30: they are removed in one committed state only after the `x_search` group is gone, restoring the prior function-only Responses request surface and unsupported-status documentation without changing shared transport, results, or streams.
+
+### Chunk 26A — `web_search` external-consumer contract and strict audit
+
+**Depends on:** Chunk 26 implementation, focused verification, committed accounting, and clean code/API rereview are recorded while Chunk 26 remains intentionally incomplete.
+
+**Owned paths (exact three):** `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `planning/IMPLEMENTATION_PLAN.md`.
+
+**Draft commit boundary:** `test: audit responses web search exports`. **Serialized accounting commit boundary:** `docs: record responses web search audit`.
+
+- [ ] Extend the external compile contract for `ResponsesBuiltInToolsRequest`, sealed `ResponseBuiltInTool`, `ResponseWebSearchTool`, and both `CreateResponseWithBuiltInTools` and `StreamResponseWithBuiltInTools` method signatures while compile-locking the unchanged legacy request/result/event contracts.
+- [ ] Update the strict bidirectional expected-export inventory and external temporary-consumer compile exercise for the wrapper, web-search tool, and both methods. Continue rejecting missing expected declarations, unexpected exports, aliases, configurable search knobs, and inferred typed output/event APIs.
+- [ ] Run the focused external contract test and `./scripts/verify-local-consumer.sh` with all credentials and live-cost acknowledgements unset; independently review the expected/export equality and consumer exercise, then cleanly rereview every fix.
+- [ ] Before Chunk 27 starts, commit to the tracker the draft/review-fix hashes, exact changed paths, focused command results, and clean rereview result. Chunk 26A belongs to the atomic `web_search` rollback group with Chunk 26 and the surviving `web_search` claims/accounting; it is never committed as rolled back separately from that API surface.
+
+### Chunk 27 — Gateway-native SpaceXAI `x_search` request declaration
+
+**Depends on:** Chunk 26A's external contract, strict audit, verification, committed accounting, and clean rereview are recorded; Chunks 26 and 26A remain intentionally incomplete. The positive `x_search_call` discriminator evidence above is `[x]`.
+
+**Owned paths (exact five):** `responses_tools.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`, `planning/IMPLEMENTATION_PLAN.md`.
+
+**Draft commit boundary:** `feat: add gateway x search request`. **Serialized accounting commit boundary:** `docs: record gateway x search implementation`.
+
+**Exported API decision:** extend the sealed `ResponseBuiltInTool` union without changing `ResponsesBuiltInToolsRequest` or either method:
+
+```go
+type ResponseXSearchTool struct{}
+```
+
+- [ ] Extend the sealed Responses-only union with the fieldless declaration above. Encode exactly `{"type":"x_search"}` and no other member. Do not export option fields, arbitrary maps, provider options, aliases, query/result configuration, or a direct-xAI client behavior.
+- [ ] Reuse the wrapper validation established by Chunk 26. `ResponseXSearchTool{}` has no option-specific validation; only the shared nil/typed-nil/unsupported-union and combined tool-count rules apply before credentials/network. Do not import direct-xAI handle limits, mutual-exclusion rules, calendar/date-order checks, null rules, or defaults.
+- [ ] Model policy is documentation, not a closed runtime enum: identify `spacexai/grok-4.6` as the exact positively probed route. Do not claim all SpaceXAI models, fallback portability, or option compatibility, and do not reject dynamic future model IDs locally; unsupported routes may fail server-side.
+- [ ] Add exact minimum JSON, mixed function+`web_search`+fieldless `x_search` ordering, duplicate ordering, typed-nil union and combined-limit zero-dispatch cases, buffered raw `x_search_call` preservation, streaming raw event preservation, and unchanged legacy/web-search regressions. There are no all-options, option-presence, date, handle-list, or option-validation tests.
+- [ ] Compile-lock the fieldless exported type and unchanged wrapper/method/result/event contracts in owned implementation tests. Chunk 27A owns the independent external compile contract and strict consumer audit. Do not add typed `x_search_call`, posts, actions, sources, citations, lifecycle events, server-side tool results, or any configurable-option compatibility promise.
+
+**Implementation-time verification commands:**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn|XSearch)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -race -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn|XSearch)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test ./...
+```
+
+**Review/accounting gate:**
+
+- [ ] Independent evidence/API review maps the sole emitted `type:"x_search"` member to the sanitized Gateway probe, confirms `ResponseXSearchTool` is fieldless, and rejects every direct-xAI option, inferred validation rule, result/event contract, and generic extension point.
+- [ ] After the clean rereview, commit to `planning/IMPLEMENTATION_PLAN.md` the draft and review-fix hashes, exact changed paths, focused verification, and clean rereview result. That serialized record permits Chunk 27A to begin; Chunk 27 remains intentionally incomplete until Chunk 30 closure.
+- [ ] Rollback ownership is the fieldless `ResponseXSearchTool`, its encoder/validator branches, focused tests, Chunk 27A's external contract/audit, and the matching `x_search` portions of Chunks 28–29. These paths form the atomic `x_search` rollback group defined in Chunk 30; removing that group must leave Chunk 26/26A `web_search` support, audit, documentation, and accounting intact.
+
+### Chunk 27A — `x_search` external-consumer contract and strict audit
+
+**Depends on:** Chunk 27 implementation, focused verification, committed accounting, and clean evidence/API rereview are recorded while earlier chunks remain intentionally incomplete.
+
+**Owned paths (exact three):** `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `planning/IMPLEMENTATION_PLAN.md`.
+
+**Draft commit boundary:** `test: audit gateway x search exports`. **Serialized accounting commit boundary:** `docs: record gateway x search audit`.
+
+- [ ] Extend the external compile contract and strict expected-export inventory for fieldless `ResponseXSearchTool` while retaining the wrapper, `ResponseWebSearchTool`, and both built-in-tool methods added by 26A.
+- [ ] Extend the temporary external-consumer compile exercise to construct both tool types in the wrapper and invoke both methods. Preserve bidirectional expected/export equality and reject configurable x-search fields, generic escape hatches, aliases, and typed search output/event APIs.
+- [ ] Run the focused external contract test and `./scripts/verify-local-consumer.sh` with all credentials and live-cost acknowledgements unset; independently review the complete wrapper/two-method/two-tool inventory and compile exercise, then cleanly rereview every fix.
+- [ ] Before Chunk 28 starts, commit to the tracker the draft/review-fix hashes, exact changed paths, focused command results, and clean rereview result. Chunk 27A belongs to the atomic `x_search` rollback group with Chunk 27 and the matching `x_search` claims/accounting; rollback restores the 26A web-search-only audit in the same commit that removes the fieldless API.
+
+### Chunk 28 — Public search request documentation and evidence record
+
+**Depends on:** Chunks 26, 26A, 27, and 27A have committed their implementation/audit hashes, exact changed paths, verification, and clean rereviews to the tracker; all remain intentionally incomplete pending closure.
+
+**Owned paths (exact five):** `docs/generation.md`, `docs/x-search.md`, `README.md`, `CHANGELOG.md`, `planning/IMPLEMENTATION_PLAN.md`.
+
+**Documentation commit boundary:** `docs: document responses search requests`. **Serialized accounting commit boundary:** `docs: record responses search documentation`.
+
+- [ ] Add buffered and streaming contract examples for `ResponseWebSearchTool{}` and fieldless `ResponseXSearchTool{}`, showing the opt-in wrapper, existing function-tool coexistence, fixed web-search low context, exact x-search `{"type":"x_search"}` serialization, and raw result/event inspection without printing response prose.
+- [ ] Add a model-compatibility table: exact documented `web_search` route `openai/gpt-5.4-mini`; exact positively probed fieldless `x_search` route `spacexai/grok-4.6`; dynamic catalog/no universal-support claim; no Gateway fallback, configurable-x-search-option, or direct xAI client promise.
+- [ ] Replace every stale blanket support statement in these four owned documents with the precise request-only boundary: the two exact request declarations are supported; configurable `x_search` options and typed search calls/results/actions/posts/sources/citations/annotations/refusals/errors/usage/cost and lifecycle events remain blocked; `web_search_preview`, other current/preview forms, and undocumented request options remain blocked.
+- [ ] Add a changelog entry describing additive request-only support and the source-compatible wrapper; explicitly state that existing `ResponsesRequest`, `CreateResponse`, `StreamResponse`, `ResponseResult`, and `ResponseEvent` contracts are unchanged. All implementation, audit, documentation, and accounting chunks remain intentionally incomplete after these claims land; Chunk 30 owns final split verification and the tracker-only commit that marks Chunks 26, 26A, 27, 27A, 28, and 29 `[x]` together.
+- [ ] Perform a sanitation review of every retained probe artifact before writing durable evidence. Treat `agent://search-evidence-1` as non-publishable internal orchestration evidence because it retains both exact prompt inputs; never copy, quote, paraphrase, or claim non-retention of those prompts. Retain in `docs/x-search.md` only endpoint, tested model, request tool shape/discriminator and actually exercised options, HTTP status, top-level object/status, output discriminator/status sets, and source URLs. Never retain credentials, Authorization values, prompt text, generated prose, full bodies, headers, IDs, or raw payloads. Future reruns require explicit owner authorization and append a dated structural record rather than overwrite history.
+
+**Documentation-time verification commands:**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test ./examples/...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK ./scripts/verify-local-consumer.sh
+```
+
+**Review/accounting gate:**
+
+- [ ] Independent public-documentation/security review verifies every support statement against the exact Chunks 26–27 request shapes, every configurable-option and typed-output/event blocker remains explicit, examples do not print sensitive/raw generated content, and the retained repository evidence contains only the allowed structural fields and no text derived from the retained prompts. It must also confirm no file implies direct-xAI support or support for preview/other web-search forms.
+- [ ] After the clean documentation/security rereview, commit to the tracker the documentation and review-fix hashes, exact changed paths, exact verification results, and clean rereview result before Chunk 29 begins. Chunk 28 remains intentionally incomplete until Chunk 30 closure. On rollback, split its claims by surviving surface inside the atomic groups defined in Chunk 30: removing `x_search` must retain truthful `web_search` documentation, and removing `web_search` must restore the pre-continuation unsupported status. Documentation is never committed ahead of or behind its corresponding API/audit state.
+
+### Chunk 29 — Package, live-evidence, release, and maintainer accounting
+
+**Depends on:** Chunk 28's public boundary, sanitation work, verification, hashes, exact changed paths, and clean local rereview are durably recorded in the tracker; all predecessors remain intentionally incomplete.
+
+**Owned paths (exact five):** `doc.go`, `docs/evaluation-live-evidence.md`, `docs/releasing.md`, `AGENTS.md`, `planning/IMPLEMENTATION_PLAN.md`.
+
+**Documentation commit boundary:** `docs: reconcile search support gates`. **Serialized accounting commit boundary:** `docs: record search support reconciliation`.
+
+- [ ] Narrow every current blanket unsupported-search statement in `doc.go`, `docs/evaluation-live-evidence.md`, and `docs/releasing.md` to request-only support for exact `{"type":"web_search","search_context_size":"low"}` and fieldless `{"type":"x_search"}` declarations. Preserve explicit blockers for configurable `x_search` options, `web_search_preview` and all other undocumented web-search forms/options, typed buffered outputs, typed stream events/lifecycle, citations/annotations, wider model compatibility, and direct-xAI support.
+- [ ] Keep live-evidence accounting truthful: the dated structural probes corroborate only the two exact request declarations and observed raw discriminators; they do not satisfy typed output/event contracts, configurable-option evidence, optional Chat live corroboration, provider-evaluation live evidence, or any other owner-authorized paid-live gate. Preserve the sanitation exception for the non-publishable internal artifact without reproducing its prompts.
+- [ ] Keep release accounting truthful: request-only support does not clear Chunk 24 or release gates for protected hosted CI/environment evidence, owner-authorized paid generation and provider-evaluation contracts, owner-selected license, hosted metadata/provenance/permissions/publication review, hosting authorization, immutable tagging, direct-VCS/public-proxy/checksum evidence, or final promotion/publication. Do not relabel those gates complete or make request support a release substitute.
+- [ ] Add an `AGENTS.md` lesson requiring field-by-field Gateway evidence, fixed types for single proven values, separate direct-provider provenance from Gateway acceptance evidence, raw preservation rather than inferred typed output, and no credential, prompt, generated-prose, or raw-payload retention in repository evidence.
+- [ ] Reconcile package-scope, live-evidence, release, and maintainer wording against Chunk 28 so no current repository statement still says the two request declarations are wholly unsupported and no statement broadens support beyond their exact wire shapes.
+
+**Documentation-time verification commands:**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go doc -all .
+```
+
+**Review/accounting gate:**
+
+- [ ] Independent documentation/release review checks the four documentation/maintainer paths plus their `planning/IMPLEMENTATION_PLAN.md` accounting record against Chunks 26–28, confirms the request-only claims and every remaining evidence/live/release blocker are concrete and non-contradictory, and confirms no prompt-derived text or inferred output schema was introduced.
+- [ ] After the clean documentation/release rereview, commit to the tracker the documentation and review-fix hashes, exact changed paths, exact verification results, and clean rereview result. That durable record permits Chunk 30 to begin; Chunk 29 remains intentionally incomplete until closure. On rollback, its surface-specific status claims and shared evidence/release/accounting text travel with the atomic group for the surviving API state; shared text must describe exactly the surfaces that remain after each committed rollback.
+
+### Chunk 30 — Search continuation final verification and split review
+
+**Depends on:** Chunks 26, 26A, 27, 27A, 28, and 29 have landed all owned work and already committed their complete hash chains, exact changed-path inventories, focused verification, and clean local rereview results to `planning/IMPLEMENTATION_PLAN.md`; all remain intentionally incomplete. The strict external-consumer audit already recognizes the wrapper, both methods, and both tool types before this final gate first invokes it.
+
+**Owned closure path and read-only review partitions:** `planning/IMPLEMENTATION_PLAN.md` is Chunk 30's only writable path. The final review is split into four read-only content-review tasks, each with 3–5 exact paths and a distinct lens: (1) **API/encoding/validation/tests** — `responses.go`, `responses_tools.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`; (2) **external contract/audit** — `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `planning/IMPLEMENTATION_PLAN.md`; (3) **public docs/evidence sanitation** — `docs/generation.md`, `docs/x-search.md`, `README.md`, `CHANGELOG.md`; (4) **package/release/status/accounting** — `doc.go`, `docs/evaluation-live-evidence.md`, `docs/releasing.md`, `AGENTS.md`. These partitions collectively cover every owned path from Chunks 26, 26A, 27, 27A, 28, and 29; all paths except the tracker are read-only in Chunk 30. Chunk 30 never edits implementation, audit, or public documentation.
+
+**Final tracker-only commit boundary:** `docs: close responses search continuation`. It records only the final gate/review results and closure statuses; prior accounting is not deferred into this commit.
+
+- [ ] Run the initial complete gate set: focused tests for both tools, full ordinary tests, full race tests, vet, examples, `go doc`, external-consumer verification, workspace diagnostics, and `git diff --check`, with all credentials and live-cost acknowledgements unset. Do not rerun paid probes as a release check; the dated sanitized records above are evidence, not an ordinary test dependency.
+- [ ] After the initial complete gate passes, conduct all four final content-review tasks against their exact path lists and stated lenses. Partition 1 checks exported API/source compatibility, exact request encoding, validation/resource limits, zero-dispatch failures, raw buffered/stream preservation, unchanged legacy behavior, and focused test sufficiency. Partition 2 checks the independent compile contract, wrapper/two-method/two-tool exercise, strict bidirectional expected-export equality, and the tracker's complete hash/path/verification/rereview accounting. Partition 3 checks every public support statement, example, changelog claim, model-compatibility boundary, retained structural evidence field, and sanitation prohibition. Partition 4 checks package wording, live-evidence limits, release blockers, maintainer guidance, and status/accounting consistency without treating inventory metadata as content review.
+- [ ] Reconcile the four partition reports against the exact changed-path inventories already recorded for Chunks 26, 26A, 27, 27A, 28, and 29. Closure requires a one-to-one coverage record showing that every recorded changed path appears in at least one exact partition and received substantive content review; inventory/hash/status metadata alone never counts as review, and any recorded path outside the declared ownership sets blocks closure until its owning chunk corrects the inventory or the partitioning is explicitly updated within the 3–5-path limit. Cross-check implementation claims against both documentation partitions, external exports against the API partition, and tracker statuses/evidence against all three other reports so contradictions cannot pass as four independently clean results.
+- [ ] Route every final-review finding to exactly one owning chunk by substance, not merely by a shared path. Wrapper, built-in-tool-union, method, encoding/validation, raw-preservation, and implementation-test defects in the `web_search` baseline belong to Chunk 26; `web_search` external compile-contract, expected-export, and consumer-audit defects belong to 26A. Additions or regressions specific to the later `x_search` delta belong to Chunk 27, and its external contract/audit additions belong to 27A. A truly cross-tool defect in a shared implementation or audit path belongs to the earliest chunk that introduced the faulty shared abstraction—26 or 26A—even if the final review first observes it through `x_search`; route it to 27 or 27A only when the defect exists solely in that later delta. Findings in public documentation/evidence sanitation belong to 28, and package/live-evidence/release/maintainer wording belongs to 29. For `planning/IMPLEMENTATION_PLAN.md`, a missing or incorrect prerequisite hash, changed-path inventory, verification result, review-fix chain, rereview result, or other substantive-chunk accounting belongs to the chunk whose work the record describes; only Chunk-30-specific gate commands, partition/coverage reconciliation, final-review routing, closure status, or final closure record belongs to Chunk 30. A mixed finding that spans more than one of these rules must be split into separate fixes and narrow Conventional Commits under each owning chunk, with each originating tracker record corrected independently; it must never be assigned wholesale to the latest chunk or to Chunk 30. After each fix, every affected review partition and each touched cross-partition comparison must rereview clean. Final verification resumes only after all fixes and prerequisite accounting corrections are committed, then the entire complete gate set reruns once against the final combined chain. Only that post-fix run, four clean partition reports, and clean coverage reconciliation may authorize Chunk 30's tracker-only commit to mark all six substantive/audit chunks `[x]`; if review returns no findings, the initial complete gate authorizes closure only after the same four reports and reconciliation are clean.
+- [ ] Final acceptance requires unchanged function-only callers; exact wrapper encoding for both supported tools; both built-in-tool methods and both tool types present in the strict expected-export inventory and external compile exercise; shared invalid configurations failing before credentials/network; no generic/configurable search escape hatch; unchanged raw outputs/events; concrete blockers for unsupported APIs; every substantive changed file content-reviewed in its declared partition; all eight documents matching implementation and preserving live/release gates; no path omitted by coverage reconciliation or accepted only through inventory metadata; and no credential, prompt text, generated prose, or raw payload in repository evidence. The internal orchestration report remains the explicit non-publishable exception above.
+- [ ] Rollback uses coordinated atomic groups rather than mechanically reverting whole documentation commits in reverse order. If Chunk 30's tracker-only closure commit exists, revert it first **only when inspection confirms it changes closure metadata and no API support, evidence, or status claim**; otherwise include its affected claims/accounting in the applicable group below. Next create one atomic `x_search` rollback commit that removes Chunk 27's fieldless API and focused tests, restores Chunk 27A's audit/consumer inventory to the 26A web-search-only state, and rewrites only the `x_search` portions of Chunks 28–29 plus tracker/status accounting to the blocked/absent state; all `web_search` API, audit, examples, documentation, evidence, and support claims remain intact. Then create one atomic `web_search` rollback commit that removes Chunk 26's wrapper/method/tool implementation and focused tests, removes Chunk 26A's external contract/audit entries, and restores the remaining Chunks 28–29 documentation/status/accounting to the pre-continuation unsupported state. A group may be implemented as an atomic revert set or as a single coordinated rollback commit, but no constituent revert or transitional documentation edit may be committed separately. Shared general evidence, release, sanitation, and accounting text must be rewritten in each group to describe exactly the surviving surface; it must not be deleted merely because one tool is removed. Finding-fix commits and prerequisite tracker corrections belong to the same group as their uniquely owning substantive defect: `web_search` implementation/audit findings travel with the `web_search` group, `x_search`-specific findings travel with the `x_search` group, and a mixed finding is split into separately owned changes before rollback. Tracker hashes, changed-path inventories, finding dispositions, and completion markers are corrected in the same atomic commit as their owning API/audit/docs changes. After each committed group, the strict consumer audit must equal the retained exports, and repository documentation must describe every retained API as supported at its proven boundary while making no claim that a removed API exists. No intermediate committed state may mark an implemented API unsupported, omit its support documentation, claim a removed API is present, or leave finding/tracker ownership assigned to a group that has already been removed.
+
+### Remaining evidence blockers after request support
+
+- [!] `web_search_preview` and every configurable `web_search` value/field beyond exact `search_context_size:"low"`: require an exact first-party Gateway request example/schema/source/test defining discriminator, field type, presence, enum/bounds, and compatible routing.
+- [!] Search-specific tool choice, `allowed_tools`, function/built-in precedence, and fallback behavior: require exact first-party Gateway Responses semantics; generic Responses modes alone do not prove built-in-search behavior.
+- [!] Typed `web_search_call` and `x_search_call` outputs, actions, posts, sources, citations/annotations/offsets, statuses, refusals, provider errors, usage/cost, and unknown variants: require a first-party Gateway schema/source/test or an owner-authorized retained sanitized fixture set establishing every field's discriminator, type, requiredness, nullability, cardinality, unknown-field policy, and raw-preservation rule. The two structural probes alone do not clear this gate.
+- [!] Search lifecycle SSE typing and terminal semantics: require first-party Gateway event schemas or authorized sanitized event fixtures establishing event names, payloads, ordering, deltas, completion/failure effects, and unknown-event behavior. Until then all non-text-delta events remain `RawResponseEvent`.
+- [!] Wider model/provider compatibility: require exact first-party Vercel evidence or separately authorized model-specific probes. Evidence for `openai/gpt-5.4-mini` and `spacexai/grok-4.6` must not be generalized to all OpenAI, SpaceXAI, or Gateway models.
+- [!] Configurable `x_search` fields are blocked independently from the fieldless declaration. Each exact field or inseparable option family requires Gateway-specific first-party evidence or an owner-authorized exact-field Gateway probe covering presence form, accepted/rejected boundary, and relevant route. Conflicting direct-xAI versions remain candidate vocabulary only and must not be combined into local Gateway validation.
