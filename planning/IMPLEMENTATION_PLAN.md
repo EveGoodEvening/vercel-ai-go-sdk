@@ -2184,11 +2184,13 @@ For stream provenance, the complete pinned discriminator set is nevertheless cla
 
 #### Chunk 35 — Capability-plan review and evidence freeze
 
-**Status:** `[ ]`. **Owned writable paths:** `planning/IMPLEMENTATION_PLAN.md`, `docs/evaluation-live-evidence.md`, `docs/releasing.md`. **Plan subject:** `docs: approve gateway capability expansion plan`. **Tracker subject:** `docs: record gateway capability plan accounting`.
+**Status:** `[x]`. **Owned writable paths:** `planning/IMPLEMENTATION_PLAN.md`, `docs/evaluation-live-evidence.md`, `docs/releasing.md`. **Plan subject:** `docs: approve gateway capability expansion plan`. **Tracker subject:** `docs: record gateway capability plan accounting`.
 
-Independently verify provenance, every frozen export/signature/variant/field/limit/raw representation/helper/ownership rule, every ledger mapping, blocker, rollback, command, and subject. A mismatch becomes `[!]` with exact owner decision. Planning-only review; no tests. After clean rereview, a separate post-review tracker handoff must update both durable status documents to point to “the first dependency-ready item in the authoritative Chunk 35–52 queue” rather than a numbered chunk, preserving all live/release blockers; in that same handoff it must close and account for Chunk 35 without recording its own hash, under the acyclic tracker-accounting rule. Until that handoff lands, Chunk 35 remains open and both durable status documents retain their pre-continuation committed content. Rollback removes only this continuation and, after the handoff, its two status pointers.
+Independent review and clean rereview verified the frozen provenance, exports, signatures, variants, fields, limits, raw representations, helpers, ownership rules, ledger mappings, blockers, rollback rules, commands, and subjects with no unresolved finding. The landed predecessor plan commit is exactly `f289e31e24b0304c8c6108c71478bb81b280fcde` (`docs: approve gateway capability expansion plan`) with sole changed path `planning/IMPLEMENTATION_PLAN.md`. This post-review accounting handoff updates both durable status documents to point to “the first dependency-ready item in the authoritative Chunk 35–52 queue”, preserving every external live/release blocker, and closes Chunk 35 without claiming this accounting commit's own hash. Rollback removes only this continuation and its two status pointers.
 
 #### Chunk 36 — Shared provider transport and sealed options foundation
+**Status:** `[ ]` — first dependency-ready unchecked chunk in the authoritative Chunk 35–52 queue.
+
 
 **Depends on:** 35. **Paths:** `client.go`, `headers.go`, `transport.go`, `provider_options.go`, `contract_internal_test.go`. **Subject:** `feat: add gateway modality transport foundation`. **Tracker:** `docs: record gateway modality foundation accounting`.
 
@@ -2326,4 +2328,4 @@ The final closure ledger must enumerate separately every Chunk 35–52 status an
 
 ### Planning-only status correction
 
-- [x] Chunk 34 remains complete. For this plan-approval boundary, both durable status documents retain their exact pre-continuation committed content. The separate post-review Chunk 35 tracker handoff will update them to the generic first-dependency-ready pointer and close/account Chunk 35 without recording its own hash. No production, live, hosted, license, tag, or release gate changes.
+- [x] Chunk 35 is complete and accounted after clean independent review and rereview. Its exact landed predecessor is `f289e31e24b0304c8c6108c71478bb81b280fcde` (`docs: approve gateway capability expansion plan`) with sole changed path `planning/IMPLEMENTATION_PLAN.md`; this accounting handoff does not claim its own hash. Both durable status documents now use the non-staling “first dependency-ready item in the authoritative Chunk 35–52 queue” pointer, and Chunk 36 is the first dependency-ready unchecked chunk. No production, live, hosted, license, tag, or release gate changes.
