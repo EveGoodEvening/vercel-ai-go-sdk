@@ -11,7 +11,10 @@ import (
 	"time"
 )
 
-const defaultBaseURL = "https://ai-gateway.vercel.sh/v4/ai"
+const (
+	defaultBaseURL       = "https://ai-gateway.vercel.sh/v4/ai"
+	defaultPublicBaseURL = "https://ai-gateway.vercel.sh/v1"
+)
 
 // Client is an evaluation-only Vercel AI Gateway client.
 type Client struct {
@@ -29,6 +32,7 @@ const (
 
 type clientConfig struct {
 	baseURL         string
+	publicBaseURL   string
 	httpClient      *http.Client
 	apiKey          string
 	explicitAPIKey  bool
@@ -100,8 +104,9 @@ func defaultRetryHooks() retryHooks {
 // are absent. Missing credentials and invalid options return ConfigurationError.
 func NewClient(opts ...Option) (*Client, error) {
 	config := clientConfig{
-		baseURL:    defaultBaseURL,
-		httpClient: http.DefaultClient,
+		baseURL:       defaultBaseURL,
+		publicBaseURL: defaultPublicBaseURL,
+		httpClient:    http.DefaultClient,
 		retryPolicy: RetryPolicy{
 			MaxAttempts: 1,
 		},
@@ -171,22 +176,49 @@ func WithOIDCTokenSource(source TokenSource) Option {
 // scheme, host, port, escaping, and the remaining path are preserved before
 // Evaluate appends /evaluation-model.
 func WithBaseURL(baseURL string) Option {
+	return withBaseURL("WithBaseURL", baseURL, false, func(config *clientConfig, normalized string) {
+		config.baseURL = normalized
+	})
+}
+
+// WithPublicBaseURL sets the base URL for public Gateway APIs. It rejects the
+// same invalid URLs as WithBaseURL plus any literal fragment delimiter, while
+// preserving escaped path data. It does not affect the provider-protocol URL.
+func WithPublicBaseURL(baseURL string) Option {
+	return withBaseURL("WithPublicBaseURL", baseURL, true, func(config *clientConfig, normalized string) {
+		config.publicBaseURL = normalized
+	})
+}
+
+func withBaseURL(option, baseURL string, rejectFragmentDelimiter bool, set func(*clientConfig, string)) Option {
 	return func(config *clientConfig) error {
 		if blank(baseURL) || baseURL != strings.TrimSpace(baseURL) {
-			return newConfigurationError("WithBaseURL", "must not be empty or whitespace")
+			return newConfigurationError(option, "must not be empty or whitespace")
 		}
 		parsed, err := url.Parse(baseURL)
 		if err != nil || !parsed.IsAbs() || parsed.Opaque != "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-			return newConfigurationError("WithBaseURL", "must be an absolute http or https URL")
+			return newConfigurationError(option, "must be an absolute http or https URL")
 		}
-		if parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
-			return newConfigurationError("WithBaseURL", "must not contain userinfo, query, or fragment")
+		if parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || (rejectFragmentDelimiter && strings.Contains(baseURL, "#")) {
+			return newConfigurationError(option, "must not contain userinfo, query, or fragment")
 		}
 		parsed.Path = strings.TrimRight(parsed.Path, "/")
 		parsed.RawPath = strings.TrimRight(parsed.RawPath, "/")
-		config.baseURL = parsed.String()
+		set(config, parsed.String())
 		return nil
 	}
+}
+
+func (config *clientConfig) providerEndpoint(path string) string {
+	return appendEndpoint(config.baseURL, path)
+}
+
+func (config *clientConfig) publicEndpoint(path string) string {
+	return appendEndpoint(config.publicBaseURL, path)
+}
+
+func appendEndpoint(baseURL, path string) string {
+	return baseURL + path
 }
 
 // WithHTTPClient rejects nil and stores the supplied pointer without cloning or

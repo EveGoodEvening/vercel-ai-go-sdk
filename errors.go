@@ -6,7 +6,7 @@ import (
 )
 
 // ConfigurationError reports client construction failure. Option is one of
-// WithBaseURL, WithHTTPClient, WithAPIKey, WithOIDCToken,
+// WithBaseURL, WithPublicBaseURL, WithHTTPClient, WithAPIKey, WithOIDCToken,
 // WithOIDCTokenSource, WithTeam, WithHeaders, WithRetryPolicy, or credentials;
 // Reason is a stable closed value documented by Option. A nil receiver's
 // accessors return empty strings and Error returns "gateway configuration error".

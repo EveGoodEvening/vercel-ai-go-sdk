@@ -35,16 +35,25 @@ func containsProtectedHeader(headers http.Header) bool {
 }
 
 func (config *clientConfig) buildHeaders(authorization, authMethod, modelID string) http.Header {
+	headers := config.buildOwnedHeaders(authorization)
+	headers.Set(headerGatewayProtocolVersion, gatewayProtocolVersion)
+	headers.Set(headerGatewayAuthMethod, authMethod)
+	headers.Set(headerEvaluationModelSpecificationVersion, evaluationModelSpecificationVersion)
+	headers.Set(headerModelID, modelID)
+	return headers
+}
+
+func (config *clientConfig) buildPublicHeaders(authorization string) http.Header {
+	return config.buildOwnedHeaders(authorization)
+}
+
+func (config *clientConfig) buildOwnedHeaders(authorization string) http.Header {
 	headers := config.headers.Clone()
 	if headers == nil {
 		headers = make(http.Header, len(protectedHeaderNames))
 	}
 	headers.Set(headerAuthorization, authorization)
 	headers.Set(headerContentType, "application/json")
-	headers.Set(headerGatewayProtocolVersion, gatewayProtocolVersion)
-	headers.Set(headerGatewayAuthMethod, authMethod)
-	headers.Set(headerEvaluationModelSpecificationVersion, evaluationModelSpecificationVersion)
-	headers.Set(headerModelID, modelID)
 	if config.team != "" {
 		headers.Set(headerTeam, config.team)
 	}

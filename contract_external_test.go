@@ -22,6 +22,7 @@ func compilePublicContract() {
 	var _ func(string) gateway.Option = gateway.WithOIDCToken
 	var _ func(gateway.TokenSource) gateway.Option = gateway.WithOIDCTokenSource
 	var _ func(string) gateway.Option = gateway.WithBaseURL
+	var _ func(string) gateway.Option = gateway.WithPublicBaseURL
 	var _ func(*http.Client) gateway.Option = gateway.WithHTTPClient
 	var _ func(string) gateway.Option = gateway.WithTeam
 	var _ func(http.Header) gateway.Option = gateway.WithHeaders
