@@ -214,6 +214,37 @@ func TestEmbeddingMetadataBoundsAndArbitraryNestedAcceptance(t *testing.T) {
 	requireEmbeddingFailure(t, `{"embeddings":[[1]],"providerMetadata":{"p":`+deep+`}}`, 1, `$["providerMetadata"]["p"]`+strings.Repeat(`["x"]`, 62), "maximum depth is 64")
 }
 
+func metadataObjectJSON(n int) string {
+	var b strings.Builder
+	b.WriteByte('{')
+	for i := range n {
+		if i != 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(strconv.Quote(strconv.Itoa(i)))
+		b.WriteString(`:null`)
+	}
+	b.WriteByte('}')
+	return b.String()
+}
+
+func TestEmbeddingMetadataCollectionBounds(t *testing.T) {
+	object := metadataObjectJSON(maxCollectionItems)
+	array := vectorJSON(maxCollectionItems)
+	providerRaw := `{"nestedObject":` + object + `,"nestedArray":` + array + `}`
+	body := `{"embeddings":[[1]],"providerMetadata":{"p":` + providerRaw + `}}`
+	r, err := decodeEmbeddingResult("p/m", 1, rawProviderResponse{body: []byte(body)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(r.ProviderMetadata["p"]); got != providerRaw {
+		t.Fatalf("provider metadata raw value changed: got %.80q want %.80q", got, providerRaw)
+	}
+
+	requireEmbeddingFailure(t, `{"embeddings":[[1]],"providerMetadata":{"p":{"nestedObject":`+metadataObjectJSON(maxCollectionItems+1)+`}}}`, 1, `$["providerMetadata"]["p"]["nestedObject"]`, "object exceeds 4096 members")
+	requireEmbeddingFailure(t, `{"embeddings":[[1]],"providerMetadata":{"p":{"nestedArray":`+vectorJSON(maxCollectionItems+1)+`}}}`, 1, `$["providerMetadata"]["p"]["nestedArray"]`, "array exceeds 4096 members")
+}
+
 func vectorJSON(n int) string {
 	if n == 0 {
 		return "[]"

@@ -231,7 +231,7 @@ func sortedRawKeys(m map[string]json.RawMessage) []string {
 func validateEmbeddingJSON(body []byte) *embeddingFailure {
 	d := json.NewDecoder(bytes.NewReader(body))
 	d.UseNumber()
-	if f := scanEmbeddingValue(d, "$", 1); f != nil {
+	if f := scanEmbeddingValue(d, "$", 1, false, false); f != nil {
 		return f
 	}
 	if _, err := d.Token(); err == nil {
@@ -241,7 +241,7 @@ func validateEmbeddingJSON(body []byte) *embeddingFailure {
 	}
 	return nil
 }
-func scanEmbeddingValue(d *json.Decoder, path string, depth int) *embeddingFailure {
+func scanEmbeddingValue(d *json.Decoder, path string, depth int, limitCollection, metadataRoot bool) *embeddingFailure {
 	if depth > maxJSONDepth {
 		return &embeddingFailure{path, "maximum depth is 64", nil}
 	}
@@ -261,8 +261,14 @@ func scanEmbeddingValue(d *json.Decoder, path string, depth int) *embeddingFailu
 		seen := map[string]bool{}
 		count := 0
 		for d.More() {
-			if count >= 10000 {
-				return &embeddingFailure{path, "object exceeds 10000 members", nil}
+			limit := 10000
+			reason := "object exceeds 10000 members"
+			if limitCollection {
+				limit = maxCollectionItems
+				reason = "object exceeds 4096 members"
+			}
+			if count >= limit {
+				return &embeddingFailure{path, reason, nil}
 			}
 			kt, e := d.Token()
 			if e != nil {
@@ -281,7 +287,9 @@ func scanEmbeddingValue(d *json.Decoder, path string, depth int) *embeddingFailu
 			}
 			seen[k] = true
 			count++
-			if f := scanEmbeddingValue(d, p, depth+1); f != nil {
+			childMetadataRoot := !limitCollection && !metadataRoot && path == "$" && k == "providerMetadata"
+			childLimitCollection := limitCollection || metadataRoot
+			if f := scanEmbeddingValue(d, p, depth+1, childLimitCollection, childMetadataRoot); f != nil {
 				return f
 			}
 		}
@@ -290,7 +298,10 @@ func scanEmbeddingValue(d *json.Decoder, path string, depth int) *embeddingFailu
 		}
 	case '[':
 		for i := 0; d.More(); i++ {
-			if f := scanEmbeddingValue(d, indexPath(path, i), depth+1); f != nil {
+			if limitCollection && i >= maxCollectionItems {
+				return &embeddingFailure{path, "array exceeds 4096 members", nil}
+			}
+			if f := scanEmbeddingValue(d, indexPath(path, i), depth+1, limitCollection, false); f != nil {
 				return f
 			}
 		}
