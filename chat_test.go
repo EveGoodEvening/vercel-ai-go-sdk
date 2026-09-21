@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"math"
@@ -18,6 +19,22 @@ import (
 func validChatRequest() ChatCompletionRequest {
 	return ChatCompletionRequest{Model: "provider/model", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("hello")}}}
 }
+
+type invalidChatExaText struct{}
+
+func (invalidChatExaText) chatExaText() {}
+
+type invalidChatExaHighlights struct{}
+
+func (invalidChatExaHighlights) chatExaHighlights() {}
+
+type invalidChatExaSubpageTarget struct{}
+
+func (invalidChatExaSubpageTarget) chatExaSubpageTarget() {}
+
+type invalidChatPerplexityQuery struct{}
+
+func (invalidChatPerplexityQuery) chatPerplexityQuery() {}
 
 func TestChatRequestExactJSONAndInventory(t *testing.T) {
 	description, safety, sort, schemaName := "weather tool", "user-123", "cost", "legacy"
@@ -160,7 +177,7 @@ func TestCreateChatCompletionValidationBeforeCredentialAndNetwork(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	invalid := []ChatCompletionRequest{{}, {Model: "p/m"}, {Model: "p/m", Messages: []ChatMessage{{Role: "bad", Content: ChatTextContent("x")}}}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: nil}}}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, Temperature: new(math.NaN())}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, TopP: new(1.01)}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, FrequencyPenalty: new(-2.01)}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, ToolChoice: ChatToolChoiceMode("required")}}
+	invalid := []ChatCompletionRequest{{}, {Model: "p/m"}, {Model: "p/m", Messages: []ChatMessage{{Role: "bad", Content: ChatTextContent("x")}}}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: nil}}}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, Temperature: new(math.NaN())}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, TopP: new(1.01)}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, FrequencyPenalty: new(-2.01)}, {Model: "p/m", Messages: []ChatMessage{{Role: "user", Content: ChatTextContent("x")}}, ToolChoice: ChatToolChoiceMode("invalid")}}
 	for i, r := range invalid {
 		_, err := client.CreateChatCompletion(context.Background(), r)
 		var validation *ValidationError
@@ -490,5 +507,381 @@ func TestCreateChatCompletionDoesNotLeakAcrossSurfaces(t *testing.T) {
 	}
 	if got := provider.Requests()[0].URL; got != "/v4/ai/evaluation-model" {
 		t.Fatalf("provider URL=%q", got)
+	}
+}
+
+func TestChatGatewaySearchMinimumExactJSON(t *testing.T) {
+	tests := []struct {
+		name string
+		tool ChatServerTool
+		want string
+	}{
+		{"exa", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q"}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":"q"},"type":"vercel:exa_search"}]}`},
+		{"parallel", ChatParallelSearchTool{Config: ChatParallelSearchConfig{Objective: "o"}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"objective":"o"},"type":"vercel:parallel_search"}]}`},
+		{"perplexity string", ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString("q")}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":"q"},"type":"vercel:perplexity_search"}]}`},
+		{"perplexity strings", ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryStrings{"q1", "q2"}}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":["q1","q2"]},"type":"vercel:perplexity_search"}]}`},
+		{"tako", ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q"}}, `{"messages":[{"content":"hello","role":"user"}],"model":"provider/model","stream":false,"tools":[{"config":{"query":"q"},"type":"vercel:tako_search"}]}`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var bodies [][]byte
+			bufferedRaw := []byte(` {"choices":[],"gatewayToolCalls":{"opaque":true}} `)
+			streamRaw := []byte(`{"object":"chat.completion.chunk","choices":[],"gatewayToolCalls":{"opaque":true}}`)
+			client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				body, _ := io.ReadAll(request.Body)
+				bodies = append(bodies, body)
+				if request.Header.Get("Accept") == "text/event-stream" {
+					payload := "data: " + string(streamRaw) + "\n\ndata: [DONE]\n\n"
+					return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(payload)), Request: request}, nil
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(bufferedRaw)), Request: request}, nil
+			})}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: validChatRequest(), ServerTools: []ChatServerTool{test.tool}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(bodies[0]) != test.want {
+				t.Fatalf("body\n got: %s\nwant: %s", bodies[0], test.want)
+			}
+			if !bytes.Equal(result.RawJSON(), bufferedRaw) {
+				t.Fatalf("buffered raw=%q", result.RawJSON())
+			}
+			stream, err := client.StreamChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: validChatRequest(), ServerTools: []ChatServerTool{test.tool}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stream.Close()
+			if !stream.Next() || !bytes.Equal(stream.Event().RawJSON(), streamRaw) {
+				t.Fatalf("stream raw=%q err=%v", stream.Event().RawJSON(), stream.Err())
+			}
+			if stream.Next() || stream.Err() != nil {
+				t.Fatalf("stream terminal err=%v", stream.Err())
+			}
+			if !bytes.Contains(bodies[1], []byte(`"stream":true`)) {
+				t.Fatalf("stream body=%s", bodies[1])
+			}
+		})
+	}
+}
+
+func TestChatGatewaySearchAllOptionsAndPresence(t *testing.T) {
+	zero, falseValue, trueValue, emptyString := 0, false, true, ""
+	emptyStrings := []string(nil)
+	emptySections := []ChatExaSection(nil)
+	exaType, category, verbosity := ChatExaSearchInstant, ChatExaCategoryFinancialReport, ChatExaVerbosityFull
+	parallelMode, recency := ChatParallelModeAgentic, ChatPerplexityRecencyYear
+	effort, dataMode, format, webCategory := ChatTakoEffortInstant, ChatTakoDataModeURL, ChatTakoContentFormatJSONRecords, ChatTakoWebCategorySports
+	request := ChatServerToolsRequest{Request: validChatRequest(), ServerTools: []ChatServerTool{
+		ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "exa", Type: &exaType, NumResults: &zero, Category: &category, UserLocation: &emptyString, IncludeDomains: &emptyStrings, ExcludeDomains: &[]string{}, StartPublishedDate: &emptyString, EndPublishedDate: &emptyString, Contents: &ChatExaContents{Text: ChatExaTextOptions{MaxCharacters: &zero, IncludeHTMLTags: &falseValue, Verbosity: &verbosity, IncludeSections: &emptySections, ExcludeSections: &[]ChatExaSection{}}, Highlights: ChatExaHighlightsOptions{Query: &emptyString, MaxCharacters: &zero}, MaxAgeHours: &zero, LivecrawlTimeout: &zero, Subpages: &zero, SubpageTarget: ChatExaSubpageTargetStrings{}, Extras: &ChatExaExtras{Links: &zero, ImageLinks: &zero}}}},
+		ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "unions", Contents: &ChatExaContents{Text: ChatExaTextEnabled(false), Highlights: ChatExaHighlightsEnabled(false), SubpageTarget: ChatExaSubpageTargetString("")}}},
+		ChatParallelSearchTool{Config: ChatParallelSearchConfig{Objective: "parallel", SearchQueries: &emptyStrings, Mode: &parallelMode, MaxResults: &zero, SourcePolicy: &ChatParallelSourcePolicy{IncludeDomains: &emptyStrings, ExcludeDomains: &[]string{}, AfterDate: &emptyString}, Excerpts: &ChatParallelExcerpts{MaxCharsPerResult: &zero, MaxCharsTotal: &zero}, FetchPolicy: &ChatParallelFetchPolicy{MaxAgeSeconds: &zero}}},
+		ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryStrings{"p"}, MaxResults: &zero, MaxTokensPerPage: &zero, MaxTokens: &zero, Country: &emptyString, SearchDomainFilter: &emptyStrings, SearchLanguageFilter: &[]string{}, SearchAfterDate: &emptyString, SearchBeforeDate: &emptyString, LastUpdatedAfterFilter: &emptyString, LastUpdatedBeforeFilter: &emptyString, SearchRecencyFilter: &recency}},
+		ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "tako", Effort: &effort, Sources: &ChatTakoSources{Data: &ChatTakoDataSource{Count: &zero, IncludeContents: &falseValue, Mode: &dataMode, ContentFormat: &format, MaxRows: &zero, NodeIDs: &[]string{"node"}, Strict: &trueValue}, Web: &ChatTakoWebSource{Count: &zero, IncludeContents: &falseValue, Category: &webCategory, IncludeDomains: &emptyStrings, ExcludeDomains: &[]string{}, SnippetMaxChars: &zero, Highlights: &falseValue, ArticleContentMaxChars: &zero, PublishedAfter: &emptyString, PublishedBefore: &emptyString}}, Location: &ChatTakoLocation{Latitude: 0, Longitude: 0}, CountryCode: &emptyString, Locale: &emptyString, Timezone: &emptyString, OutputSettings: &ChatTakoOutputSettings{ImageDarkMode: &falseValue, ForceRefresh: &falseValue}, IncludeRelated: &zero}},
+	}}
+	var body []byte
+	client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		body, _ = io.ReadAll(r.Body)
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"choices":[]}`)), Request: r}, nil
+	})}))
+	if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	tools := decoded["tools"].([]any)
+	if len(tools) != 5 {
+		t.Fatalf("tools=%#v", tools)
+	}
+	for i, item := range tools {
+		m := item.(map[string]any)
+		if m["config"] == nil {
+			t.Fatalf("tool %d missing config", i)
+		}
+		if _, ok := m["config"].(map[string]any); !ok {
+			t.Fatalf("tool %d config=%#v", i, m["config"])
+		}
+	}
+	encoded := string(body)
+	for _, fragment := range []string{`"num_results":0`, `"include_html_tags":false`, `"include_sections":[]`, `"text":false`, `"highlights":false`, `"search_queries":[]`, `"max_results":0`, `"search_domain_filter":[]`, `"latitude":0`, `"include_contents":false`, `"image_dark_mode":false`, `"include_related":0`} {
+		if !strings.Contains(encoded, fragment) {
+			t.Errorf("missing explicit presence %s in %s", fragment, encoded)
+		}
+	}
+	documentedExaType := ChatExaSearchAuto
+	documentedExaCategory := ChatExaCategoryCompany
+	documentedExaVerbosity := ChatExaVerbosityCompact
+	documentedParallelMode := ChatParallelModeOneShot
+	documentedPerplexityRecency := ChatPerplexityRecencyDay
+	documentedTakoEffort := ChatTakoEffortDeep
+	documentedTakoDataMode := ChatTakoDataModeInline
+	documentedTakoContentFormat := ChatTakoContentFormatCardJSON
+	documentedTakoWebCategory := ChatTakoWebCategoryFinance
+	for _, enumTool := range []ChatServerTool{
+		ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Type: &documentedExaType, Category: &documentedExaCategory, Contents: &ChatExaContents{Text: ChatExaTextOptions{Verbosity: &documentedExaVerbosity, IncludeSections: &[]ChatExaSection{ChatExaSectionHeader, ChatExaSectionNavigation, ChatExaSectionBanner, ChatExaSectionBody, ChatExaSectionSidebar, ChatExaSectionFooter, ChatExaSectionMetadata}}}}},
+		ChatParallelSearchTool{Config: ChatParallelSearchConfig{Objective: "o", Mode: &documentedParallelMode}},
+		ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString("q"), SearchRecencyFilter: &documentedPerplexityRecency}},
+		ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Effort: &documentedTakoEffort, Sources: &ChatTakoSources{Data: &ChatTakoDataSource{Mode: &documentedTakoDataMode, ContentFormat: &documentedTakoContentFormat}, Web: &ChatTakoWebSource{Category: &documentedTakoWebCategory}}}},
+	} {
+		request.ServerTools = []ChatServerTool{enumTool}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("documented enum rejected: %v", err)
+		}
+	}
+	for _, value := range []ChatExaSearchType{ChatExaSearchAuto, ChatExaSearchFast, ChatExaSearchInstant} {
+		request.ServerTools = []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Type: &value}}}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("exa type %q: %v", value, err)
+		}
+	}
+	for _, value := range []ChatExaCategory{ChatExaCategoryCompany, ChatExaCategoryPeople, ChatExaCategoryResearchPaper, ChatExaCategoryNews, ChatExaCategoryPersonalSite, ChatExaCategoryFinancialReport} {
+		request.ServerTools = []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Category: &value}}}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("exa category %q: %v", value, err)
+		}
+	}
+	for _, value := range []ChatExaVerbosity{ChatExaVerbosityCompact, ChatExaVerbosityStandard, ChatExaVerbosityFull} {
+		request.ServerTools = []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: ChatExaTextOptions{Verbosity: &value}}}}}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("exa verbosity %q: %v", value, err)
+		}
+	}
+	for _, value := range []ChatParallelMode{ChatParallelModeOneShot, ChatParallelModeAgentic} {
+		request.ServerTools = []ChatServerTool{ChatParallelSearchTool{Config: ChatParallelSearchConfig{Objective: "o", Mode: &value}}}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("parallel mode %q: %v", value, err)
+		}
+	}
+	for _, value := range []ChatPerplexityRecency{ChatPerplexityRecencyDay, ChatPerplexityRecencyWeek, ChatPerplexityRecencyMonth, ChatPerplexityRecencyYear} {
+		request.ServerTools = []ChatServerTool{ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString("q"), SearchRecencyFilter: &value}}}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("perplexity recency %q: %v", value, err)
+		}
+	}
+	for _, value := range []ChatTakoEffort{ChatTakoEffortDeep, ChatTakoEffortFast, ChatTakoEffortInstant} {
+		request.ServerTools = []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Effort: &value}}}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("tako effort %q: %v", value, err)
+		}
+	}
+	for _, value := range []ChatTakoDataMode{ChatTakoDataModeInline, ChatTakoDataModeURL} {
+		request.ServerTools = []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Sources: &ChatTakoSources{Data: &ChatTakoDataSource{Mode: &value}}}}}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("tako data mode %q: %v", value, err)
+		}
+	}
+	for _, value := range []ChatTakoContentFormat{ChatTakoContentFormatCardJSON, ChatTakoContentFormatCSV, ChatTakoContentFormatJSONCompact, ChatTakoContentFormatJSONRecords} {
+		request.ServerTools = []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Sources: &ChatTakoSources{Data: &ChatTakoDataSource{ContentFormat: &value}}}}}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("tako format %q: %v", value, err)
+		}
+	}
+	for _, value := range []ChatTakoWebCategory{ChatTakoWebCategoryFinance, ChatTakoWebCategoryNews, ChatTakoWebCategorySports} {
+		request.ServerTools = []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Sources: &ChatTakoSources{Web: &ChatTakoWebSource{Category: &value}}}}}
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err != nil {
+			t.Fatalf("tako category %q: %v", value, err)
+		}
+	}
+}
+
+func TestChatGatewaySearchOrderingChoicesOmissionAndRawCompatibility(t *testing.T) {
+	bufferedRaw := []byte(` {"choices":[],"gatewayToolCalls":[{"future":true}],"cost":{"future":1}} `)
+	var bodies [][]byte
+	responses := 0
+	client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		body, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, body)
+		responses++
+		if r.Header.Get("Accept") == "text/event-stream" {
+			raw := "data: {\"object\":\"chat.completion.chunk\",\"choices\":[],\"gatewayToolCalls\":[{\"future\":true}]}\n\ndata: [DONE]\n\n"
+			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(raw)), Request: r}, nil
+		}
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(bufferedRaw)), Request: r}, nil
+	})}))
+	description := "ordinary"
+	base := validChatRequest()
+	base.Tools = []ChatTool{{Name: "first", Description: &description, Parameters: map[string]any{"type": "object"}}, {Name: "second", Parameters: map[string]any{}}}
+	base.ToolChoice = ChatToolChoiceRequired
+	server := []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "one"}}, ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "two"}}, ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "three"}}}
+	result, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: base, ServerTools: server})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(result.RawJSON(), bufferedRaw) {
+		t.Fatalf("raw=%q", result.RawJSON())
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(bodies[0], &decoded); err != nil {
+		t.Fatal(err)
+	}
+	tools := decoded["tools"].([]any)
+	gotTypes := make([]string, len(tools))
+	for i, tool := range tools {
+		m := tool.(map[string]any)
+		gotTypes[i], _ = m["type"].(string)
+		if gotTypes[i] == "function" {
+			gotTypes[i] = m["function"].(map[string]any)["name"].(string)
+		}
+	}
+	if !reflect.DeepEqual(gotTypes, []string{"first", "second", "vercel:tako_search", "vercel:exa_search", "vercel:tako_search"}) {
+		t.Fatalf("order=%v", gotTypes)
+	}
+	stream, err := client.StreamChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatParallelSearchTool{Config: ChatParallelSearchConfig{Objective: "o"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+	if !stream.Next() || !bytes.Contains(stream.Event().RawJSON(), []byte(`"gatewayToolCalls"`)) {
+		t.Fatalf("event=%#v err=%v", stream.Event(), stream.Err())
+	}
+	if stream.Next() || stream.Err() != nil {
+		t.Fatalf("terminal err=%v", stream.Err())
+	}
+	for _, tc := range []struct {
+		name      string
+		request   ChatServerToolsRequest
+		wantTools bool
+	}{
+		{"both nil", ChatServerToolsRequest{Request: validChatRequest()}, false},
+		{"ordinary empty retained", func() ChatServerToolsRequest {
+			r := validChatRequest()
+			r.Tools = []ChatTool{}
+			return ChatServerToolsRequest{Request: r}
+		}(), true},
+		{"server only", ChatServerToolsRequest{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q"}}}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			before := len(bodies)
+			if _, err := client.CreateChatCompletionWithServerTools(context.Background(), tc.request); err != nil {
+				t.Fatal(err)
+			}
+			has := bytes.Contains(bodies[before], []byte(`"tools"`))
+			if has != tc.wantTools {
+				t.Fatalf("body=%s", bodies[before])
+			}
+		})
+	}
+	_ = responses
+}
+
+func TestChatGatewaySearchConditionalCollisionsAndChoices(t *testing.T) {
+	client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"choices":[]}`)), Request: r}, nil
+	})}))
+	identifiers := []struct {
+		short, full string
+		tool        ChatServerTool
+	}{{"exa_search", "vercel:exa_search", ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q"}}}, {"parallel_search", "vercel:parallel_search", ChatParallelSearchTool{Config: ChatParallelSearchConfig{Objective: "o"}}}, {"perplexity_search", "vercel:perplexity_search", ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString("q")}}}, {"tako_search", "vercel:tako_search", ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q"}}}}
+	for _, id := range identifiers {
+		t.Run(id.short, func(t *testing.T) {
+			ordinary := validChatRequest()
+			ordinary.Tools = []ChatTool{{Name: id.short, Parameters: map[string]any{}}}
+			ordinary.ToolChoice = ChatSpecificToolChoice{Name: id.short}
+			if _, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: ordinary}); err != nil {
+				t.Fatalf("absent server rejected: %v", err)
+			}
+			for _, choice := range []string{id.short, id.full} {
+				r := validChatRequest()
+				r.ToolChoice = ChatSpecificToolChoice{Name: choice}
+				if _, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: r, ServerTools: []ChatServerTool{id.tool}}); err == nil {
+					t.Fatalf("choice %q accepted", choice)
+				}
+			}
+			if _, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: ordinary, ServerTools: []ChatServerTool{id.tool}}); err == nil {
+				t.Fatal("collision accepted")
+			}
+			different := validChatRequest()
+			different.Tools = []ChatTool{{Name: "ordinary", Parameters: map[string]any{}}}
+			different.ToolChoice = ChatSpecificToolChoice{Name: "ordinary"}
+			if _, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: different, ServerTools: []ChatServerTool{id.tool}}); err != nil {
+				t.Fatalf("different choice rejected: %v", err)
+			}
+		})
+	}
+	for _, mode := range []ChatToolChoiceMode{ChatToolChoiceAuto, ChatToolChoiceRequired, ChatToolChoiceNone} {
+		for _, tools := range [][]ChatServerTool{nil, {ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q"}}}} {
+			r := validChatRequest()
+			r.ToolChoice = mode
+			if _, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: r, ServerTools: tools}); err != nil {
+				t.Fatalf("mode %q tools=%d: %v", mode, len(tools), err)
+			}
+		}
+	}
+}
+
+func TestChatGatewaySearchInvalidBeforeCredentialOrDispatch(t *testing.T) {
+	clearCredentialEnvironment(t)
+	source := &transportTokenSource{token: "token"}
+	calls := 0
+	client, _ := NewClient(WithOIDCTokenSource(source), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { calls++; return nil, errors.New("must not send") })}))
+	var nilTool *ChatExaSearchTool
+	var nilText *ChatExaTextOptions
+	var nilHighlights *ChatExaHighlightsOptions
+	var nilTarget *ChatExaSubpageTargetStrings
+	var nilQuery *ChatPerplexityQueryStrings
+	badExaType := ChatExaSearchType("bad")
+	badCategory := ChatExaCategory("bad")
+	badVerbosity := ChatExaVerbosity("bad")
+	badParallel := ChatParallelMode("bad")
+	badRecency := ChatPerplexityRecency("bad")
+	badEffort := ChatTakoEffort("bad")
+	badMode := ChatTakoDataMode("bad")
+	badFormat := ChatTakoContentFormat("bad")
+	badWeb := ChatTakoWebCategory("bad")
+	strict := true
+	tooLong := strings.Repeat("x", (1<<20)+1)
+	cases := []ChatServerToolsRequest{
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{nil}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{nilTool}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Type: &badExaType}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Category: &badCategory}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: nilText}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Highlights: nilHighlights}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: nilTarget}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: ChatExaTextOptions{Verbosity: &badVerbosity}}}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Text: invalidChatExaText{}}}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{Highlights: invalidChatExaHighlights{}}}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q", Contents: &ChatExaContents{SubpageTarget: invalidChatExaSubpageTarget{}}}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatParallelSearchTool{Config: ChatParallelSearchConfig{}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatParallelSearchTool{Config: ChatParallelSearchConfig{Objective: "o", Mode: &badParallel}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: nilQuery}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString("")}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryStrings{}}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString("q"), SearchRecencyFilter: &badRecency}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatExaSearchTool{Config: ChatExaSearchConfig{Query: tooLong}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatParallelSearchTool{Config: ChatParallelSearchConfig{Objective: tooLong}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: ChatPerplexityQueryString(tooLong)}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatPerplexitySearchTool{Config: ChatPerplexitySearchConfig{Query: invalidChatPerplexityQuery{}}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: tooLong}}}},
+		{Request: validChatRequest(), ServerTools: []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Effort: &badEffort}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Sources: &ChatTakoSources{Data: &ChatTakoDataSource{Mode: &badMode}}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Sources: &ChatTakoSources{Data: &ChatTakoDataSource{ContentFormat: &badFormat}}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Sources: &ChatTakoSources{Web: &ChatTakoWebSource{Category: &badWeb}}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Sources: &ChatTakoSources{Data: &ChatTakoDataSource{Strict: &strict}}}}}}, {Request: validChatRequest(), ServerTools: []ChatServerTool{ChatTakoSearchTool{Config: ChatTakoSearchConfig{Query: "q", Location: &ChatTakoLocation{Latitude: math.Inf(1)}}}}},
+	}
+	for i, request := range cases {
+		if _, err := client.CreateChatCompletionWithServerTools(context.Background(), request); err == nil {
+			t.Errorf("case %d accepted", i)
+		}
+	}
+	if _, err := client.StreamChatCompletionWithServerTools(nil, ChatServerToolsRequest{Request: validChatRequest()}); err == nil {
+		t.Error("nil context accepted")
+	}
+	if calls != 0 || source.callCount() != 0 {
+		t.Fatalf("network=%d credential=%d", calls, source.callCount())
+	}
+}
+
+func TestChatGatewaySearchCombinedToolLimit(t *testing.T) {
+	client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"choices":[]}`)), Request: r}, nil
+	})}))
+	server := make([]ChatServerTool, 9999)
+	for i := range server {
+		server[i] = ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q"}}
+	}
+	r := validChatRequest()
+	r.Tools = []ChatTool{{Name: "ordinary", Parameters: map[string]any{}}}
+	if _, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: r, ServerTools: server}); err != nil {
+		t.Fatalf("10000 tools rejected: %v", err)
+	}
+	server = append(server, ChatExaSearchTool{Config: ChatExaSearchConfig{Query: "q"}})
+	if _, err := client.CreateChatCompletionWithServerTools(context.Background(), ChatServerToolsRequest{Request: r, ServerTools: server}); err == nil {
+		t.Fatal("10001 tools accepted")
 	}
 }

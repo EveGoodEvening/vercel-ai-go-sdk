@@ -23,6 +23,8 @@ func compilePublicContract() {
 	var _ func(string) gateway.Option = gateway.WithAPIKey
 	var _ func(*gateway.Client, context.Context, gateway.ChatCompletionRequest) (*gateway.ChatCompletionResult, error) = (*gateway.Client).CreateChatCompletion
 	var _ func(*gateway.Client, context.Context, gateway.ChatCompletionRequest) (*gateway.ChatCompletionStream, error) = (*gateway.Client).StreamChatCompletion
+	var _ func(*gateway.Client, context.Context, gateway.ChatServerToolsRequest) (*gateway.ChatCompletionResult, error) = (*gateway.Client).CreateChatCompletionWithServerTools
+	var _ func(*gateway.Client, context.Context, gateway.ChatServerToolsRequest) (*gateway.ChatCompletionStream, error) = (*gateway.Client).StreamChatCompletionWithServerTools
 	var _ func(string) gateway.Option = gateway.WithOIDCToken
 	var _ func(gateway.TokenSource) gateway.Option = gateway.WithOIDCTokenSource
 	var _ func(string) gateway.Option = gateway.WithBaseURL
@@ -60,6 +62,9 @@ func compilePublicContract() {
 	frequencyPenalty := -0.1
 	presencePenalty := 0.1
 	sort := "price"
+	// Positional construction locks the complete field order and proves that adding
+	// server tools did not change ChatCompletionRequest's source contract.
+	_ = gateway.ChatCompletionRequest{"provider/model", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 	_ = gateway.ChatCompletionRequest{
 		Model: "provider/model",
 		Messages: []gateway.ChatMessage{
@@ -84,6 +89,32 @@ func compilePublicContract() {
 	_ = []gateway.ChatToolChoiceMode{gateway.ChatToolChoiceAuto, gateway.ChatToolChoiceNone}
 	_ = []gateway.ChatResponseFormatType{gateway.ChatResponseFormatText, gateway.ChatResponseFormatJSON}
 	_ = gateway.ChatLegacyJSONResponseFormat{Schema: map[string]any{"type": "object"}, Name: &description, Description: &description}
+	var _ gateway.ChatToolChoiceMode = gateway.ChatToolChoiceRequired
+	_ = [3]gateway.ChatToolChoiceMode{gateway.ChatToolChoiceAuto, gateway.ChatToolChoiceNone, gateway.ChatToolChoiceRequired}
+	if string(gateway.ChatToolChoiceRequired) != "required" {
+		panic("ChatToolChoiceRequired changed")
+	}
+	exaType, exaCategory, exaVerbosity := gateway.ChatExaSearchFast, gateway.ChatExaCategoryResearchPaper, gateway.ChatExaVerbosityStandard
+	exaSections := []gateway.ChatExaSection{gateway.ChatExaSectionHeader, gateway.ChatExaSectionNavigation, gateway.ChatExaSectionBanner, gateway.ChatExaSectionBody, gateway.ChatExaSectionSidebar, gateway.ChatExaSectionFooter, gateway.ChatExaSectionMetadata}
+	maxCharacters, includeHTML, links := 100, false, 2
+	includeDomains := []string{"example.com"}
+	_ = gateway.ChatServerToolsRequest{Request: gateway.ChatCompletionRequest{Model: "provider/model"}, ServerTools: []gateway.ChatServerTool{
+		gateway.ChatExaSearchTool{Config: gateway.ChatExaSearchConfig{Query: "query", Type: &exaType, NumResults: &maxCharacters, Category: &exaCategory, UserLocation: new("US"), IncludeDomains: &includeDomains, ExcludeDomains: &[]string{}, StartPublishedDate: new("2026-01-01"), EndPublishedDate: new("2026-09-21"), Contents: &gateway.ChatExaContents{Text: gateway.ChatExaTextEnabled(true), Highlights: gateway.ChatExaHighlightsEnabled(false), MaxAgeHours: new(0), LivecrawlTimeout: new(0), Subpages: new(0), SubpageTarget: gateway.ChatExaSubpageTargetString("docs"), Extras: &gateway.ChatExaExtras{Links: &links, ImageLinks: new(0)}}}},
+		gateway.ChatExaSearchTool{Config: gateway.ChatExaSearchConfig{Query: "query", Contents: &gateway.ChatExaContents{Text: gateway.ChatExaTextOptions{MaxCharacters: &maxCharacters, IncludeHTMLTags: &includeHTML, Verbosity: &exaVerbosity, IncludeSections: &exaSections, ExcludeSections: &[]gateway.ChatExaSection{}}, Highlights: gateway.ChatExaHighlightsOptions{Query: new("focus"), MaxCharacters: &maxCharacters}, SubpageTarget: gateway.ChatExaSubpageTargetStrings{"docs", "blog"}}}},
+		gateway.ChatParallelSearchTool{Config: gateway.ChatParallelSearchConfig{Objective: "objective", SearchQueries: &[]string{"one"}, Mode: new(gateway.ChatParallelModeAgentic), MaxResults: new(0), SourcePolicy: &gateway.ChatParallelSourcePolicy{IncludeDomains: &includeDomains, ExcludeDomains: &[]string{}, AfterDate: new("2026-01-01")}, Excerpts: &gateway.ChatParallelExcerpts{MaxCharsPerResult: new(0), MaxCharsTotal: new(0)}, FetchPolicy: &gateway.ChatParallelFetchPolicy{MaxAgeSeconds: new(0)}}},
+		gateway.ChatPerplexitySearchTool{Config: gateway.ChatPerplexitySearchConfig{Query: gateway.ChatPerplexityQueryString("query"), MaxResults: new(0), MaxTokensPerPage: new(0), MaxTokens: new(0), Country: new("US"), SearchDomainFilter: &includeDomains, SearchLanguageFilter: &[]string{}, SearchAfterDate: new("2026-01-01"), SearchBeforeDate: new("2026-09-21"), LastUpdatedAfterFilter: new("2026-01-01"), LastUpdatedBeforeFilter: new("2026-09-21"), SearchRecencyFilter: new(gateway.ChatPerplexityRecencyWeek)}},
+		gateway.ChatPerplexitySearchTool{Config: gateway.ChatPerplexitySearchConfig{Query: gateway.ChatPerplexityQueryStrings{"one", "two"}}},
+		gateway.ChatTakoSearchTool{Config: gateway.ChatTakoSearchConfig{Query: "query", Effort: new(gateway.ChatTakoEffortDeep), Sources: &gateway.ChatTakoSources{Data: &gateway.ChatTakoDataSource{Count: new(0), IncludeContents: new(false), Mode: new(gateway.ChatTakoDataModeInline), ContentFormat: new(gateway.ChatTakoContentFormatJSONCompact), MaxRows: new(0), NodeIDs: &[]string{"node"}, Strict: new(true)}, Web: &gateway.ChatTakoWebSource{Count: new(0), IncludeContents: new(false), Category: new(gateway.ChatTakoWebCategoryNews), IncludeDomains: &includeDomains, ExcludeDomains: &[]string{}, SnippetMaxChars: new(0), Highlights: new(false), ArticleContentMaxChars: new(0), PublishedAfter: new("2026-01-01"), PublishedBefore: new("2026-09-21")}}, Location: &gateway.ChatTakoLocation{Latitude: 1, Longitude: 2}, CountryCode: new("US"), Locale: new("en"), Timezone: new("UTC"), OutputSettings: &gateway.ChatTakoOutputSettings{ImageDarkMode: new(false), ForceRefresh: new(false)}, IncludeRelated: new(0)}},
+	}}
+	_ = []gateway.ChatExaSearchType{gateway.ChatExaSearchAuto, gateway.ChatExaSearchFast, gateway.ChatExaSearchInstant}
+	_ = []gateway.ChatExaCategory{gateway.ChatExaCategoryCompany, gateway.ChatExaCategoryPeople, gateway.ChatExaCategoryResearchPaper, gateway.ChatExaCategoryNews, gateway.ChatExaCategoryPersonalSite, gateway.ChatExaCategoryFinancialReport}
+	_ = []gateway.ChatExaVerbosity{gateway.ChatExaVerbosityCompact, gateway.ChatExaVerbosityStandard, gateway.ChatExaVerbosityFull}
+	_ = []gateway.ChatParallelMode{gateway.ChatParallelModeOneShot, gateway.ChatParallelModeAgentic}
+	_ = []gateway.ChatPerplexityRecency{gateway.ChatPerplexityRecencyDay, gateway.ChatPerplexityRecencyWeek, gateway.ChatPerplexityRecencyMonth, gateway.ChatPerplexityRecencyYear}
+	_ = []gateway.ChatTakoEffort{gateway.ChatTakoEffortDeep, gateway.ChatTakoEffortFast, gateway.ChatTakoEffortInstant}
+	_ = []gateway.ChatTakoDataMode{gateway.ChatTakoDataModeInline, gateway.ChatTakoDataModeURL}
+	_ = []gateway.ChatTakoContentFormat{gateway.ChatTakoContentFormatCardJSON, gateway.ChatTakoContentFormatCSV, gateway.ChatTakoContentFormatJSONCompact, gateway.ChatTakoContentFormatJSONRecords}
+	_ = []gateway.ChatTakoWebCategory{gateway.ChatTakoWebCategoryFinance, gateway.ChatTakoWebCategoryNews, gateway.ChatTakoWebCategorySports}
 	_ = gateway.JSONField[string]{Present: true, Value: "value"}
 	var chatResult *gateway.ChatCompletionResult
 	_ = chatResult.RawJSON()

@@ -66,13 +66,22 @@ type ChatCompletionStream struct {
 // request. A non-200 response is consumed and returned as ResponseError before
 // a stream is exposed. Streaming responses are never retried after headers.
 func (client *Client) StreamChatCompletion(ctx context.Context, request ChatCompletionRequest) (*ChatCompletionStream, error) {
+	return client.streamChatCompletion(ctx, request, nil)
+}
+
+// StreamChatCompletionWithServerTools starts a stream with typed Gateway server tools.
+func (client *Client) StreamChatCompletionWithServerTools(ctx context.Context, request ChatServerToolsRequest) (*ChatCompletionStream, error) {
+	return client.streamChatCompletion(ctx, request.Request, request.ServerTools)
+}
+
+func (client *Client) streamChatCompletion(ctx context.Context, request ChatCompletionRequest, serverTools []ChatServerTool) (*ChatCompletionStream, error) {
 	if ctx == nil {
 		return nil, validationError(memberPath("$", "context"), "required")
 	}
-	if err := validateChatCompletionRequest(request); err != nil {
+	if err := validateChatCompletionWithServerTools(request, serverTools); err != nil {
 		return nil, err
 	}
-	payload, err := encodeStreamingChatCompletionRequest(request)
+	payload, err := encodeStreamingChatCompletionWithServerTools(request, serverTools)
 	if err != nil {
 		return nil, &TransportError{operation: "encode request", cause: err}
 	}
@@ -112,7 +121,11 @@ func (client *Client) StreamChatCompletion(ctx context.Context, request ChatComp
 }
 
 func encodeStreamingChatCompletionRequest(request ChatCompletionRequest) ([]byte, error) {
-	payload, err := encodeChatCompletionRequest(request)
+	return encodeStreamingChatCompletionWithServerTools(request, nil)
+}
+
+func encodeStreamingChatCompletionWithServerTools(request ChatCompletionRequest, serverTools []ChatServerTool) ([]byte, error) {
+	payload, err := encodeChatCompletionWithServerTools(request, serverTools)
 	if err != nil {
 		return nil, err
 	}

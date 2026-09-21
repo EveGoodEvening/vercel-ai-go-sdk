@@ -143,8 +143,8 @@ func validateChatCompletionRequest(r ChatCompletionRequest) *ValidationError {
 	if r.ToolChoice != nil {
 		switch choice := r.ToolChoice.(type) {
 		case ChatToolChoiceMode:
-			if choice != ChatToolChoiceAuto && choice != ChatToolChoiceNone {
-				return validationError(memberPath("$", "tool_choice"), "must be auto or none")
+			if choice != ChatToolChoiceAuto && choice != ChatToolChoiceNone && choice != ChatToolChoiceRequired {
+				return validationError(memberPath("$", "tool_choice"), "must be auto, none, or required")
 			}
 		case ChatSpecificToolChoice:
 			if choice.Name == "" {
@@ -215,6 +215,209 @@ func validateChatCompletionRequest(r ChatCompletionRequest) *ValidationError {
 		}
 	}
 	return nil
+}
+
+func validateChatCompletionWithServerTools(r ChatCompletionRequest, serverTools []ChatServerTool) *ValidationError {
+	if len(r.Tools) > maxResponseMembers-len(serverTools) {
+		return validationError(memberPath("$", "tools"), "must contain at most 10000 items")
+	}
+	if err := validateChatCompletionRequest(r); err != nil {
+		return err
+	}
+	present := make(map[string]bool, 4)
+	for i, tool := range serverTools {
+		path := indexPath(memberPath("$", "tools"), len(r.Tools)+i)
+		if nilValue(tool) {
+			return validationError(path, "must be a non-nil server tool")
+		}
+		identifier, err := validateChatServerTool(tool, path)
+		if err != nil {
+			return err
+		}
+		present[identifier] = true
+	}
+	for i, tool := range r.Tools {
+		if present[tool.Name] {
+			return validationError(memberPath(memberPath(indexPath(memberPath("$", "tools"), i), "function"), "name"), "must not collide with a present server tool")
+		}
+	}
+	if choice, ok := r.ToolChoice.(ChatSpecificToolChoice); ok {
+		for identifier := range present {
+			if choice.Name == identifier || choice.Name == "vercel:"+identifier {
+				return validationError(memberPath(memberPath(memberPath("$", "tool_choice"), "function"), "name"), "must not select a present server tool")
+			}
+		}
+	}
+	return nil
+}
+
+func validateChatServerTool(tool ChatServerTool, path string) (string, *ValidationError) {
+	configPath := memberPath(path, "config")
+	var identifier string
+	var config map[string]any
+	switch tool := tool.(type) {
+	case ChatExaSearchTool:
+		identifier = "exa_search"
+		if err := validateChatExaSearchConfig(tool.Config, configPath); err != nil {
+			return "", err
+		}
+		config = encodeChatExaSearchConfig(tool.Config)
+	case ChatParallelSearchTool:
+		identifier = "parallel_search"
+		if err := validateChatParallelSearchConfig(tool.Config, configPath); err != nil {
+			return "", err
+		}
+		config = encodeChatParallelSearchConfig(tool.Config)
+	case ChatPerplexitySearchTool:
+		identifier = "perplexity_search"
+		if err := validateChatPerplexitySearchConfig(tool.Config, configPath); err != nil {
+			return "", err
+		}
+		config = encodeChatPerplexitySearchConfig(tool.Config)
+	case ChatTakoSearchTool:
+		identifier = "tako_search"
+		if err := validateChatTakoSearchConfig(tool.Config, configPath); err != nil {
+			return "", err
+		}
+		config = encodeChatTakoSearchConfig(tool.Config)
+	default:
+		return "", validationError(path, "server tool type is unsupported")
+	}
+	if err := validateBoundedJSON(config, configPath); err != nil {
+		return "", err
+	}
+	return identifier, nil
+}
+
+func validateChatExaSearchConfig(c ChatExaSearchConfig, path string) *ValidationError {
+	if c.Query == "" {
+		return validationError(memberPath(path, "query"), "must be nonempty")
+	}
+	if c.Type != nil && !oneOf(string(*c.Type), "auto", "fast", "instant") {
+		return validationError(memberPath(path, "type"), "must be auto, fast, or instant")
+	}
+	if c.Category != nil && !oneOf(string(*c.Category), "company", "people", "research paper", "news", "personal site", "financial report") {
+		return validationError(memberPath(path, "category"), "unsupported category")
+	}
+	if c.Contents == nil {
+		return nil
+	}
+	contentsPath := memberPath(path, "contents")
+	if nilValue(c.Contents.Text) {
+		if c.Contents.Text != nil {
+			return validationError(memberPath(contentsPath, "text"), "must be a non-nil text option")
+		}
+	} else {
+		switch value := c.Contents.Text.(type) {
+		case ChatExaTextEnabled:
+		case ChatExaTextOptions:
+			if value.Verbosity != nil && !oneOf(string(*value.Verbosity), "compact", "standard", "full") {
+				return validationError(memberPath(memberPath(contentsPath, "text"), "verbosity"), "must be compact, standard, or full")
+			}
+			for name, sections := range map[string]*[]ChatExaSection{"include_sections": value.IncludeSections, "exclude_sections": value.ExcludeSections} {
+				if sections != nil {
+					for i, section := range *sections {
+						if !oneOf(string(section), "header", "navigation", "banner", "body", "sidebar", "footer", "metadata") {
+							return validationError(indexPath(memberPath(memberPath(contentsPath, "text"), name), i), "unsupported section")
+						}
+					}
+				}
+			}
+		default:
+			return validationError(memberPath(contentsPath, "text"), "text type is unsupported")
+		}
+	}
+	if nilValue(c.Contents.Highlights) {
+		if c.Contents.Highlights != nil {
+			return validationError(memberPath(contentsPath, "highlights"), "must be a non-nil highlights option")
+		}
+	} else {
+		switch c.Contents.Highlights.(type) {
+		case ChatExaHighlightsEnabled, ChatExaHighlightsOptions:
+		default:
+			return validationError(memberPath(contentsPath, "highlights"), "highlights type is unsupported")
+		}
+	}
+	if nilValue(c.Contents.SubpageTarget) {
+		if c.Contents.SubpageTarget != nil {
+			return validationError(memberPath(contentsPath, "subpage_target"), "must be a non-nil subpage target")
+		}
+	} else {
+		switch c.Contents.SubpageTarget.(type) {
+		case ChatExaSubpageTargetString, ChatExaSubpageTargetStrings:
+		default:
+			return validationError(memberPath(contentsPath, "subpage_target"), "subpage target type is unsupported")
+		}
+	}
+	return nil
+}
+
+func validateChatParallelSearchConfig(c ChatParallelSearchConfig, path string) *ValidationError {
+	if c.Objective == "" {
+		return validationError(memberPath(path, "objective"), "must be nonempty")
+	}
+	if c.Mode != nil && !oneOf(string(*c.Mode), "one-shot", "agentic") {
+		return validationError(memberPath(path, "mode"), "must be one-shot or agentic")
+	}
+	return nil
+}
+
+func validateChatPerplexitySearchConfig(c ChatPerplexitySearchConfig, path string) *ValidationError {
+	queryPath := memberPath(path, "query")
+	if nilValue(c.Query) {
+		return validationError(queryPath, "required")
+	}
+	switch query := c.Query.(type) {
+	case ChatPerplexityQueryString:
+		if query == "" {
+			return validationError(queryPath, "must be nonempty")
+		}
+	case ChatPerplexityQueryStrings:
+		if len(query) == 0 {
+			return validationError(queryPath, "must contain at least one item")
+		}
+	default:
+		return validationError(queryPath, "query type is unsupported")
+	}
+	if c.SearchRecencyFilter != nil && !oneOf(string(*c.SearchRecencyFilter), "day", "week", "month", "year") {
+		return validationError(memberPath(path, "search_recency_filter"), "must be day, week, month, or year")
+	}
+	return nil
+}
+
+func validateChatTakoSearchConfig(c ChatTakoSearchConfig, path string) *ValidationError {
+	if c.Query == "" {
+		return validationError(memberPath(path, "query"), "must be nonempty")
+	}
+	if c.Effort != nil && !oneOf(string(*c.Effort), "deep", "fast", "instant") {
+		return validationError(memberPath(path, "effort"), "must be deep, fast, or instant")
+	}
+	if c.Sources != nil && c.Sources.Data != nil {
+		data := c.Sources.Data
+		dataPath := memberPath(memberPath(path, "sources"), "data")
+		if data.Mode != nil && !oneOf(string(*data.Mode), "inline", "url") {
+			return validationError(memberPath(dataPath, "mode"), "must be inline or url")
+		}
+		if data.ContentFormat != nil && !oneOf(string(*data.ContentFormat), "card_json", "csv", "json_compact", "json_records") {
+			return validationError(memberPath(dataPath, "content_format"), "unsupported content format")
+		}
+		if data.Strict != nil && *data.Strict && (data.NodeIDs == nil || len(*data.NodeIDs) == 0) {
+			return validationError(memberPath(dataPath, "node_ids"), "must be present and nonempty when strict is true")
+		}
+	}
+	if c.Sources != nil && c.Sources.Web != nil && c.Sources.Web.Category != nil && !oneOf(string(*c.Sources.Web.Category), "finance", "news", "sports") {
+		return validationError(memberPath(memberPath(memberPath(path, "sources"), "web"), "category"), "must be finance, news, or sports")
+	}
+	return nil
+}
+
+func oneOf(value string, allowed ...string) bool {
+	for _, candidate := range allowed {
+		if value == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 func validateChatRole(role, path string) *ValidationError {

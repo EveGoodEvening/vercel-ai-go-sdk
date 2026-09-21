@@ -31,7 +31,12 @@
 // ResponseError, or ResponseValidationError and support errors.As. Raw JSON,
 // diagnostic bodies, prompts, tool data, provider options, headers, and
 // identifiers may be sensitive and must be sanitized before logging or storage.
-// Search, public /v1/evaluate, automatic tools, and unlisted modalities are not
-// supported. Hermetic fixtures are not live-service evidence; the separately
-// gated public-generation and provider-evaluation live runs remain NOT RUN.
+// Typed request declarations for the Exa, Parallel, Perplexity, and Tako Chat
+// Gateway server-search tools are available only through the opt-in server-tools
+// methods. Outputs retain the existing typed and raw Chat boundaries, with no
+// automatic tool execution. Public /v1/evaluate, Responses built-in search,
+// typed Chat search outputs or metadata, Gateway-native x_search, and unlisted
+// modalities remain unsupported. Hermetic fixtures are not live-service
+// evidence; the separately gated public-generation and provider-evaluation live
+// runs remain NOT RUN.
 package gateway
