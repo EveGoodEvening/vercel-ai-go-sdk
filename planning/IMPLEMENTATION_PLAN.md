@@ -2168,8 +2168,8 @@ For stream provenance, the complete pinned discriminator set is nevertheless cla
 | Buffered transcription | 41 | `[ ]` inline bytes/base64 only; exact 8 MiB decoded and 16 MiB encoded-body boundaries |
 | Streaming transcription | 49 | `[!]` Chunk 48 approval/completion |
 | Realtime | 50 | `[!]` Chunk 48 approval/completion; no WebRTC/SDP |
-| Embeddings | 37 | `[-]` active after the verified Chunk 36 tracker-only handoff; implementation and minimum truthful staged/experimental documentation are both owned here; no JavaScript-parity or broad release claim |
-| Reranking | 38 | `[ ]` |
+| Embeddings | 37 | `[x]` complete and accounted after implementation, documentation, focused verification, and four clean final rereviews; staged/experimental only, with no JavaScript-parity or broad release claim |
+| Reranking | 38 | `[-]` first dependency-ready unchecked and active item after the verified Chunk 37 tracker-only handoff |
 | Provider Evaluation | historical | `[x]` existing `/v4/ai/evaluation-model`; do not reimplement |
 | Public Evaluation | historical Chunk 14 | `[!]` exhaustive public decoder evidence |
 | Provider vision/file inline input | 39/44/47 | `[ ]` for Chunk 39 image inputs; `[!]` for language/video portions on the exact export decisions above; no upload service |
@@ -2191,7 +2191,7 @@ For stream provenance, the complete pinned discriminator set is nevertheless cla
 Independent review and clean rereview verified the frozen provenance, exports, signatures, variants, fields, limits, raw representations, helpers, ownership rules, ledger mappings, blockers, rollback rules, commands, and subjects with no unresolved finding. The landed predecessor plan commit is exactly `f289e31e24b0304c8c6108c71478bb81b280fcde` (`docs: approve gateway capability expansion plan`) with sole changed path `planning/IMPLEMENTATION_PLAN.md`. This post-review accounting handoff updates both durable status documents to point to “the first dependency-ready item in the authoritative Chunk 35–52 queue”, preserving every external live/release blocker, and closes Chunk 35 without claiming this accounting commit's own hash. Rollback removes only this continuation and its two status pointers.
 
 #### Chunk 36 — Shared provider transport and sealed options foundation
-**Status:** `[x]` — complete and accounted; Chunk 37 is the first dependency-ready unchecked item in the authoritative Chunk 35–52 queue.
+**Status:** `[x]` — complete and accounted; Chunk 38 is the first dependency-ready unchecked and active item in the authoritative Chunk 35–52 queue after the verified Chunk 37 tracker-only handoff.
 
 
 **Depends on:** 35. **Paths:** `client.go`, `headers.go`, `transport.go`, `provider_options.go`, `contract_internal_test.go`. **Subject:** `feat: add gateway modality transport foundation`. **Tracker:** `docs: record gateway modality foundation accounting`.
@@ -2253,6 +2253,30 @@ Chunk 37 rollback is confined to the same exhaustive eleven-path ownership/accou
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^(Test(Embed|Embedding)|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -race -count=1 -run '^(Test(Embed|Embedding)|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
 ```
+
+**Chunk 37 accounting handoff.** Chunk 37 is complete and accounted after implementation, three implementation review-fix commits, separate documentation and documentation-fix commits, exact focused verification, and four clean independent final rereviews. Its direct prerequisite handoff is `9158e829f00f766fc69689d605741159204e97d7` (`docs: record gateway modality foundation accounting`) with sole changed path `planning/IMPLEMENTATION_PLAN.md`. The exact landed Chunk 37 predecessor series is:
+
+- `bf43f08ad531a91e0bb3231842288f2c8849bb32` (`fix: correct gateway embeddings accounting`) — sole changed path: `planning/IMPLEMENTATION_PLAN.md`.
+- `030bb79514bea1601ca1f541544deef7a3105bae` (`feat: add gateway embeddings`) — changed paths: `contract_external_test.go`, `embedding.go`, `embedding_test.go`, `embedding_validate.go`, `embedding_wire.go`, `scripts/verify-local-consumer.sh`.
+- `38d79b94c9e1313bd723f3a03daa6de84750efe0` (`fix: correct gateway embeddings wire contract`) — changed paths: `embedding_test.go`, `embedding_wire.go`.
+- `c4a3de436820a0f6fb8e782a660ec89250b65f5a` (`fix: correct gateway embeddings resource safety`) — changed paths: `embedding_test.go`, `embedding_wire.go`.
+- `762255c72be77b14c36cb852326be3a02b25da60` (`fix: correct gateway embeddings resource safety`) — changed paths: `embedding_test.go`, `embedding_wire.go`.
+- `8c12505d377c6472a98d00b08ce47b7c2d349386` (`docs: describe experimental gateway embeddings`) — changed paths: `CHANGELOG.md`, `README.md`, `doc.go`, `docs/client.md`.
+- `e25eebdf6d40ced60cae7e2d12a673ddc5b7f9e0` (`fix: correct gateway embeddings documentation`) — sole changed path: `README.md`.
+
+The following exact commands passed after the last documentation fix, all with the five credential/live-acknowledgement variables unset and `GOPROXY=off`:
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^(Test(Embed|Embedding)|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -race -count=1 -run '^(Test(Embed|Embedding)|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^TestExternalContract' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off ./scripts/verify-local-consumer.sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go doc -all .
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^(TestDocumentation|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
+```
+
+`gopls` was unavailable, so no LSP result is claimed. Final rereviews `chunk37-final-review-1`, `chunk37-final-review-2`, `chunk37-final-review-3`, and `chunk37-final-review-4` each returned **CLEAN** with no remaining actionable implementation, security, resource, cancellation, API/wire-contract, external-consumer, test-quality, documentation, privacy, maturity, integration, or tracker-accounting finding. The previously raised nested `providerMetadata` duplicate-key finding was explicitly discarded because the reviewed Chunk 37 plan requires recursive duplicate-key rejection; the implementation and regression coverage conform to that requirement. The intended tracker subject is `docs: record gateway embeddings accounting`, its sole changed path is `planning/IMPLEMENTATION_PLAN.md`, and this accounting handoff does not claim its own hash. Chunk 38 is now the first dependency-ready unchecked and active item; every retained blocker and non-goal remains unchanged.
+
 **Exact Chunk 38 commands:**
 ```sh
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^(Test(Rerank|Reranking)|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
