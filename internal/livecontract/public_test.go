@@ -92,10 +92,10 @@ func TestGatewayChatContract(t *testing.T) {
 func requirePublicLiveClient(t *testing.T) *gateway.Client {
 	t.Helper()
 	if os.Getenv("AI_GATEWAY_PUBLIC_LIVE_COST_ACK") != publicLiveCostAck {
-		t.Skip("live Gateway public API contract requires AI_GATEWAY_PUBLIC_LIVE_COST_ACK=I_ACCEPT_LIVE_PUBLIC_API_COSTS exactly")
+		t.Fatalf("live Gateway public API contract requires AI_GATEWAY_PUBLIC_LIVE_COST_ACK=I_ACCEPT_LIVE_PUBLIC_API_COSTS exactly")
 	}
 	if _, present := os.LookupEnv("AI_GATEWAY_LIVE_COST_ACK"); present {
-		t.Skip("live Gateway public API contract requires AI_GATEWAY_LIVE_COST_ACK to be absent")
+		t.Fatalf("live Gateway public API contract requires AI_GATEWAY_LIVE_COST_ACK to be absent")
 	}
 
 	apiKey := os.Getenv("AI_GATEWAY_API_KEY")
@@ -103,7 +103,7 @@ func requirePublicLiveClient(t *testing.T) *gateway.Client {
 	hasAPIKey := strings.TrimSpace(apiKey) != ""
 	hasOIDCToken := strings.TrimSpace(oidcToken) != ""
 	if hasAPIKey == hasOIDCToken {
-		t.Skip("live Gateway public API contract requires exactly one non-empty AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN")
+		t.Fatalf("live Gateway public API contract requires exactly one non-empty AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN")
 	}
 
 	var credential gateway.Option
