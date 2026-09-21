@@ -120,6 +120,36 @@ func compileChat(client *gateway.Client) {
 	var choice gateway.ChatToolChoice = gateway.ChatToolChoiceNone
 	var format gateway.ChatResponseFormat = gateway.ChatResponseFormatJSON
 	_, _, _, _, _ = content, part, stop, choice, format
+	var _ gateway.ChatToolChoiceMode = gateway.ChatToolChoiceRequired
+	var exaText gateway.ChatExaText = gateway.ChatExaTextEnabled(true)
+	var exaHighlights gateway.ChatExaHighlights = gateway.ChatExaHighlightsEnabled(true)
+	var exaSubpageTarget gateway.ChatExaSubpageTarget = gateway.ChatExaSubpageTargetString("docs")
+	var perplexityQuery gateway.ChatPerplexityQuery = gateway.ChatPerplexityQueryString("query")
+	_, _, _, _ = exaText, exaHighlights, exaSubpageTarget, perplexityQuery
+	exaType, exaCategory, exaVerbosity := gateway.ChatExaSearchFast, gateway.ChatExaCategoryResearchPaper, gateway.ChatExaVerbosityStandard
+	exaSections := []gateway.ChatExaSection{gateway.ChatExaSectionHeader, gateway.ChatExaSectionNavigation, gateway.ChatExaSectionBanner, gateway.ChatExaSectionBody, gateway.ChatExaSectionSidebar, gateway.ChatExaSectionFooter, gateway.ChatExaSectionMetadata}
+	maxCharacters, includeHTML, links := 100, false, 2
+	includeDomains := []string{"example.com"}
+	serverRequest := gateway.ChatServerToolsRequest{Request: request, ServerTools: []gateway.ChatServerTool{
+		gateway.ChatExaSearchTool{Config: gateway.ChatExaSearchConfig{Query: "query", Type: &exaType, NumResults: &maxCharacters, Category: &exaCategory, UserLocation: new("US"), IncludeDomains: &includeDomains, ExcludeDomains: &[]string{}, StartPublishedDate: new("2026-01-01"), EndPublishedDate: new("2026-09-21"), Contents: &gateway.ChatExaContents{Text: gateway.ChatExaTextEnabled(true), Highlights: gateway.ChatExaHighlightsEnabled(false), MaxAgeHours: new(0), LivecrawlTimeout: new(0), Subpages: new(0), SubpageTarget: gateway.ChatExaSubpageTargetString("docs"), Extras: &gateway.ChatExaExtras{Links: &links, ImageLinks: new(0)}}}},
+		gateway.ChatExaSearchTool{Config: gateway.ChatExaSearchConfig{Query: "query", Contents: &gateway.ChatExaContents{Text: gateway.ChatExaTextOptions{MaxCharacters: &maxCharacters, IncludeHTMLTags: &includeHTML, Verbosity: &exaVerbosity, IncludeSections: &exaSections, ExcludeSections: &[]gateway.ChatExaSection{}}, Highlights: gateway.ChatExaHighlightsOptions{Query: new("focus"), MaxCharacters: &maxCharacters}, SubpageTarget: gateway.ChatExaSubpageTargetStrings{"docs", "blog"}}}},
+		gateway.ChatParallelSearchTool{Config: gateway.ChatParallelSearchConfig{Objective: "objective", SearchQueries: &[]string{"one"}, Mode: new(gateway.ChatParallelModeAgentic), MaxResults: new(0), SourcePolicy: &gateway.ChatParallelSourcePolicy{IncludeDomains: &includeDomains, ExcludeDomains: &[]string{}, AfterDate: new("2026-01-01")}, Excerpts: &gateway.ChatParallelExcerpts{MaxCharsPerResult: new(0), MaxCharsTotal: new(0)}, FetchPolicy: &gateway.ChatParallelFetchPolicy{MaxAgeSeconds: new(0)}}},
+		gateway.ChatPerplexitySearchTool{Config: gateway.ChatPerplexitySearchConfig{Query: gateway.ChatPerplexityQueryString("query"), MaxResults: new(0), MaxTokensPerPage: new(0), MaxTokens: new(0), Country: new("US"), SearchDomainFilter: &includeDomains, SearchLanguageFilter: &[]string{}, SearchAfterDate: new("2026-01-01"), SearchBeforeDate: new("2026-09-21"), LastUpdatedAfterFilter: new("2026-01-01"), LastUpdatedBeforeFilter: new("2026-09-21"), SearchRecencyFilter: new(gateway.ChatPerplexityRecencyWeek)}},
+		gateway.ChatPerplexitySearchTool{Config: gateway.ChatPerplexitySearchConfig{Query: gateway.ChatPerplexityQueryStrings{"one", "two"}}},
+		gateway.ChatTakoSearchTool{Config: gateway.ChatTakoSearchConfig{Query: "query", Effort: new(gateway.ChatTakoEffortDeep), Sources: &gateway.ChatTakoSources{Data: &gateway.ChatTakoDataSource{Count: new(0), IncludeContents: new(false), Mode: new(gateway.ChatTakoDataModeInline), ContentFormat: new(gateway.ChatTakoContentFormatJSONCompact), MaxRows: new(0), NodeIDs: &[]string{"node"}, Strict: new(true)}, Web: &gateway.ChatTakoWebSource{Count: new(0), IncludeContents: new(false), Category: new(gateway.ChatTakoWebCategoryNews), IncludeDomains: &includeDomains, ExcludeDomains: &[]string{}, SnippetMaxChars: new(0), Highlights: new(false), ArticleContentMaxChars: new(0), PublishedAfter: new("2026-01-01"), PublishedBefore: new("2026-09-21")}}, Location: &gateway.ChatTakoLocation{Latitude: 1, Longitude: 2}, CountryCode: new("US"), Locale: new("en"), Timezone: new("UTC"), OutputSettings: &gateway.ChatTakoOutputSettings{ImageDarkMode: new(false), ForceRefresh: new(false)}, IncludeRelated: new(0)}},
+	}}
+	_ = []gateway.ChatExaSearchType{gateway.ChatExaSearchAuto, gateway.ChatExaSearchFast, gateway.ChatExaSearchInstant}
+	_ = []gateway.ChatExaCategory{gateway.ChatExaCategoryCompany, gateway.ChatExaCategoryPeople, gateway.ChatExaCategoryResearchPaper, gateway.ChatExaCategoryNews, gateway.ChatExaCategoryPersonalSite, gateway.ChatExaCategoryFinancialReport}
+	_ = []gateway.ChatExaVerbosity{gateway.ChatExaVerbosityCompact, gateway.ChatExaVerbosityStandard, gateway.ChatExaVerbosityFull}
+	_ = []gateway.ChatParallelMode{gateway.ChatParallelModeOneShot, gateway.ChatParallelModeAgentic}
+	_ = []gateway.ChatPerplexityRecency{gateway.ChatPerplexityRecencyDay, gateway.ChatPerplexityRecencyWeek, gateway.ChatPerplexityRecencyMonth, gateway.ChatPerplexityRecencyYear}
+	_ = []gateway.ChatTakoEffort{gateway.ChatTakoEffortDeep, gateway.ChatTakoEffortFast, gateway.ChatTakoEffortInstant}
+	_ = []gateway.ChatTakoDataMode{gateway.ChatTakoDataModeInline, gateway.ChatTakoDataModeURL}
+	_ = []gateway.ChatTakoContentFormat{gateway.ChatTakoContentFormatCardJSON, gateway.ChatTakoContentFormatCSV, gateway.ChatTakoContentFormatJSONCompact, gateway.ChatTakoContentFormatJSONRecords}
+	_ = []gateway.ChatTakoWebCategory{gateway.ChatTakoWebCategoryFinance, gateway.ChatTakoWebCategoryNews, gateway.ChatTakoWebCategorySports}
+	_, _ = client.CreateChatCompletionWithServerTools(context.Background(), serverRequest)
+	serverStream, _ := client.StreamChatCompletionWithServerTools(context.Background(), serverRequest)
+	_ = serverStream
 	result, _ := client.CreateChatCompletion(context.Background(), request)
 	if result != nil {
 		_ = result.RawJSON()
@@ -193,6 +223,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -201,12 +232,17 @@ var allowedTypes = names(
 	"ConfigurationError", "ValidationError", "TransportError", "ResponseError", "ResponseValidationError",
 	"EvaluationRequest", "Question", "BooleanQuestion", "ChoiceQuestion", "ScoreQuestion", "OptionalJSON", "BooleanCriteria", "EvaluationResult", "Rounding", "Usage", "WarningType", "Warning", "ResponseMetadata", "Answer", "BooleanAnswer", "ChoiceAnswer", "ScoreAnswer",
 	"ResponsesRequest", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
-	"ChatCompletionRequest", "ChatMessage", "ChatMessageContent", "ChatTextContent", "ChatPartsContent", "ChatContentPart", "ChatTextPart", "ChatImageURLPart", "ChatFilePart", "ChatStop", "ChatStopString", "ChatStopStrings", "ChatTool", "ChatToolChoice", "ChatToolChoiceMode", "ChatSpecificToolChoice", "ChatResponseFormat", "ChatResponseFormatType", "ChatJSONSchemaResponseFormat", "ChatLegacyJSONResponseFormat", "ChatProviderOptions", "ChatGatewayOptions", "ChatProviderTimeouts", "ChatProvider", "JSONField", "ChatCompletionResult", "ChatChoice", "ChatAssistantMessage", "ChatToolCall", "ChatFunctionCall", "ChatUsage", "ChatCompletionChunk", "ChatCompletionChunkChoice", "ChatCompletionChunkDelta", "ChatCompletionStream",
+	"ChatCompletionRequest", "ChatServerToolsRequest", "ChatServerTool", "ChatExaSearchTool", "ChatParallelSearchTool", "ChatPerplexitySearchTool", "ChatTakoSearchTool",
+	"ChatExaSearchType", "ChatExaCategory", "ChatExaVerbosity", "ChatExaSection", "ChatExaText", "ChatExaTextEnabled", "ChatExaTextOptions", "ChatExaHighlights", "ChatExaHighlightsEnabled", "ChatExaHighlightsOptions", "ChatExaExtras", "ChatExaSubpageTarget", "ChatExaSubpageTargetString", "ChatExaSubpageTargetStrings", "ChatExaContents", "ChatExaSearchConfig",
+	"ChatParallelMode", "ChatParallelSourcePolicy", "ChatParallelExcerpts", "ChatParallelFetchPolicy", "ChatParallelSearchConfig",
+	"ChatPerplexityQuery", "ChatPerplexityQueryString", "ChatPerplexityQueryStrings", "ChatPerplexityRecency", "ChatPerplexitySearchConfig",
+	"ChatTakoEffort", "ChatTakoDataMode", "ChatTakoContentFormat", "ChatTakoWebCategory", "ChatTakoDataSource", "ChatTakoWebSource", "ChatTakoSources", "ChatTakoLocation", "ChatTakoOutputSettings", "ChatTakoSearchConfig",
+	"ChatMessage", "ChatMessageContent", "ChatTextContent", "ChatPartsContent", "ChatContentPart", "ChatTextPart", "ChatImageURLPart", "ChatFilePart", "ChatStop", "ChatStopString", "ChatStopStrings", "ChatTool", "ChatToolChoice", "ChatToolChoiceMode", "ChatSpecificToolChoice", "ChatResponseFormat", "ChatResponseFormatType", "ChatJSONSchemaResponseFormat", "ChatLegacyJSONResponseFormat", "ChatProviderOptions", "ChatGatewayOptions", "ChatProviderTimeouts", "ChatProvider", "JSONField", "ChatCompletionResult", "ChatChoice", "ChatAssistantMessage", "ChatToolCall", "ChatFunctionCall", "ChatUsage", "ChatCompletionChunk", "ChatCompletionChunkChoice", "ChatCompletionChunkDelta", "ChatCompletionStream",
 )
 
 var allowedFunctions = names("NewClient", "WithAPIKey", "WithOIDCToken", "WithOIDCTokenSource", "WithBaseURL", "WithPublicBaseURL", "WithHTTPClient", "WithTeam", "WithHeaders", "WithRetryPolicy")
 var allowedMethods = names(
-	"Client.Evaluate", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateChatCompletion", "Client.StreamChatCompletion",
+	"Client.Evaluate", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
 	"ResponseResult.RawJSON", "RawResponseEvent.RawJSON", "ResponseStream.Next", "ResponseStream.Event", "ResponseStream.Err", "ResponseStream.Close",
 	"ChatCompletionResult.RawJSON", "ChatCompletionChunk.RawJSON", "ChatCompletionStream.Next", "ChatCompletionStream.Event", "ChatCompletionStream.Err", "ChatCompletionStream.Close",
 	"ConfigurationError.Error", "ConfigurationError.Option", "ConfigurationError.Reason",
@@ -215,7 +251,12 @@ var allowedMethods = names(
 	"ResponseError.Error", "ResponseError.Unwrap", "ResponseError.StatusCode", "ResponseError.Message", "ResponseError.Type", "ResponseError.Code", "ResponseError.Param", "ResponseError.GenerationID", "ResponseError.RequestID", "ResponseError.ResponseID", "ResponseError.RetryAfter", "ResponseError.Retryable", "ResponseError.BodyTruncated", "ResponseError.RawResponseBody",
 	"ResponseValidationError.Error", "ResponseValidationError.Unwrap", "ResponseValidationError.StatusCode", "ResponseValidationError.Path", "ResponseValidationError.Reason", "ResponseValidationError.RequestID", "ResponseValidationError.ResponseID", "ResponseValidationError.BodyTruncated", "ResponseValidationError.RawResponseBody",
 )
-var allowedValues = names("WarningUnsupported", "WarningCompatibility", "WarningDeprecated", "WarningOther", "ResponseToolChoiceAuto", "ResponseToolChoiceRequired", "ResponseToolChoiceNone", "ResponseTextFormatText", "ResponseTextFormatJSONObject", "ChatToolChoiceAuto", "ChatToolChoiceNone", "ChatResponseFormatText", "ChatResponseFormatJSON")
+var allowedValues = names(
+	"WarningUnsupported", "WarningCompatibility", "WarningDeprecated", "WarningOther", "ResponseToolChoiceAuto", "ResponseToolChoiceRequired", "ResponseToolChoiceNone", "ResponseTextFormatText", "ResponseTextFormatJSONObject",
+	"ChatToolChoiceAuto", "ChatToolChoiceNone", "ChatToolChoiceRequired", "ChatResponseFormatText", "ChatResponseFormatJSON",
+	"ChatExaSearchAuto", "ChatExaSearchFast", "ChatExaSearchInstant", "ChatExaCategoryCompany", "ChatExaCategoryPeople", "ChatExaCategoryResearchPaper", "ChatExaCategoryNews", "ChatExaCategoryPersonalSite", "ChatExaCategoryFinancialReport", "ChatExaVerbosityCompact", "ChatExaVerbosityStandard", "ChatExaVerbosityFull", "ChatExaSectionHeader", "ChatExaSectionNavigation", "ChatExaSectionBanner", "ChatExaSectionBody", "ChatExaSectionSidebar", "ChatExaSectionFooter", "ChatExaSectionMetadata",
+	"ChatParallelModeOneShot", "ChatParallelModeAgentic", "ChatPerplexityRecencyDay", "ChatPerplexityRecencyWeek", "ChatPerplexityRecencyMonth", "ChatPerplexityRecencyYear", "ChatTakoEffortDeep", "ChatTakoEffortFast", "ChatTakoEffortInstant", "ChatTakoDataModeInline", "ChatTakoDataModeURL", "ChatTakoContentFormatCardJSON", "ChatTakoContentFormatCSV", "ChatTakoContentFormatJSONCompact", "ChatTakoContentFormatJSONRecords", "ChatTakoWebCategoryFinance", "ChatTakoWebCategoryNews", "ChatTakoWebCategorySports",
+)
 
 func names(values ...string) map[string]bool {
 	out := make(map[string]bool, len(values))
@@ -225,11 +266,29 @@ func names(values ...string) map[string]bool {
 	return out
 }
 
-func requireAllowed(kind, name string, allowed map[string]bool) {
+func requireAllowed(kind, name string, allowed, seen map[string]bool) {
 	if !allowed[name] {
 		fmt.Fprintf(os.Stderr, "unexpected exported %s found: %s\n", kind, name)
 		os.Exit(1)
 	}
+	seen[name] = true
+}
+
+func requireAllSeen(kind string, allowed, seen map[string]bool) {
+	missing := make([]string, 0)
+	for name := range allowed {
+		if !seen[name] {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 {
+		return
+	}
+	sort.Strings(missing)
+	for _, name := range missing {
+		fmt.Fprintf(os.Stderr, "expected exported %s not found: %s\n", kind, name)
+	}
+	os.Exit(1)
 }
 
 func exportedReceiver(receiver *ast.FieldList) bool {
@@ -259,6 +318,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	seenTypes := make(map[string]bool, len(allowedTypes))
+	seenFunctions := make(map[string]bool, len(allowedFunctions))
+	seenMethods := make(map[string]bool, len(allowedMethods))
+	seenValues := make(map[string]bool, len(allowedValues))
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
@@ -280,11 +343,11 @@ func main() {
 							fmt.Fprintf(os.Stderr, "exported compatibility alias found: %s\n", spec.Name.Name)
 							os.Exit(1)
 						}
-						requireAllowed("type", spec.Name.Name, allowedTypes)
+						requireAllowed("type", spec.Name.Name, allowedTypes, seenTypes)
 					case *ast.ValueSpec:
 						for _, name := range spec.Names {
 							if ast.IsExported(name.Name) {
-								requireAllowed("value", name.Name, allowedValues)
+							requireAllowed("value", name.Name, allowedValues, seenValues)
 							}
 						}
 					}
@@ -294,14 +357,18 @@ func main() {
 					continue
 				}
 				if typed.Recv == nil {
-					requireAllowed("function", typed.Name.Name, allowedFunctions)
+					requireAllowed("function", typed.Name.Name, allowedFunctions, seenFunctions)
 				} else if exportedReceiver(typed.Recv) {
 					receiver := receiverName(typed.Recv.List[0].Type)
-					requireAllowed("method", receiver+"."+typed.Name.Name, allowedMethods)
+					requireAllowed("method", receiver+"."+typed.Name.Name, allowedMethods, seenMethods)
 				}
 			}
 		}
 	}
+	requireAllSeen("type", allowedTypes, seenTypes)
+	requireAllSeen("function", allowedFunctions, seenFunctions)
+	requireAllSeen("method", allowedMethods, seenMethods)
+	requireAllSeen("value", allowedValues, seenValues)
 }
 EOF
 
