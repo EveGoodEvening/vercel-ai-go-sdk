@@ -457,7 +457,7 @@ func TestResponsesBuiltInWebSearchExactWireAndRawBoundaries(t *testing.T) {
 	function := ResponseTool{Name: "lookup", Parameters: map[string]any{"type": "object"}}
 	request := ResponsesBuiltInToolsRequest{
 		Request: ResponsesRequest{Model: "openai/gpt-5.4-mini", Input: ResponseTextInput("news"), Tools: []ResponseTool{function}},
-		Tools:   []ResponseBuiltInTool{ResponseWebSearchTool{}, ResponseWebSearchTool{}},
+		Tools:   []ResponseBuiltInTool{&ResponseWebSearchTool{}, ResponseWebSearchTool{}},
 	}
 	buffered, err := encodeResponsesBuiltInToolsRequest(request, false)
 	if err != nil {
@@ -475,15 +475,13 @@ func TestResponsesBuiltInWebSearchExactWireAndRawBoundaries(t *testing.T) {
 		t.Fatalf("streaming wire = %s", streaming)
 	}
 
+	minimal, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{ResponseWebSearchTool{}}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	wantMinimal := `{"input":"hello","model":"provider/model","stream":false,"tools":[{"search_context_size":"low","type":"web_search"}]}`
-	for _, tool := range []ResponseBuiltInTool{ResponseWebSearchTool{}, &ResponseWebSearchTool{}} {
-		minimal, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest(), Tools: []ResponseBuiltInTool{tool}}, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := string(minimal); got != wantMinimal {
-			t.Fatalf("minimal wire for %T\n got: %s\nwant: %s", tool, got, wantMinimal)
-		}
+	if got := string(minimal); got != wantMinimal {
+		t.Fatalf("minimal wire\n got: %s\nwant: %s", got, wantMinimal)
 	}
 	omitted, err := encodeResponsesBuiltInToolsRequest(ResponsesBuiltInToolsRequest{Request: validResponsesRequest()}, false)
 	if err != nil {
