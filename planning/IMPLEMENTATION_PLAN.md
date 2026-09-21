@@ -1911,3 +1911,142 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 - [!] Direct xAI remains deferred, not an unchecked continuation task: a client for `https://api.x.ai/v1/responses`, direct-xAI authentication/base URLs, provider-specific option validation, provider-tool result normalization, and generic OpenAI-compatible parity require a separately approved direct-provider package/API plan and authoritative direct-xAI contracts. Gateway fieldless `x_search` support does not authorize this surface.
 - [!] Unrelated live and release surfaces remain blocked, not over-marked complete: public `/v1/evaluate` still lacks an exhaustive first-party strict HTTP contract; the general paid public-generation and provider-evaluation live contracts still require owner authorization, protected credentials, exact cost acknowledgements, approved pinned models/environments, and sanitized independently reviewed evidence; and candidate/tag/publication still require owner-selected license, verified hosted repository metadata and protected CI/environment evidence, provenance/permissions/publication review, hosting authorization, immutable tag creation, direct-VCS/public-proxy fetched-module verification, checksum capture, and final promotion/publication authorization.
 - [!] Every remaining search-continuation item is therefore explicitly blocked or deferred by the evidence/authorization prerequisite stated in this section. There is no locally doable unchecked continuation item after Chunk 30 closure.
+
+## 2026-09-21 configurable Gateway `x_search` continuation — current authority
+
+This section is the current authority for any future configurable `x_search` work. It appends to, and does not rewrite or reopen, the completed Chunk 26 → 30 history above. **Implementation has not started.** The repository still supports only fieldless `ResponseXSearchTool{}`, encoded exactly as `{"type":"x_search"}`, through the existing Gateway Responses built-in-tool wrapper. No configurable type, option encoder, option validation, configurable external-consumer contract, or configurable support claim exists yet.
+
+### Contract target, candidate vocabulary, and non-authoritative conflicts
+
+- [x] The target is additive, request-only configuration for public Vercel AI Gateway `POST /v1/responses`; it is not a direct `https://api.x.ai/v1/responses` client. Existing methods, wrappers, `ResponsesRequest`, raw buffered output, raw non-text streaming events, retry behavior, authentication, endpoint ownership, and fieldless `ResponseXSearchTool{}` remain unchanged.
+- [x] Version-pinned `ai@7.0.107` / `@ai-sdk/xai@5.0.4` establish only this candidate direct-xAI vocabulary and mapping: `allowedXHandles` → `allowed_x_handles`, `excludedXHandles` → `excluded_x_handles`, `fromDate` → `from_date`, `toDate` → `to_date`, `enableImageUnderstanding` → `enable_image_understanding`, and `enableVideoUnderstanding` → `enable_video_understanding`. All six candidates are optional in that direct-provider helper; this is not Gateway acceptance evidence.
+- [x] The pinned direct provider caps each handle list at 10 and does not encode mutual exclusion, while current direct xAI prose says up to 20 and forbids combining allowed and excluded handles. Those statements conflict and are **non-authoritative for Gateway**. Neither 10 nor 20, mutual exclusion nor coexistence, date grammar/order, empty-list behavior, null behavior, defaults, or any other invariant may be selected locally until exact Gateway evidence resolves it.
+- [x] Pinned/current Gateway package and Gateway documentation do not provide a native `xSearch` helper or public `/v1/responses` configurable `x_search` schema. Their silence is not proof of rejection, but it is insufficient proof of pass-through. The prior fieldless `spacexai/grok-4.6` probe exercised none of the six option fields.
+- [x] The additive option-bearing sealed Responses built-in-tool type is named exactly `ResponseXSearchOptionsTool`; Gate A determines only which exported fields and Go presence/validation semantics it contains. Preserve `ResponseXSearchTool struct{}` and its exact fieldless wire and reflection contract. Do not add fields to it, add an arbitrary map/provider-options escape hatch, change either built-in-tool method, or add fields to `ResponsesBuiltInToolsRequest` or `ResponsesRequest`.
+- [x] Direct-xAI output metadata, `query/posts`, `x_search_call` details, citations, actions, lifecycle events, and provider-executed result normalization remain out of scope. `ResponseResult.RawJSON()` and `RawResponseEvent` remain the complete boundaries for untyped Gateway data.
+
+### Gate A — exact Gateway option evidence before any implementation
+
+**Gate status and next action:** `[!]` **BLOCKED; this is the sole next dependency-ready item.** No implementation chunk below may begin. The next action is to obtain and review exact Gateway-specific evidence for one named field/family, either from a versioned first-party Vercel Gateway public-REST document/schema/source/test for `POST /v1/responses`, or from the owner-authorized sanitized paid-probe procedure below. Current artifacts contain neither. A direct xAI document, `@ai-sdk/xai`, generic provider capability, Gateway web-search example, generated prose, or successful fieldless request cannot clear this gate.
+
+Each family clears independently; evidence for one family does not authorize another:
+
+- [!] **Allowed handles — `allowed_x_handles`: blocked.** Required proof: exact snake-case wire name; JSON type and element type; optionality; omitted, `null`, empty-list, and non-empty-list behavior; accepted handle syntax if Gateway defines one; duplicate behavior; error status/shape for any evidenced rejection; compatible Gateway model route; and whether it can coexist with ordinary function tools, fieldless/configurable built-ins, `tool_choice`, routing, and fallback settings. A field-specific finite maximum and max+1 rejection boundary are required only if authoritative Gateway evidence defines or demonstrates that narrower rule; otherwise record that no narrower field-specific limit or rejection boundary was established and retain the SDK's existing generic request count/size/depth bounds.
+- [!] **Excluded handles — `excluded_x_handles`: blocked.** Requires the same independent proof as allowed handles, plus exact behavior when both allowed and excluded lists are present if Gateway defines or rejects that interaction. The direct 10-versus-20 and mutual-exclusion conflict is unresolved until Gateway evidence explicitly selects a rule; if it selects none, record the absence of a narrower Gateway rule and enforce only the existing generic request bounds.
+- [!] **Date range — `from_date` and `to_date`: blocked as an inseparable family unless first-party Gateway evidence explicitly makes either field independent.** Required proof: exact names and JSON types; omission/`null`/empty-string behavior; accepted grammar and timezone/calendar rules; inclusive/exclusive meaning; each field alone; equal dates; forward and reversed ranges; invalid-date rejection; defaults; and compatible Gateway route.
+- [!] **Image understanding — `enable_image_understanding`: blocked.** Required proof: exact name/type; omission versus explicit `false` versus `true`; `null` behavior; default if documented; compatible Gateway route; interaction with the handle/date families; and any request, cost, privacy, or media-processing qualification that Gateway itself states.
+- [!] **Video understanding — `enable_video_understanding`: blocked.** Requires the same boolean presence proof independently from image understanding, including whether image and video flags may coexist and any exact Gateway route/cost/privacy qualification.
+- [!] **Cross-family validation and presence semantics: blocked.** Local validation may enforce only Gateway-proven rules. Evidence must distinguish server acceptance from SDK policy and establish whether non-nil empty slices or explicit false values are meaningful, rejected, or equivalent to omission. The implementation must never emit JSON `null` unless the Gateway contract explicitly requires it.
+
+**Sanitized paid-probe prerequisites, if first-party evidence is insufficient:**
+
+- [!] Owner authorization is required for the exact field/family, number of requests, pinned Gateway model/environment, and accepted cost. The future probe/workflow must fail closed unless the sole dedicated acknowledgement is exactly `AI_GATEWAY_X_SEARCH_LIVE_COST_ACK=I_ACCEPT_LIVE_X_SEARCH_COSTS`, both `AI_GATEWAY_LIVE_COST_ACK` and `AI_GATEWAY_PUBLIC_LIVE_COST_ACK` are absent, and exactly one protected Gateway credential is present. Retries remain disabled.
+- [!] Before any paid run, add credential-free mismatch tests for missing or wrong dedicated acknowledgement, either general acknowledgement being present, zero credentials, and multiple credentials. Every mismatch must fail before credential use and prove zero network dispatch. The probe matrix must then include the minimum positive presence case and only the negative/boundary cases needed to establish the field's type, omission/zero/empty behavior, any Gateway-defined narrower bound or interaction, and error shape. It must target public `https://ai-gateway.vercel.sh/v1/responses`, pin the approved `provider/model` route, and must not infer portability or fallback behavior from one route.
+- [!] Durable evidence may retain only inspection date, cited version/source, approved model, option names and structural value classes/counts, HTTP status, top-level response status/object, structured discriminator/status sets, and sanitized error category/code. Never retain credentials, Authorization/header values, exact handles, prompts, queries, generated prose, complete bodies, IDs, raw events, provider metadata, or billable content.
+- [!] Probe implementation/workflow paths, if authorized, must be planned against the then-current repository before editing; the earlier prospective `internal/livecontract/x_search_test.go` path is not assumed to exist. Probe code and durable evidence require their own review and commit boundary and do not themselves authorize the public API until Gate A records the exact cleared fields and semantics.
+
+**Gate A acceptance and accounting:**
+
+- [!] Blocked until the tracker records, for each cleared field/family, the exact authoritative source or sanitized probe, inspection/run date, exact route, proven wire spelling/type/presence, every authoritative accepted or rejected boundary, unresolved behaviors, sanitation review, and independent evidence review. If authoritative Gateway evidence establishes no narrower field-specific finite limit, syntax rule, interaction rule, or rejection boundary, explicitly record that absence and retain the existing generic request count/size/depth bounds. Fields lacking the otherwise complete record stay explicitly blocked and absent from the API.
+- [!] After evidence clears at least one family, record the current pre-implementation base hash, then land a tracker-only Gate A accounting commit with intended subject `docs: record gateway x search option evidence` and sole path `planning/IMPLEMENTATION_PLAN.md`. Record every landed evidence/probe predecessor by full hash, exact subject, and exact changed paths; do not record the accounting commit's impossible self-hash. This landed Gate A accounting commit is the recorded pre-implementation boundary used by the final range diff, and only then is Chunk 31 dependency-ready.
+
+### Chunk 31 — Additive option-bearing request API and exact wire behavior
+
+**Status:** `[!]` Blocked on Gate A's committed field/family record. **Commit boundary:** `feat: add gateway x search options`.
+
+**Owned paths (exact five):** `responses_tools.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`, `planning/IMPLEMENTATION_PLAN.md`.
+
+- [!] Add `ResponseXSearchOptionsTool` alongside—not instead of—`ResponseXSearchTool{}`. Its exported fields and Go presence representation must correspond only to Gate-A-cleared Gateway fields. Keep the old fieldless value and non-nil pointer forms accepted and byte-for-byte encoded as `{"type":"x_search"}`.
+- [!] Encode only proven fields, with proven omission/explicit-zero/empty semantics. Preserve function-tools-first ordering, caller order among built-ins, duplicates, `stream` ownership, exact `web_search` behavior, existing request size/depth/count bounds, and both existing public methods.
+- [!] Add only Gate-A-proven validation, at the canonical `tools[i]` path, before credentials or network. Do not adopt direct-provider 10/20 limits, mutual exclusion, date parsing/order, handle syntax, defaults, or cross-field rules unless the Gate A record explicitly proves them for Gateway.
+- [!] Add observable-contract tests for each cleared field independently and every proven family interaction: exact buffered and streaming request JSON; omission and explicit false/empty distinctions; every authoritative accepted boundary and rejected boundary when Gateway defines one, otherwise retention of the generic request bounds and no invented narrower rejection; value/non-nil-pointer parity; nil and typed-nil rejection; mixed ordinary/web/fieldless-x/configurable-x ordering; duplicates; zero credential/network work on local rejection; unchanged fieldless shape; unchanged raw buffered/event behavior; and no typed x-search output/event additions. Tests for uncleared candidates are forbidden except assertions that no such public field exists where the repository's contract style requires it.
+- [!] Review loop: run the focused commands below, obtain an independent API/wire/validation/security review, fix every actionable finding in a separate narrowly owned commit, rerun the same commands after the last fix, then obtain a clean rereview. After closure, land a tracker-only accounting handoff commit with intended subject `docs: account gateway x search options` and sole path `planning/IMPLEMENTATION_PLAN.md`; it records every implementation/fix full hash, exact subject/path, command result, and review outcome without claiming its own hash. Chunk 31A may begin only after that accounting commit lands and treats it as an acyclic predecessor to be recorded by the next handoff.
+
+**Chunk 31 acceptance commands (credentials and all live acknowledgements absent):**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK go test -count=1 -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn|XSearch)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK go test -race -count=1 -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn|XSearch)' ./...
+```
+
+### Chunk 31A — External consumer contract and strict export audit
+
+**Status:** `[!]` Blocked on Chunk 31's landed tracker-only accounting handoff after committed implementation, passing focused gates, recorded findings/fixes, and clean rereview. **Commit boundary:** `test: audit gateway x search options`.
+
+**Owned paths (exact three):** `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `planning/IMPLEMENTATION_PLAN.md`.
+
+- [!] Compile- and reflection-lock `ResponseXSearchOptionsTool`'s exact name, exported field order/types, value/non-nil-pointer sealed-interface conformance, and constructibility for every cleared presence form. Retain the exact zero-field `ResponseXSearchTool`, wrapper inventory, method signatures, legacy `ResponsesRequest`, and raw result/event contracts.
+- [!] Extend the strict bidirectional export inventory and offline external consumer to exercise fieldless and configurable forms. It must reject alternate/compatibility names for `ResponseXSearchOptionsTool`, generic option maps, provider-option escape hatches, direct-xAI clients/auth/base URLs, typed x-search output/event types, accidental method changes, and any uncleared candidate field.
+- [!] Review loop: fix every actionable external-contract/audit finding, rerun both commands after the last fix, and obtain a clean independent rereview. After closure, land a tracker-only accounting handoff commit with intended subject `docs: account gateway x search option audit` and sole path `planning/IMPLEMENTATION_PLAN.md`; record the Chunk 31 accounting hash and every Chunk 31A implementation/fix hash, subject, changed path, result, and review outcome without claiming the handoff's own hash. Chunk 32 may begin only after this handoff lands.
+
+**Chunk 31A acceptance commands:**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK go test -count=1 -run '^TestExternalContract' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off ./scripts/verify-local-consumer.sh
+```
+
+### Chunk 32 — Public documentation, migration note, and durable evidence
+
+**Status:** `[!]` Blocked on Chunk 31A's landed tracker-only accounting handoff. **Commit boundary:** `docs: describe gateway x search options`.
+
+**Owned paths (exact five):** `docs/x-search.md`, `docs/generation.md`, `README.md`, `CHANGELOG.md`, `planning/IMPLEMENTATION_PLAN.md`.
+
+- [!] Document only Gate-A-cleared fields and exact presence/validation semantics, the exact evidenced Gateway route(s), request-only scope, no universal model/fallback promise, unchanged fieldless form, and unchanged raw output/event boundaries. List every uncleared candidate field/family as blocked rather than implying all-or-nothing support.
+- [!] Add a safe configurable example that prints no handles, prompts, raw bodies/events, generated prose, citations, IDs, or provider metadata. Explain that existing callers require no migration because `ResponseXSearchTool{}`, wrappers, and methods are preserved; configuration is opt-in through the new sealed type.
+- [!] Reconcile the changelog/support matrix without erasing the historical fieldless record or claiming direct-xAI support. Cite the pinned direct sources only as vocabulary provenance and the Gate A Gateway evidence as acceptance authority.
+- [!] Record sanitized evidence exactly within the Gate A retention policy. A paid probe does not clear general public-generation/provider-evaluation live gates or typed-output/event gates.
+- [!] Review loop: independently review API names/examples, evidence provenance, sanitation/privacy/cost wording, migration accuracy, and remaining blockers; fix findings; rerun both commands; obtain a clean rereview. After closure, land a tracker-only accounting handoff commit with intended subject `docs: account gateway x search option docs` and sole path `planning/IMPLEMENTATION_PLAN.md`; record the Chunk 31A accounting hash and every Chunk 32 implementation/fix hash, subject, changed path, result, and review outcome without claiming the handoff's own hash. Chunk 33 may begin only after this handoff lands.
+
+**Chunk 32 acceptance commands:**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK go test -count=1 ./examples/...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off ./scripts/verify-local-consumer.sh
+```
+
+### Chunk 33 — Package/release/maintainer reconciliation
+
+**Status:** `[!]` Blocked on Chunk 32's landed tracker-only accounting handoff. **Commit boundary:** `docs: reconcile gateway x search option status`.
+
+**Owned paths (exact five):** `doc.go`, `docs/evaluation-live-evidence.md`, `docs/releasing.md`, `AGENTS.md`, `planning/IMPLEMENTATION_PLAN.md`.
+
+- [!] Update package, live-evidence, release, and maintainer statements to the exact cleared option subset while preserving fieldless support, raw boundaries, model-specific evidence limits, direct-xAI separation, unrelated live/release blockers, and immutable-tag/bad-release policy.
+- [!] Update and consolidate the existing adjacent `x_search` lessons in `AGENTS.md` with the exact Gate-A-cleared option subset: keep direct-provider schemas as candidate vocabulary separate from exact public Gateway acceptance evidence; use the exact exported name `ResponseXSearchOptionsTool`; preserve fieldless `ResponseXSearchTool{}` and raw output/event boundaries; and do not add a duplicate lesson or duplicate plan.
+- [!] Review loop: independently audit documentation/source consistency, evidence sanitation, release implications, rollback wording, and acyclic commit accounting; fix and rerun the commands; obtain a clean rereview. After closure, land a tracker-only accounting handoff commit with intended subject `docs: account gateway x search option status` and sole path `planning/IMPLEMENTATION_PLAN.md`; record the Chunk 32 accounting hash and every Chunk 33 implementation/fix hash, subject, changed path, result, and review outcome without claiming the handoff's own hash. Chunk 34 may begin only after this handoff lands.
+
+**Chunk 33 acceptance commands:**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK go doc -all .
+git diff --check
+```
+
+### Chunk 34 — Final verification, split review, and exact completion accounting
+
+**Status:** `[!]` Blocked on the landed tracker-only accounting handoffs for Chunks 31, 31A, 32, and 33, with complete acyclic predecessor accounting and clean local rereviews. **Final tracker-only commit boundary:** `docs: close configurable x search continuation`; sole changed path `planning/IMPLEMENTATION_PLAN.md`; never attempt to embed its own hash.
+
+- [!] Run the complete credential-scrubbed gate from a clean committed checkout with `GOPROXY=off`: focused ordinary/race tests, full ordinary/race tests, vet, examples, documentation, external contract, local consumer/export audit, workspace diagnostics if available, and diff check. This is hermetic proof only and must not be described as a paid live run.
+- [!] Perform four independent read-only split reviews: (1) API/encoding/validation/tests; (2) external contract/export audit/backward compatibility; (3) public docs/evidence sanitation/privacy/cost; and (4) package/release/maintainer/accounting/rollback. Route every finding to its owning chunk, commit the fix in that chunk's path boundary, rerun that chunk's gates and then the complete gate, and repeat the affected review until clean.
+- [!] Reconcile one-to-one coverage of every changed path, every candidate field disposition (cleared or still blocked), every review finding/fix, and every predecessor full hash/subject/path. Only after all four partitions are clean may this tracker mark the implementation chunks `[x]` together.
+
+**Chunk 34 complete verification commands:**
+
+```sh
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn|XSearch)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -race -count=1 -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn|XSearch)' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -race -count=1 ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go vet ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 ./examples/...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go doc -all .
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^TestExternalContract' ./...
+env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off ./scripts/verify-local-consumer.sh
+git diff --check <recorded-Gate-A-accounting-hash>..HEAD
+```
+
+### Configurable-options rollback group and exact current accounting
+
+- [x] The configurable-options rollback group is separate from the completed fieldless `x_search` rollback group. If required, one coordinated committed rollback removes the new `ResponseXSearchOptionsTool`, its encoder/validator branches and focused tests, Chunk 31A external contract/export entries, option-specific docs/evidence/support claims, and maintainer/release statements. It must preserve all completed Chunk 31–34 and historical Chunk 26–30 accounting as truthful append-only history, then append rollback accounting with the removed API, exact predecessor and rollback hashes/subjects/paths, verification results, and review disposition. It must leave `ResponseXSearchTool{}`, its exact `{"type":"x_search"}` encoding, the two built-in-tool methods/wrapper, fieldless evidence, `web_search`, and raw outputs/events intact.
+- [x] Safe sequential implementation, audit, documentation, status, and tracker-only accounting commits may exist, but no intermediate state may mark the configurable feature complete or release it before audit, docs, accounting handoffs, and Chunk 34 close. No state may retain support claims for removed options, remove the fieldless API with only the configurable group, or rewrite old closed-chunk history. If a published configurable contract is defective, issue a new patch and follow the repository's immutable-tag/retract/advisory procedure; never move or reuse a tag.
+- [x] **Current implementation accounting:** zero configurable implementation commits; zero cleared Gateway option families; exact future public type name `ResponseXSearchOptionsTool`; all six candidate fields remain absent. Gate A is the sole next item, blocked on exact Gateway evidence and, if probing is necessary, owner authorization, fail-closed dedicated acknowledgement/general-ack absence/exactly-one-credential enforcement, credential-free zero-dispatch mismatch tests, protected credential, accepted cost, and sanitized evidence. Chunks 31, 31A, 32, 33, and 34 are dependency-blocked in that order through their explicit tracker-only handoffs. There is no locally doable implementation, audit, documentation, or final-review item until Gate A clears and its accounting commit lands.
