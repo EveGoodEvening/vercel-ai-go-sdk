@@ -7,15 +7,21 @@ All notable changes, including every exported breaking change during v0, are rec
 ### Supported behavior
 
 - Experimental Evaluation Model V4 Go client for boolean, choice, and score evaluation questions.
-- Typed request, result, metadata, retry-policy, warning, and error surfaces for evaluation calls.
-- Credential-free hermetic checks, a separately gated paid live-contract workflow, and a clean local-consumer compile gate.
+- Public Gateway generation through `POST /v1/responses` and `POST /v1/chat/completions`, with typed buffered and caller-owned SSE streaming calls.
+- Separate `WithBaseURL` routing for provider evaluation and `WithPublicBaseURL` routing for public generation; neither base URL redirects the other contract.
+- Typed request, result, metadata, retry-policy, warning, stream, and error surfaces. Responses and Chat function-tool definitions, calls, arguments, and results are transported as data; the SDK does not execute tools.
+- Credential-free hermetic contract gates cover evaluation plus buffered and streaming Responses and Chat over loopback, alongside separately gated paid live-contract workflows and a clean local-consumer compile gate.
+- Successful raw generation JSON, stream events, evaluation bodies, prompts, tool data, headers, identifiers, and provider metadata remain sensitive evidence boundaries; repository gates and sanitized structural output do not establish hosted-service success.
 
 ### Explicit non-goals
 
-- No OpenAI-compatible `/v1/chat/completions`, `/v1/responses`, or public `/v1/evaluate` client.
-- No language-generation or streaming API.
+- No public `POST /v1/evaluate` client; its success schema remains blocked on first-party evidence.
+- No AI SDK internal `POST /v4/ai/language-model` provider client; generation uses the distinct public `/v1/responses` and `/v1/chat/completions` contracts.
+- No Responses built-in search or Chat Gateway server-search tools without sufficient first-party wire and live evidence.
+- No Gateway-native xAI `x_search` API. Confirmed direct-xAI behavior does not establish Gateway support; first-party Gateway wire evidence and an authorized native live probe are still required.
+- No automatic tool execution, agents, or orchestration; function-tool payload support is data transport only.
 - No claim of full Vercel AI SDK or provider feature parity.
-- No Gateway-native `x_search` API. Gateway support for native xAI `x_search` is unconfirmed, so it remains unsupported here; confirmed direct-xAI behavior does not establish Gateway support.
+- Public generation and provider evaluation live execution remain **NOT RUN / PENDING LIVE RUN**. Hermetic fixtures are not hosted-service evidence, and the separately acknowledged live contracts are not evidence for each other.
 
 ### Experimental status and risk
 
