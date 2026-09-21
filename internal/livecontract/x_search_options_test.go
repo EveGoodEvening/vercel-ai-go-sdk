@@ -146,7 +146,7 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 		t.Fatal("fieldless-control failed before configurable probes: unexpected HTTP status class")
 	}
 
-	canonicalSucceeded := false
+	canonicalNeedsDiagnostics := false
 	failures := make([]string, 0)
 	for _, probeCase := range configurableCases {
 		record, probeErr := runProbe(probeCase)
@@ -156,12 +156,12 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 		}
 		logXSearchProbeRecord(t, record)
 		succeeded := record.httpStatus >= 200 && record.httpStatus < 300
+		ambiguousCanonicalRejection := probeCase.label == "canonical-all-six" &&
+			!succeeded && isSafeXSearchAmbiguousRejection(record)
 		if probeCase.label == "canonical-all-six" {
-			canonicalSucceeded = succeeded
+			canonicalNeedsDiagnostics = ambiguousCanonicalRejection
 		}
 		if probeCase.wantSuccess {
-			ambiguousCanonicalRejection := probeCase.label == "canonical-all-six" &&
-				(record.httpStatus == http.StatusBadRequest || record.httpStatus == http.StatusUnprocessableEntity)
 			if !succeeded && !ambiguousCanonicalRejection {
 				failures = append(failures, probeCase.label+": unexpected HTTP status class")
 			}
@@ -170,7 +170,7 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 		}
 	}
 
-	if !canonicalSucceeded {
+	if canonicalNeedsDiagnostics {
 		for _, probeCase := range diagnostics {
 			record, probeErr := runProbe(probeCase)
 			if probeErr != nil {
@@ -403,18 +403,22 @@ func individualXSearchOptionDiagnostics(private xSearchPrivateInputs) []xSearchP
 }
 
 func isAttributableXSearchValidationRejection(record xSearchProbeRecord) bool {
-	if record.wrongKindCount != 1 || !record.errorPresent {
+	return record.wrongKindCount == 1 && isSafeXSearchAmbiguousRejection(record)
+}
+
+func isSafeXSearchAmbiguousRejection(record xSearchProbeRecord) bool {
+	if !record.errorPresent {
 		return false
 	}
 	if record.httpStatus != http.StatusBadRequest && record.httpStatus != http.StatusUnprocessableEntity {
 		return false
 	}
 	switch record.errorCategory {
-	case "authentication_error", "permission_error", "rate_limit_error", "server_error":
+	case "authentication_error", "permission_error", "rate_limit_error", "server_error", "service_error", "transient_error", "timeout_error", "conflict_error":
 		return false
 	}
 	switch record.errorCode {
-	case "model_not_found", "unauthorized", "forbidden", "rate_limit_exceeded":
+	case "model_not_found", "unauthorized", "forbidden", "rate_limit_exceeded", "server_error", "internal_server_error", "service_unavailable", "overloaded", "timeout", "request_timeout", "conflict":
 		return false
 	}
 	return true
@@ -485,7 +489,7 @@ func safeErrorJSONClass(raw json.RawMessage, classify func(string) string) strin
 
 func safeErrorCategory(value string) string {
 	switch value {
-	case "invalid_request_error", "authentication_error", "permission_error", "rate_limit_error", "server_error":
+	case "invalid_request_error", "authentication_error", "permission_error", "rate_limit_error", "server_error", "service_error", "transient_error", "timeout_error", "conflict_error":
 		return value
 	case "":
 		return "absent"
@@ -496,7 +500,7 @@ func safeErrorCategory(value string) string {
 
 func safeErrorCode(value string) string {
 	switch value {
-	case "invalid_request", "invalid_tool", "invalid_argument", "model_not_found", "unauthorized", "forbidden", "rate_limit_exceeded":
+	case "invalid_request", "invalid_tool", "invalid_argument", "model_not_found", "unauthorized", "forbidden", "rate_limit_exceeded", "server_error", "internal_server_error", "service_unavailable", "overloaded", "timeout", "request_timeout", "conflict":
 		return value
 	case "":
 		return "absent"
