@@ -1572,6 +1572,10 @@ The unchecked chunks below are sequential. **Chunk 26 is the first dependency-re
 
 **Draft commit boundary:** `feat: add responses web search request`. **Serialized accounting commit boundary:** `docs: record responses web search implementation`.
 
+**Current status:** `[-]` implementation and implementation-time verification are complete in draft commit `0295db6` (`feat: add responses web search request`); independent API/wire review is the next gate. Chunk 26 remains intentionally incomplete pending its review/accounting gates and the final encompassing Chunk 30 closure.
+
+**Draft implementation changed paths (exact four):** `responses.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`.
+
 **Exported API decision:** preserve the exact exported field order and types of `ResponsesRequest` so external unkeyed literals remain source-compatible. Add an opt-in wrapper and distinct methods rather than adding a field to the existing struct:
 
 ```go
@@ -1590,13 +1594,13 @@ func (c *Client) CreateResponseWithBuiltInTools(context.Context, ResponsesBuiltI
 func (c *Client) StreamResponseWithBuiltInTools(context.Context, ResponsesBuiltInToolsRequest) (*ResponseStream, error)
 ```
 
-- [ ] Implement the sealed Responses-only declaration above. `ResponseWebSearchTool{}` must be the sole public web-search configuration; do not export a free string, option map, `SearchContextSize` enum, preview type, or generic built-in-tool escape hatch.
-- [ ] Encode existing function tools first and wrapper built-in tools second, each in caller order. The exact web-search JSON is `{"type":"web_search","search_context_size":"low"}`. Preserve existing omission behavior when both tool collections are empty and preserve the existing SDK-owned `stream:false`/`stream:true` distinction.
-- [ ] Reuse existing `ResponsesRequest` validation unchanged, then validate wrapper tools before credentials/network. Reject nil and typed-nil interface elements, unsupported private variants, and a combined function-plus-built-in tool count above the existing 10,000-member ceiling with canonical `ValidationError` paths. Duplicate declarations remain caller-visible and serialize in order; do not silently deduplicate.
-- [ ] Preserve existing generic Responses `tool_choice` and `allowed_tools` request behavior only as already exported; do not add a search-specific selector, name, or compatibility promise. Focused web-search examples and tests must omit both because their search-specific semantics are unproven.
-- [ ] Keep buffered and streaming output APIs byte-for-byte unchanged. Hermetic fixtures may include raw `web_search_call` JSON only to prove it remains accessible through `RawJSON`/`RawResponseEvent`; tests must not decode or assert undocumented child fields.
-- [ ] Add exact minimum JSON, mixed function+built-in ordering, duplicate ordering, buffered/stream request parity, nil/typed-nil/unsupported/combined-limit zero-dispatch failures, raw-output preservation, and unchanged legacy request tests. Compile-lock the wrapper, marker implementation, both method signatures, unchanged `ResponsesRequest` field inventory/order, and unchanged result/event APIs in the owned implementation tests; Chunk 26A owns the independent external-consumer compile lock and strict export audit.
-- [ ] Document in Go comments that the first-party public-HTTP compatibility evidence is OpenAI-provider native search and names `openai/gpt-5.4-mini`; do not hard-code a model catalog or reject future model IDs locally. State that callers must choose a compatible OpenAI model and that Gateway routing/fallback compatibility is not promised.
+- [x] Implement the sealed Responses-only declaration above. `ResponseWebSearchTool{}` must be the sole public web-search configuration; do not export a free string, option map, `SearchContextSize` enum, preview type, or generic built-in-tool escape hatch.
+- [x] Encode existing function tools first and wrapper built-in tools second, each in caller order. The exact web-search JSON is `{"type":"web_search","search_context_size":"low"}`. Preserve existing omission behavior when both tool collections are empty and preserve the existing SDK-owned `stream:false`/`stream:true` distinction.
+- [x] Reuse existing `ResponsesRequest` validation unchanged, then validate wrapper tools before credentials/network. Reject nil and typed-nil interface elements, unsupported private variants, and a combined function-plus-built-in tool count above the existing 10,000-member ceiling with canonical `ValidationError` paths. Duplicate declarations remain caller-visible and serialize in order; do not silently deduplicate.
+- [x] Preserve existing generic Responses `tool_choice` and `allowed_tools` request behavior only as already exported; do not add a search-specific selector, name, or compatibility promise. Focused web-search examples and tests must omit both because their search-specific semantics are unproven.
+- [x] Keep buffered and streaming output APIs byte-for-byte unchanged. Hermetic fixtures may include raw `web_search_call` JSON only to prove it remains accessible through `RawJSON`/`RawResponseEvent`; tests must not decode or assert undocumented child fields.
+- [x] Add exact minimum JSON, mixed function+built-in ordering, duplicate ordering, buffered/stream request parity, nil/typed-nil/unsupported/combined-limit zero-dispatch failures, raw-output preservation, and unchanged legacy request tests. Compile-lock the wrapper, marker implementation, both method signatures, unchanged `ResponsesRequest` field inventory/order, and unchanged result/event APIs in the owned implementation tests; Chunk 26A owns the independent external-consumer compile lock and strict export audit.
+- [x] Document in Go comments that the first-party public-HTTP compatibility evidence is OpenAI-provider native search and names `openai/gpt-5.4-mini`; do not hard-code a model catalog or reject future model IDs locally. State that callers must choose a compatible OpenAI model and that Gateway routing/fallback compatibility is not promised.
 
 **Implementation-time verification commands:**
 
@@ -1605,6 +1609,8 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -race -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn)' ./...
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test ./...
 ```
+
+**Recorded draft verification (`0295db6`):** `gofmt` completed. Each credential-scrubbed command above passed exactly as shown: the focused test command, the race-focused test command, and the full Go test command. Go LSP diagnostics were attempted but unavailable because no Go language server is installed.
 
 **Review/accounting gate:**
 
