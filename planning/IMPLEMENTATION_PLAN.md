@@ -1723,11 +1723,15 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 
 ### Chunk 27 — Gateway-native SpaceXAI `x_search` request declaration
 
+**Current status:** `[-]` green implementation draft `79137a6` is recorded with exact changed paths and all three credential-scrubbed implementation-time Go test gates passing. The fieldless request declaration is implemented without configurable options or typed output/event/model expansion. Independent evidence/API review is the next gate; Chunk 27 remains intentionally incomplete until Chunk 30 closure.
+
 **Depends on:** Chunk 26A's external contract, strict audit, verification, committed accounting, and clean rereview are recorded; Chunks 26 and 26A remain intentionally incomplete. The positive `x_search_call` discriminator evidence above is `[x]`.
 
 **Owned paths (exact five):** `responses_tools.go`, `responses_wire.go`, `responses_validate.go`, `responses_test.go`, `planning/IMPLEMENTATION_PLAN.md`.
 
 **Draft commit boundary:** `feat: add gateway x search request`. **Serialized accounting commit boundary:** `docs: record gateway x search implementation`.
+
+**Green draft commit:** `79137a6` (`feat: add gateway x search request`) changed exactly `responses_tools.go`, `responses_wire.go`, `responses_validate.go`, and `responses_test.go`. The four changed Go files were formatted with `gofmt`.
 
 **Exported API decision:** extend the sealed `ResponseBuiltInTool` union without changing `ResponsesBuiltInToolsRequest` or either method:
 
@@ -1735,11 +1739,11 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 type ResponseXSearchTool struct{}
 ```
 
-- [ ] Extend the sealed Responses-only union with the fieldless declaration above. Encode exactly `{"type":"x_search"}` and no other member. Do not export option fields, arbitrary maps, provider options, aliases, query/result configuration, or a direct-xAI client behavior.
-- [ ] Reuse the wrapper validation established by Chunk 26. `ResponseXSearchTool{}` has no option-specific validation; only the shared nil/typed-nil/unsupported-union and combined tool-count rules apply before credentials/network. Do not import direct-xAI handle limits, mutual-exclusion rules, calendar/date-order checks, null rules, or defaults.
-- [ ] Model policy is documentation, not a closed runtime enum: identify `spacexai/grok-4.6` as the exact positively probed route. Do not claim all SpaceXAI models, fallback portability, or option compatibility, and do not reject dynamic future model IDs locally; unsupported routes may fail server-side.
-- [ ] Add exact minimum JSON, mixed function+`web_search`+fieldless `x_search` ordering, duplicate ordering, typed-nil union and combined-limit zero-dispatch cases, buffered raw `x_search_call` preservation, streaming raw event preservation, and unchanged legacy/web-search regressions. There are no all-options, option-presence, date, handle-list, or option-validation tests.
-- [ ] Compile-lock the fieldless exported type and unchanged wrapper/method/result/event contracts in owned implementation tests. Chunk 27A owns the independent external compile contract and strict consumer audit. Do not add typed `x_search_call`, posts, actions, sources, citations, lifecycle events, server-side tool results, or any configurable-option compatibility promise.
+- [x] Extend the sealed Responses-only union with fieldless `ResponseXSearchTool{}`. It encodes exactly `{"type":"x_search"}` and no other member; no option fields, arbitrary maps, provider options, aliases, query/result configuration, or direct-xAI client behavior were added.
+- [x] Reuse the wrapper validation established by Chunk 26. `ResponseXSearchTool{}` has no option-specific validation; only the shared nil/typed-nil/unsupported-union and combined tool-count rules apply before credentials/network. No direct-xAI handle limits, mutual-exclusion rules, calendar/date-order checks, null rules, or defaults were imported.
+- [x] Preserve model policy as documentation rather than a closed runtime enum: `spacexai/grok-4.6` remains the exact positively probed route. The implementation does not claim all SpaceXAI models, fallback portability, or option compatibility and does not reject dynamic future model IDs locally; unsupported routes may fail server-side.
+- [x] Add exact minimum JSON, mixed function+`web_search`+fieldless `x_search` ordering, duplicate ordering, typed-nil union and combined-limit zero-dispatch cases, buffered raw `x_search_call` preservation, streaming raw event preservation, and unchanged legacy/web-search regressions. No all-options, option-presence, date, handle-list, or option-validation tests were added.
+- [x] Compile-lock the fieldless exported type and unchanged wrapper/method/result/event contracts in owned implementation tests. Chunk 27A still owns the independent external compile contract and strict consumer audit. No typed `x_search_call`, posts, actions, sources, citations, lifecycle events, server-side tool results, or configurable-option compatibility promise was added.
 
 **Implementation-time verification commands:**
 
@@ -1748,6 +1752,8 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test -race -run 'Test(CreateResponse|StreamResponse|ResponsesBuiltIn|XSearch)' ./...
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK go test ./...
 ```
+
+All three commands above passed against green draft `79137a6` with `AI_GATEWAY_API_KEY`, `VERCEL_OIDC_TOKEN`, `AI_GATEWAY_LIVE_COST_ACK`, and `AI_GATEWAY_PUBLIC_LIVE_COST_ACK` unset: focused `go test`, focused race `go test -race`, and full `go test ./...`.
 
 **Review/accounting gate:**
 
