@@ -32,7 +32,7 @@ result, err := client.CreateResponse(ctx, gateway.ResponsesRequest{
 if err != nil {
     return err
 }
-raw := result.RawJSON() // fresh copy of the complete bounded JSON object
+fmt.Printf("response_bytes=%d\n", len(result.RawJSON()))
 ```
 
 `CreateResponse` posts with `stream:false`. A status-200 body must be a single non-null JSON object with valid UTF-8, no duplicate object keys, bounded nesting/member/string sizes, and no trailing JSON value. `ResponseResult.RawJSON` returns a fresh copy; the package does not project the provider-specific response object into a larger typed result.
@@ -61,17 +61,20 @@ if err != nil {
 }
 defer stream.Close()
 
+textDeltaEvents := 0
+rawEvents := 0
 for stream.Next() {
-    switch event := stream.Event().(type) {
+    switch stream.Event().(type) {
     case gateway.ResponseOutputTextDeltaEvent:
-        fmt.Print(event.Delta)
+        textDeltaEvents++
     case gateway.RawResponseEvent:
-        _ = event.RawJSON() // fresh copy of an otherwise uninterpreted JSON event
+        rawEvents++
     }
 }
 if err := stream.Err(); err != nil {
     return err
 }
+fmt.Printf("text_delta_events=%d raw_events=%d\n", textDeltaEvents, rawEvents)
 ```
 
 `StreamResponse` sends the same request with `stream:true`. `ResponseOutputTextDeltaEvent` exposes the JSON type, SSE event name and ID, and text delta. Other valid JSON event objects are retained as `RawResponseEvent`. Clean, correctly framed EOF terminates successfully. Invalid framing/UTF-8/JSON, a missing event type, resource-limit violations, cancellation, or body read/close failure terminates with `TransportError` operation `read response stream`.
@@ -92,11 +95,13 @@ result, err := client.CreateChatCompletion(ctx, gateway.ChatCompletionRequest{
 if err != nil {
     return err
 }
+contentChoices := 0
 for _, choice := range result.Choices.Value {
     if choice.Message.Present && choice.Message.Value.Content.Present {
-        fmt.Println(choice.Message.Value.Content.Value)
+        contentChoices++
     }
 }
+fmt.Printf("choices=%d content_choices=%d\n", len(result.Choices.Value), contentChoices)
 ```
 
 `CreateChatCompletion` posts with `stream:false`. `ChatCompletionResult` provides absence/null/value-preserving `JSONField` values for ID, object, creation time, model, choices, assistant content/tool calls, finish reason, and usage. `RawJSON` returns a fresh copy of the complete bounded response. Fixed typed fields are validated, while unmodeled response fields remain available in the raw JSON.
@@ -126,14 +131,16 @@ if err != nil {
 }
 defer stream.Close()
 
+chunks := 0
+choices := 0
 for stream.Next() {
-    for _, choice := range stream.Event().Choices {
-        fmt.Print(choice.Delta.Content)
-    }
+    chunks++
+    choices += len(stream.Event().Choices)
 }
 if err := stream.Err(); err != nil {
     return err
 }
+fmt.Printf("chunks=%d choices=%d\n", chunks, choices)
 ```
 
 `StreamChatCompletion` sends `stream:true`. Each event is a validated `chat.completion.chunk`; `ChatCompletionChunk` exposes ordered choices and their text delta, while `RawJSON` retains the complete chunk. The exact `data: [DONE]` marker is required. EOF before `[DONE]`, malformed framing/JSON, the wrong object discriminator, resource-limit violations, cancellation, or body read/close failure becomes `TransportError` operation `read chat completion stream`.
