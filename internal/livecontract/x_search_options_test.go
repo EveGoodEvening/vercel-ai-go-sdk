@@ -27,6 +27,7 @@ const (
 	xSearchOptionsMaxCalls       = 14
 	xSearchOptionsRequestTimeout = 90 * time.Second
 	xSearchOptionsOverallTimeout = 22 * time.Minute
+	xSearchInteractionMaxCalls   = 4
 )
 
 var xSearchGeneralAckEnvs = [...]string{"AI_GATEWAY_LIVE_COST_ACK", "AI_GATEWAY_PUBLIC_LIVE_COST_ACK"}
@@ -105,12 +106,7 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 
 	overallCtx, cancelOverall := context.WithTimeout(t.Context(), xSearchOptionsOverallTimeout)
 	defer cancelOverall()
-	client := &http.Client{
-		Transport: http.DefaultTransport,
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
+	client := newXSearchOptionsClient()
 	controlCase := xSearchProbeCase{label: "fieldless-control", wantSuccess: true}
 	configurableCases := []xSearchProbeCase{
 		{label: "canonical-all-six", options: canonicalXSearchOptions(prerequisites.private), wantSuccess: true, optionClasses: []string{"boolean", "date", "handle-list"}},
@@ -188,6 +184,88 @@ func TestGatewayXSearchOptionsContract(t *testing.T) {
 	}
 	if len(failures) != 0 {
 		t.Fatalf("x_search options contract failed in %d structurally identified case(s): %s", len(failures), strings.Join(failures, "; "))
+	}
+}
+
+func TestGatewayXSearchOptionsInteractionContract(t *testing.T) {
+	prerequisites, err := resolveXSearchOptionsPrerequisites(os.LookupEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	overallCtx, cancelOverall := context.WithTimeout(t.Context(), xSearchOptionsOverallTimeout)
+	defer cancelOverall()
+	client := newXSearchOptionsClient()
+	probeCases := []xSearchProbeCase{
+		{label: "fieldless-control", wantSuccess: true},
+		{
+			label: "allowed-with-dates-and-understanding",
+			options: map[string]any{
+				"allowed_x_handles":          []string{prerequisites.private.handleA},
+				"from_date":                  prerequisites.private.fromDate,
+				"to_date":                    prerequisites.private.toDate,
+				"enable_image_understanding": true,
+				"enable_video_understanding": true,
+			},
+			wantSuccess:   true,
+			optionClasses: []string{"boolean", "date", "handle-list"},
+		},
+		{
+			label: "excluded-with-dates-and-understanding",
+			options: map[string]any{
+				"excluded_x_handles":         []string{prerequisites.private.handleB},
+				"from_date":                  prerequisites.private.fromDate,
+				"to_date":                    prerequisites.private.toDate,
+				"enable_image_understanding": true,
+				"enable_video_understanding": true,
+			},
+			wantSuccess:   true,
+			optionClasses: []string{"boolean", "date", "handle-list"},
+		},
+		{
+			label: "allowed-and-excluded-handles-only",
+			options: map[string]any{
+				"allowed_x_handles":  []string{prerequisites.private.handleA},
+				"excluded_x_handles": []string{prerequisites.private.handleB},
+			},
+			optionClasses: []string{"handle-list"},
+		},
+	}
+	if len(probeCases) > xSearchInteractionMaxCalls {
+		t.Fatal("x_search interaction probe exceeds its hard request cap")
+	}
+
+	calls := 0
+	for index, probeCase := range probeCases {
+		if calls >= xSearchInteractionMaxCalls {
+			t.Fatal("x_search interaction probe reached its hard request cap")
+		}
+		requestCtx, cancelRequest := context.WithTimeout(overallCtx, xSearchOptionsRequestTimeout)
+		calls++
+		record, probeErr := runXSearchOptionsProbe(requestCtx, client, prerequisites, probeCase)
+		cancelRequest()
+		if probeErr != nil {
+			t.Fatalf("%s failed: %s", probeCase.label, probeErr)
+		}
+		logXSearchProbeRecord(t, record)
+
+		switch index {
+		case 0:
+			if record.httpStatus < 200 || record.httpStatus >= 300 {
+				t.Fatal("fieldless-control failed before interaction probes: unexpected HTTP status class")
+			}
+		case 1, 2:
+			if record.httpStatus != http.StatusOK {
+				t.Fatalf("%s: expected HTTP 200", probeCase.label)
+			}
+		case 3:
+			if !isSafeXSearchAmbiguousRejection(record) {
+				t.Fatal("allowed-and-excluded-handles-only: expected safe structural HTTP 400/422 rejection")
+			}
+		}
+	}
+	if calls > xSearchInteractionMaxCalls {
+		t.Fatalf("x_search interaction probe dispatched %d requests, hard cap is %d", calls, xSearchInteractionMaxCalls)
 	}
 }
 
@@ -294,6 +372,15 @@ func executeXSearchOptionsWithPrerequisites(ctx context.Context, lookup func(str
 	}
 	_, err = runXSearchOptionsProbe(ctx, newClient(), prerequisites, probeCase)
 	return err
+}
+
+func newXSearchOptionsClient() *http.Client {
+	return &http.Client{
+		Transport: http.DefaultTransport,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 }
 
 func runXSearchOptionsProbe(ctx context.Context, client *http.Client, prerequisites xSearchPrerequisites, probeCase xSearchProbeCase) (xSearchProbeRecord, error) {

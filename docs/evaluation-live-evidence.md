@@ -6,21 +6,20 @@
 | --- | --- | --- |
 | Public generation | **NOT RUN** | Buffered and streaming Responses; buffered and streaming Chat |
 | Provider evaluation | **NOT RUN** | `Evaluate` with boolean, choice, and score questions |
-| Configurable Gateway `x_search` options | **IMPLEMENTED; TWO ATTEMPTS INCONCLUSIVE** | Corrected fail-closed prerequisite gate plus bounded structural option matrix; rerun pending |
+| Configurable Gateway `x_search` options | **14-CALL RUN REVIEWED; INTERACTION PROBE IMPLEMENTED / NOT RUN** | Six singleton fields and the exact neutral combination accepted; ambiguous interactions remain blocked |
 
-No owner-authorized public-generation or provider-evaluation paid live-contract run or sanitized hosted result is recorded; those protected records remain **PENDING LIVE RUN**. The owner separately authorized the dedicated configurable Gateway `x_search` evidence run and accepted its bounded cost. Both paid attempts on 2026-09-21 are **INCONCLUSIVE** and cleared or rejected no option field: the first was cancelled after one sanitized canonical record, and the second timed out at the fieldless control before any configurable option case ran. Hermetic tests, successful compilation, credential-gate failures, search probe/harness implementation, and these inconclusive attempts do not clear any live-contract gate.
+No owner-authorized public-generation or provider-evaluation paid live-contract run or sanitized hosted result is recorded; those protected records remain **PENDING LIVE RUN**. The separately authorized third configurable Gateway `x_search` run completed 14 serial calls on 2026-09-21 and was independently adjudicated from its sanitized structural record. It establishes request acceptance only for the six singleton fields in their tested forms and for the exact combination of both empty handle lists with both booleans false. The canonical all-six HTTP 400 is ambiguous, and the three wrong-kind HTTP 500 responses are inconclusive. No field semantics or typed output/event contract is established. The separate four-call interaction probe is implemented but **NOT RUN**. None of this clears the public-generation or provider-evaluation gate.
 
 ### Narrow Responses search evidence
 
-Owner-authorized public Gateway probes on 2026-09-21 structurally corroborated only fixed low-context `{"type":"web_search","search_context_size":"low"}` with `openai/gpt-5.4-mini` and fieldless `{"type":"x_search"}` with `spacexai/grok-4.6`, including the corresponding observed raw search-call discriminators. This supports exact request serialization only. It does not establish configurable `x_search` options; `web_search_preview` or any other web-search form or option; wider model compatibility; direct-xAI compatibility; typed buffered search outputs, citations, or annotations; typed stream events or lifecycle semantics; optional Chat live corroboration; provider-evaluation behavior; or any other owner-authorized paid-live gate.
+Owner-authorized public Gateway probes on 2026-09-21 structurally corroborated fixed low-context `{"type":"web_search","search_context_size":"low"}` with `openai/gpt-5.4-mini` and fieldless `{"type":"x_search"}` with `spacexai/grok-4.6`, including the corresponding observed raw search-call discriminators. Those narrow probes support their exact request serialization only; configurable `x_search` acceptance is governed separately by the reviewed matrix and pending interaction gate below. None of this establishes `web_search_preview` or any other web-search form or option; wider model compatibility; direct-xAI compatibility; typed buffered search outputs, citations, or annotations; typed stream events or lifecycle semantics; optional Chat live corroboration; provider-evaluation behavior; or any other owner-authorized paid-live gate.
 
 The durable repository evidence retains only sanitized structural facts. A non-publishable internal orchestration artifact is excluded because it contains exact prompt inputs; this record does not reproduce or paraphrase them. No credentials, authorization data, prompts, generated prose, full bodies, headers, identifiers, or raw payloads are retained here.
 ### Configurable Gateway `x_search` option evidence gate
 
-The dedicated Gate A harness is implemented. Owner authorization and cost acceptance are recorded without retaining any credential or credential value. The first paid attempt is **INCONCLUSIVE / CANCELLED** and the second is **INCONCLUSIVE / TIMED OUT AT FIELDLESS CONTROL**; neither cleared or rejected an option field. The corrected verification and authorized rerun remain pending. This is a third, separate live-evidence path: it does not run in, replace, or clear either the general `public-generation` or `provider-evaluation` job.
+The dedicated Gate A matrix harness is implemented, and its third authorized paid run completed. Owner authorization and cost acceptance are recorded without retaining any credential or credential value. Independent adjudication clears only request acceptance for `allowed_x_handles`, `excluded_x_handles`, `from_date`, `to_date`, `enable_image_understanding`, and `enable_video_understanding` in their tested singleton forms, plus the exact neutral combination containing both empty handle lists and both explicit false booleans. The canonical all-six HTTP 400 remains indivisibly ambiguous; the three wrong-kind HTTP 500 responses establish neither attributable validation rejection nor accepted wrong-kind behavior. This is a third, separate live-evidence path: it does not run in, replace, or clear either the general `public-generation` or `provider-evaluation` job.
 
-The paid selector is exactly `^TestGatewayXSearchOptionsContract$`. It sends serial, buffered requests with `-count=1` to `POST https://ai-gateway.vercel.sh/v1/responses` using only `spacexai/grok-4.6`. It makes no retry and performs no fallback. Every request has a strict 90-second deadline derived from one 22-minute overall test deadline; the protected workflow job has `timeout-minutes: 25`, so worst-case test time remains below the workflow bound. The corrected sequence sends the fieldless control first and aborts before every option-bearing case unless that control succeeds. Its static option matrix contains one combined canonical request with all six candidate fields present; explicit empty-list and explicit-false forms; `from_date` alone; `to_date` alone; and grouped wrong-type attribution cases for handle lists, dates, and booleans. Only if the combined canonical case fails may six independently controlled one-field valid diagnostics run; that canonical failure does not itself clear, reject, or attribute any field. The hard-coded ceiling remains 14 requests.
-Canonical diagnostics expand only for HTTP 400/422 with structurally present error and no known excluded auth/permission/rate/timeout/conflict/server/transient/service category/code; absent errors or excluded classes fail without expansion.
+The completed matrix selector is exactly `^TestGatewayXSearchOptionsContract$`. It sent 14 serial, buffered calls with `-count=1` to `POST https://ai-gateway.vercel.sh/v1/responses` using only `spacexai/grok-4.6`, with no retry or fallback. Each request used a strict 90-second deadline derived from one 22-minute overall test deadline. The fieldless control and nine option-bearing acceptance cases returned HTTP 200 completed responses; the canonical all-six case returned ambiguous HTTP 400; and the three wrong-kind families returned inconclusive HTTP 500. The observed structural output discriminator set does not establish output schema, semantics, requiredness, nullability, citations, results, or stream events.
 
 Execution fails closed unless exactly one nonblank `AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` is present, the dedicated acknowledgement is exactly `AI_GATEWAY_X_SEARCH_LIVE_COST_ACK=I_ACCEPT_LIVE_X_SEARCH_COSTS`, both `AI_GATEWAY_PUBLIC_LIVE_COST_ACK` and `AI_GATEWAY_LIVE_COST_ACK` are absent, and all five runtime-only private inputs are nonblank: `AI_GATEWAY_X_SEARCH_PROBE_INPUT`, `AI_GATEWAY_X_SEARCH_PROBE_HANDLE_A`, `AI_GATEWAY_X_SEARCH_PROBE_HANDLE_B`, `AI_GATEWAY_X_SEARCH_PROBE_FROM_DATE`, and `AI_GATEWAY_X_SEARCH_PROBE_TO_DATE`. The protected workflow supplies those variables only from GitHub secrets with the same exact names; it never accepts workflow-dispatch values. The credential-free selector `^TestGatewayXSearchOptionsPrerequisiteMismatchesZeroDispatch$` covers missing or wrong dedicated acknowledgement, either forbidden general acknowledgement, zero credentials, multiple credentials, and each private input missing or blank on an otherwise authorized configuration; every mismatch must fail before HTTP client or request construction and record zero `RoundTrip` calls.
 
@@ -28,8 +27,7 @@ An isolated wrong-type case may count as attributable request rejection only aft
 
 Retained output is allowlisted to the case label; structural option class set/count; HTTP status; safe top-level object/status classification; safe output discriminator/status sets; an `error_present` boolean; and sanitized error category/code classes initialized explicitly to `absent`. Missing values remain `absent` and unknown/raw provider values map to `other` rather than being copied. The harness and retained output must exclude credentials; prompts and queries; handle and date literals; request/response bodies and headers; request/response or provider IDs; generated prose; tool arguments/results; provider metadata; usage; raw events; and raw errors.
 
-Gate A remains blocked pending corrected prerequisite verification, an owner-authorized rerun of the corrected paid selector, sanitation review, and independent evidence review. Results may clear only the exact request fields and exact presence forms actually observed. A canonical combined failure must not clear, reject, or attribute any individual field; its independently controlled one-field valid diagnostics may still run. No result may silently clear an unisolated field, omitted/null behavior, an untested value class, validation rule, cross-field interaction, other model, fallback route, typed output/event contract, or direct-xAI behavior.
-Canonical diagnostics expand only for HTTP 400/422 with structurally present error and no known excluded auth/permission/rate/timeout/conflict/server/transient/service category/code; absent errors or excluded classes fail without expansion.
+Gate A remains blocked on the unresolved interaction. The separate interaction harness is **IMPLEMENTED / NOT RUN** under exact selector `^TestGatewayXSearchOptionsInteractionContract$`. It is capped at four serial calls: fieldless control; `allowed_x_handles` plus both dates and both true booleans with `excluded_x_handles` omitted; `excluded_x_handles` plus both dates and both true booleans with `allowed_x_handles` omitted; and both non-empty handle lists with dates and booleans omitted. The two five-field cases must return HTTP 200. The handle-pair-only case may establish rejection only through safe ambiguous HTTP 400/422 with a structurally present non-excluded error; otherwise it fails closed without attributing a rule. Results may not establish option semantics, typed outputs/events, untested presence/value forms, other models, fallback, or direct-xAI behavior. The immediate next action is credential-free verification of this interaction harness, followed by its separately authorized paid run and independent sanitation/evidence review.
 
 ## Pinned contracts
 
@@ -65,13 +63,22 @@ env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK \
   -run '^TestGatewayEvaluationContract$' -count=1
 ```
 
-Configurable Gateway `x_search` options (**authorized; two attempts INCONCLUSIVE; corrected rerun pending**):
+Completed configurable Gateway `x_search` matrix (do not rerun for interaction evidence):
 
 ```sh
 env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_LIVE_COST_ACK \
   AI_GATEWAY_X_SEARCH_LIVE_COST_ACK=I_ACCEPT_LIVE_X_SEARCH_COSTS \
   go test -tags=livecontract ./internal/livecontract \
   -run '^TestGatewayXSearchOptionsContract$' -count=1
+```
+
+Separate interaction probe (**IMPLEMENTED / NOT RUN; paid execution requires owner authorization**):
+
+```sh
+env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_LIVE_COST_ACK \
+  AI_GATEWAY_X_SEARCH_LIVE_COST_ACK=I_ACCEPT_LIVE_X_SEARCH_COSTS \
+  go test -tags=livecontract ./internal/livecontract \
+  -run '^TestGatewayXSearchOptionsInteractionContract$' -count=1
 ```
 
 The orchestrator selects the already-present protected credential and the five private probe inputs only at execution time. The private inputs are required environment variables named `AI_GATEWAY_X_SEARCH_PROBE_INPUT`, `AI_GATEWAY_X_SEARCH_PROBE_HANDLE_A`, `AI_GATEWAY_X_SEARCH_PROBE_HANDLE_B`, `AI_GATEWAY_X_SEARCH_PROBE_FROM_DATE`, and `AI_GATEWAY_X_SEARCH_PROBE_TO_DATE`; their values must exist only in protected GitHub secrets with matching names and must never appear in documentation, workflow-dispatch inputs, arguments, logs, retained evidence, or repository files. Before the paid selector, run the credential-free `^TestGatewayXSearchOptionsPrerequisiteMismatchesZeroDispatch$` selector with credentials and acknowledgements absent; its zero-dispatch matrix also exercises each missing or blank private input on an otherwise authorized configuration. It is verification of fail-closed dispatch behavior, not paid evidence.
@@ -112,19 +119,23 @@ Complete only from actual runs of [evaluation_test.go](../internal/livecontract/
 
 ## Sanitized configurable `x_search` option record
 
-Complete only from the dedicated paid selector after the prerequisite selector passes. The paid attempts below are retained solely as sanitized inconclusive accounting; neither is field evidence.
+The third paid matrix run below is retained only through its sanitized structural facts and independent adjudication. The interaction probe remains **NOT RUN**.
 
 | Field | Result | Retain only |
 | --- | --- | --- |
 | Authorization / cost acceptance | **RECORDED** | Boolean authorization and acceptance state; never a credential value |
-| First paid attempt | **2026-09-21 — INCONCLUSIVE / CANCELLED** | One sanitized canonical record only; the remaining serial diagnostic matrix was cancelled |
-| First-attempt route / case | `POST https://ai-gateway.vercel.sh/v1/responses`; `spacexai/grok-4.6`; `canonical-all-six` | Exact endpoint, model, and case label only; no option values |
-| First-attempt HTTP / shape | HTTP 400; object `absent`; status `absent`; no outputs; error category `other`; code `absent` | Status and safe structural classes only; no unknown/raw value or body |
-| Second paid attempt | **2026-09-21 — INCONCLUSIVE / TIMED OUT AT FIELDLESS CONTROL** | The fieldless control ended after exactly 30.02 seconds under the prior 30-second request deadline with sanitized `dispatch failed` |
-| Configurable option cases in second attempt | **ZERO** | No configurable option request was dispatched |
-| Cleared or rejected request surface | **NONE** | Neither the ambiguous first-attempt canonical 400 nor the second-attempt fieldless-control timeout attributes, clears, or rejects any field |
-| Next action | **Corrected verification, then owner-authorized rerun** | Verify the 90-second per-request / 22-minute overall bounds, then run the fieldless control first before option expansion |
-Both attempt records remain sanitized accounting only. Canonical diagnostics expand only for HTTP 400/422 with structurally present error and no known excluded auth/permission/rate/timeout/conflict/server/transient/service category/code; absent errors or excluded classes fail without expansion.
+| First paid attempt | **2026-09-21 — INCONCLUSIVE / CANCELLED** | One sanitized canonical record only; remaining calls cancelled |
+| Second paid attempt | **2026-09-21 — INCONCLUSIVE / TIMED OUT AT FIELDLESS CONTROL** | Zero configurable option calls under the former 30-second request deadline |
+| Third paid matrix run | **2026-09-21 — 14 CALLS COMPLETED; TEST FAILED ON THREE WRONG-KIND EXPECTATIONS** | 10 HTTP 200, one HTTP 400, three HTTP 500; 564.18 seconds wall-clock |
+| Route / model | `POST https://ai-gateway.vercel.sh/v1/responses`; `spacexai/grok-4.6` | Exact public route and pinned model only |
+| Accepted request forms | **Six singleton fields in tested forms; exact empty-lists/false-booleans combination** | HTTP 200 completed response structure; acceptance only, not semantic effect |
+| Canonical all-six | **HTTP 400 — AMBIGUOUS** | Error present; category `other`; code `absent`; no object/status/output; attributes no field or interaction |
+| Wrong-kind families | **HTTP 500 — INCONCLUSIVE** | Error present; category `other`; code `absent`; establishes no validation boundary or exclusive JSON type |
+| Semantic/output claim | **NONE** | Structural discriminator observations do not establish option efficacy or typed outputs/events |
+| Interaction probe | **IMPLEMENTED / NOT RUN** | Exact selector `^TestGatewayXSearchOptionsInteractionContract$`; four serial calls maximum |
+| Next action | **Credential-free interaction verification, then authorized paid interaction run** | Do not rerun the 14-case matrix; review only sanitized structural evidence |
+
+The four-call interaction probe uses the same fail-closed prerequisites, runtime-only private inputs, sanitation, endpoint/model, 90-second per-request deadline, 22-minute overall upper bound, and no retry/fallback. Its two maximal five-field cases must return HTTP 200; its non-empty handle-pair-only case may establish rejection only on safe ambiguous HTTP 400/422 with a structurally present non-excluded error. It otherwise fails closed without overclaim.
 
 No private input value, credential, body, header, ID, raw error, or generated content was retained or reconstructed. Do not add an operator/run reference, literal option value, or any excluded content to this record.
 
