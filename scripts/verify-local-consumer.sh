@@ -228,8 +228,10 @@ cat >"$consumer_dir/check_api.go" <<'EOF'
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
@@ -263,6 +265,27 @@ var allowedMethods = names(
 	"ResponseError.Error", "ResponseError.Unwrap", "ResponseError.StatusCode", "ResponseError.Message", "ResponseError.Type", "ResponseError.Code", "ResponseError.Param", "ResponseError.GenerationID", "ResponseError.RequestID", "ResponseError.ResponseID", "ResponseError.RetryAfter", "ResponseError.Retryable", "ResponseError.BodyTruncated", "ResponseError.RawResponseBody",
 	"ResponseValidationError.Error", "ResponseValidationError.Unwrap", "ResponseValidationError.StatusCode", "ResponseValidationError.Path", "ResponseValidationError.Reason", "ResponseValidationError.RequestID", "ResponseValidationError.ResponseID", "ResponseValidationError.BodyTruncated", "ResponseValidationError.RawResponseBody",
 )
+var expectedInterfaceMethods = map[string]map[string]string{
+	"TokenSource":             {},
+	"Question":                {"questionType": "func() string"},
+	"Answer":                  {"answerType": "func() string"},
+	"ResponseBuiltInTool":     {"responseBuiltInTool": "func()"},
+	"ResponseInput":           {"responseInput": "func()"},
+	"ResponseInputItem":       {"responseInputItem": "func()"},
+	"ResponseToolChoice":      {"responseToolChoice": "func()"},
+	"ResponseTextFormat":      {"responseTextFormat": "func()"},
+	"ResponseEvent":           {"responseEvent": "func()"},
+	"ChatServerTool":          {"chatServerTool": "func()"},
+	"ChatExaText":             {"chatExaText": "func()"},
+	"ChatExaHighlights":       {"chatExaHighlights": "func()"},
+	"ChatExaSubpageTarget":    {"chatExaSubpageTarget": "func()"},
+	"ChatPerplexityQuery":     {"chatPerplexityQuery": "func()"},
+	"ChatMessageContent":      {"chatMessageContent": "func()"},
+	"ChatContentPart":         {"chatContentPart": "func()"},
+	"ChatStop":                {"chatStop": "func()"},
+	"ChatToolChoice":          {"chatToolChoice": "func()"},
+	"ChatResponseFormat":      {"chatResponseFormat": "func()"},
+}
 var allowedValues = names(
 	"WarningUnsupported", "WarningCompatibility", "WarningDeprecated", "WarningOther", "ResponseToolChoiceAuto", "ResponseToolChoiceRequired", "ResponseToolChoiceNone", "ResponseTextFormatText", "ResponseTextFormatJSONObject",
 	"ChatToolChoiceAuto", "ChatToolChoiceNone", "ChatToolChoiceRequired", "ChatResponseFormatText", "ChatResponseFormatJSON",
@@ -368,25 +391,85 @@ func verifyEmbeddedTypeInspection() {
 	}
 }
 
-func inspectInterfaceMethods(interfaceName string, interfaceType *ast.InterfaceType, allowed, seen map[string]bool) {
+func methodSignature(expression ast.Expr) (string, error) {
+	var buffer bytes.Buffer
+	if err := format.Node(&buffer, token.NewFileSet(), expression); err != nil {
+		return "", err
+	}
+	return buffer.String(), nil
+}
+
+func inspectInterfaceMethods(interfaceName string, interfaceType *ast.InterfaceType, expected map[string]string, allowed, seen map[string]bool) error {
+	seenUnexported := make(map[string]bool, len(expected))
 	for _, field := range interfaceType.Methods.List {
 		if len(field.Names) == 0 {
-			if name, selected := embeddedTypeName(field.Type); ast.IsExported(selected) {
-				fmt.Fprintf(os.Stderr, "unexpected exported interface embedding found: %s.%s\n", interfaceName, name)
-				os.Exit(1)
+			name, _ := embeddedTypeName(field.Type)
+			if name == "" {
+				name = fmt.Sprintf("%T", field.Type)
 			}
-			continue
+			return fmt.Errorf("unexpected interface embedding found: %s.%s", interfaceName, name)
 		}
 		for _, name := range field.Names {
 			if ast.IsExported(name.Name) {
 				requireAllowed("method", interfaceName+"."+name.Name, allowed, seen)
+				continue
 			}
+			expectedSignature, ok := expected[name.Name]
+			if !ok {
+				return fmt.Errorf("unexpected unexported interface method found: %s.%s", interfaceName, name.Name)
+			}
+			signature, err := methodSignature(field.Type)
+			if err != nil {
+				return fmt.Errorf("inspect signature for %s.%s: %w", interfaceName, name.Name, err)
+			}
+			if signature != expectedSignature {
+				return fmt.Errorf("unexpected signature for unexported interface method %s.%s: got %s, want %s", interfaceName, name.Name, signature, expectedSignature)
+			}
+			seenUnexported[name.Name] = true
+		}
+	}
+	for name := range expected {
+		if !seenUnexported[name] {
+			return fmt.Errorf("expected unexported interface method not found: %s.%s", interfaceName, name)
+		}
+	}
+	return nil
+}
+
+func parseInterface(expression string) *ast.InterfaceType {
+	parsed, err := parser.ParseExpr(expression)
+	if err != nil {
+		panic(err)
+	}
+	interfaceType, ok := parsed.(*ast.InterfaceType)
+	if !ok {
+		panic("self-check expression is not an interface")
+	}
+	return interfaceType
+}
+
+func verifyInterfaceInspection() {
+	expected := map[string]string{"marker": "func()"}
+	if err := inspectInterfaceMethods("Fixture", parseInterface("interface { marker() }"), expected, map[string]bool{}, map[string]bool{}); err != nil {
+		fmt.Fprintf(os.Stderr, "interface inspection self-check rejected exact marker: %v\n", err)
+		os.Exit(1)
+	}
+	checks := map[string]string{
+		"marker removal":          "interface {}",
+		"marker signature change": "interface { marker(string) }",
+		"private embedding":       "interface { hidden }",
+	}
+	for name, expression := range checks {
+		if err := inspectInterfaceMethods("Fixture", parseInterface(expression), expected, map[string]bool{}, map[string]bool{}); err == nil {
+			fmt.Fprintf(os.Stderr, "interface inspection self-check failed to reject %s\n", name)
+			os.Exit(1)
 		}
 	}
 }
 
 func main() {
 	verifyEmbeddedTypeInspection()
+	verifyInterfaceInspection()
 	entries, err := os.ReadDir(os.Args[1])
 	if err != nil {
 		panic(err)
@@ -395,6 +478,7 @@ func main() {
 	seenFunctions := make(map[string]bool, len(allowedFunctions))
 	seenMethods := make(map[string]bool, len(allowedMethods))
 	seenValues := make(map[string]bool, len(allowedValues))
+	seenInterfaces := make(map[string]bool, len(expectedInterfaceMethods))
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
@@ -418,7 +502,16 @@ func main() {
 						}
 						requireAllowed("type", spec.Name.Name, allowedTypes, seenTypes)
 						if interfaceType, ok := spec.Type.(*ast.InterfaceType); ok {
-							inspectInterfaceMethods(spec.Name.Name, interfaceType, allowedMethods, seenMethods)
+							expected, modeled := expectedInterfaceMethods[spec.Name.Name]
+							if !modeled {
+								fmt.Fprintf(os.Stderr, "unexpected exported interface found: %s\n", spec.Name.Name)
+								os.Exit(1)
+							}
+							if err := inspectInterfaceMethods(spec.Name.Name, interfaceType, expected, allowedMethods, seenMethods); err != nil {
+								fmt.Fprintln(os.Stderr, err)
+								os.Exit(1)
+							}
+							seenInterfaces[spec.Name.Name] = true
 						}
 					case *ast.ValueSpec:
 						for _, name := range spec.Names {
@@ -442,6 +535,12 @@ func main() {
 		}
 	}
 	requireAllSeen("type", allowedTypes, seenTypes)
+	for interfaceName := range expectedInterfaceMethods {
+		if !seenInterfaces[interfaceName] {
+			fmt.Fprintf(os.Stderr, "expected exported interface not found: %s\n", interfaceName)
+			os.Exit(1)
+		}
+	}
 	requireAllSeen("function", allowedFunctions, seenFunctions)
 	requireAllSeen("method", allowedMethods, seenMethods)
 	requireAllSeen("value", allowedValues, seenValues)
