@@ -34,6 +34,18 @@ func compilePublicContract() {
 		Response:         gateway.ResponseMetadata{ModelID: "provider/model", Headers: http.Header{}, Body: []byte{}},
 	}
 	_ = []gateway.ProviderWarningType{gateway.ProviderWarningUnsupported, gateway.ProviderWarningCompatibility, gateway.ProviderWarningDeprecated, gateway.ProviderWarningOther}
+	var _ func(*gateway.Client, context.Context, string, gateway.RerankRequest) (*gateway.RerankResult, error) = (*gateway.Client).Rerank
+	topN := 2
+	var requestDocuments gateway.RerankDocuments = gateway.RerankTexts{Values: []string{"one", "two"}}
+	requestDocuments = &gateway.RerankTexts{Values: []string{"one"}}
+	requestDocuments = gateway.RerankObjects{Values: []json.RawMessage{json.RawMessage(`{"key":1}`)}}
+	requestDocuments = &gateway.RerankObjects{Values: []json.RawMessage{json.RawMessage(`{"key":2}`)}}
+	_ = gateway.RerankRequest{Query: "query", Documents: requestDocuments, TopN: &topN, ProviderOptions: []gateway.ProviderOption{}}
+	var resultDocument gateway.RerankDocument = gateway.RerankText{Text: "one"}
+	resultDocument = &gateway.RerankText{Text: "two"}
+	resultDocument = gateway.RerankJSON{Value: json.RawMessage(`{"key":1}`)}
+	resultDocument = &gateway.RerankJSON{Value: json.RawMessage(`{"key":2}`)}
+	_ = gateway.RerankResult{Results: []gateway.RerankItem{{OriginalIndex: 0, Score: -1.5, Document: resultDocument}}, Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponse
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseStream, error) = (*gateway.Client).StreamResponse
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesBuiltInToolsRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponseWithBuiltInTools
@@ -457,6 +469,52 @@ func TestExternalContractEmbeddingFields(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestExternalContractRerankFieldsAndInterfaces(t *testing.T) {
+	tests := []struct {
+		name   string
+		value  any
+		fields []string
+	}{
+		{"RerankRequest", gateway.RerankRequest{}, []string{"Query string", "Documents gateway.RerankDocuments", "TopN *int", "ProviderOptions []gateway.ProviderOption"}},
+		{"RerankTexts", gateway.RerankTexts{}, []string{"Values []string"}},
+		{"RerankObjects", gateway.RerankObjects{}, []string{"Values []json.RawMessage"}},
+		{"RerankText", gateway.RerankText{}, []string{"Text string"}},
+		{"RerankJSON", gateway.RerankJSON{}, []string{"Value json.RawMessage"}},
+		{"RerankItem", gateway.RerankItem{}, []string{"OriginalIndex int", "Score float64", "Document gateway.RerankDocument"}},
+		{"RerankResult", gateway.RerankResult{}, []string{"Results []gateway.RerankItem", "Warnings []gateway.ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response gateway.ResponseMetadata"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			typ := reflect.TypeOf(test.value)
+			if typ.NumField() != len(test.fields) {
+				t.Fatalf("fields=%d", typ.NumField())
+			}
+			for i, w := range test.fields {
+				f := typ.Field(i)
+				got := f.Name + " " + f.Type.String()
+				if !f.IsExported() || got != w {
+					t.Fatalf("field %d=%q want %q", i, got, w)
+				}
+			}
+		})
+	}
+	for _, value := range []any{gateway.RerankTexts{}, (*gateway.RerankTexts)(nil), gateway.RerankObjects{}, (*gateway.RerankObjects)(nil)} {
+		if !reflect.TypeOf(value).Implements(reflect.TypeOf((*gateway.RerankDocuments)(nil)).Elem()) {
+			t.Fatalf("%T does not implement RerankDocuments", value)
+		}
+	}
+	for _, value := range []any{gateway.RerankText{}, (*gateway.RerankText)(nil), gateway.RerankJSON{}, (*gateway.RerankJSON)(nil)} {
+		if !reflect.TypeOf(value).Implements(reflect.TypeOf((*gateway.RerankDocument)(nil)).Elem()) {
+			t.Fatalf("%T does not implement RerankDocument", value)
+		}
+	}
+	for _, iface := range []reflect.Type{reflect.TypeOf((*gateway.RerankDocuments)(nil)).Elem(), reflect.TypeOf((*gateway.RerankDocument)(nil)).Elem()} {
+		if iface.NumMethod() != 1 || iface.Method(0).IsExported() || iface.Method(0).Type.NumIn() != 0 || iface.Method(0).Type.NumOut() != 0 {
+			t.Fatalf("interface=%s", iface)
+		}
 	}
 }
 

@@ -46,6 +46,20 @@ func compileEmbedding(client *gateway.Client) (*gateway.EmbeddingResult, error) 
 	return client.Embed(context.Background(), "provider/model", request)
 }
 
+func compileRerank(client *gateway.Client) (*gateway.RerankResult, error) {
+	topN := 2
+	var documents gateway.RerankDocuments = gateway.RerankTexts{Values: []string{"one", "two"}}
+	documents = &gateway.RerankTexts{Values: []string{"one", "two"}}
+	documents = gateway.RerankObjects{Values: []json.RawMessage{json.RawMessage(`{"key":1}`)}}
+	documents = &gateway.RerankObjects{Values: []json.RawMessage{json.RawMessage(`{"key":2}`)}}
+	var document gateway.RerankDocument = gateway.RerankText{Text: "one"}
+	document = &gateway.RerankText{Text: "two"}
+	document = gateway.RerankJSON{Value: json.RawMessage(`{"key":1}`)}
+	document = &gateway.RerankJSON{Value: json.RawMessage(`{"key":2}`)}
+	_ = gateway.RerankResult{Results: []gateway.RerankItem{{OriginalIndex: 0, Score: -1, Document: document}}, Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
+	return client.Rerank(context.Background(), "provider/model", gateway.RerankRequest{Query: "query", Documents: documents, TopN: &topN, ProviderOptions: []gateway.ProviderOption{}})
+}
+
 func compileEvaluation(client *gateway.Client) (*gateway.EvaluationResult, error) {
 	zero := 0
 	zero64 := int64(0)
@@ -252,7 +266,7 @@ func main() {
 	)
 	inspectErrors(err)
 	if client != nil {
-		_, _, _, _ = compileEvaluation, compileEmbedding, compileResponses, compileChat
+		_, _, _, _, _ = compileEvaluation, compileEmbedding, compileRerank, compileResponses, compileChat
 	}
 }
 EOF
@@ -280,6 +294,7 @@ var allowedTypes = names(
 	"ConfigurationError", "ValidationError", "TransportError", "ResponseError", "ResponseValidationError",
 	"EvaluationRequest", "Question", "BooleanQuestion", "ChoiceQuestion", "ScoreQuestion", "OptionalJSON", "BooleanCriteria", "EvaluationResult", "Rounding", "Usage", "WarningType", "Warning", "ResponseMetadata", "Answer", "BooleanAnswer", "ChoiceAnswer", "ScoreAnswer",
 	"EmbeddingRequest", "EmbeddingResult", "EmbeddingUsage", "ProviderWarningType", "ProviderWarning",
+	"RerankRequest", "RerankDocuments", "RerankTexts", "RerankObjects", "RerankDocument", "RerankText", "RerankJSON", "RerankItem", "RerankResult",
 	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseXSearchTool", "ResponseXSearchOptionsTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
 	"ChatCompletionRequest", "ChatServerToolsRequest", "ChatServerTool", "ChatExaSearchTool", "ChatParallelSearchTool", "ChatPerplexitySearchTool", "ChatTakoSearchTool",
 	"ChatExaSearchType", "ChatExaCategory", "ChatExaVerbosity", "ChatExaSection", "ChatExaText", "ChatExaTextEnabled", "ChatExaTextOptions", "ChatExaHighlights", "ChatExaHighlightsEnabled", "ChatExaHighlightsOptions", "ChatExaExtras", "ChatExaSubpageTarget", "ChatExaSubpageTargetString", "ChatExaSubpageTargetStrings", "ChatExaContents", "ChatExaSearchConfig",
@@ -292,7 +307,7 @@ var allowedTypes = names(
 var allowedFunctions = names("NewClient", "WithAPIKey", "WithOIDCToken", "WithOIDCTokenSource", "WithBaseURL", "WithPublicBaseURL", "WithHTTPClient", "WithTeam", "WithHeaders", "WithRetryPolicy")
 var allowedMethods = names(
 	"TokenSource.Token",
-	"Client.Evaluate", "Client.Embed", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
+	"Client.Evaluate", "Client.Embed", "Client.Rerank", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
 	"ResponseResult.RawJSON", "RawResponseEvent.RawJSON", "ResponseStream.Next", "ResponseStream.Event", "ResponseStream.Err", "ResponseStream.Close",
 	"ChatCompletionResult.RawJSON", "ChatCompletionChunk.RawJSON", "ChatCompletionStream.Next", "ChatCompletionStream.Event", "ChatCompletionStream.Err", "ChatCompletionStream.Close",
 	"ConfigurationError.Error", "ConfigurationError.Option", "ConfigurationError.Reason",
@@ -306,6 +321,8 @@ var expectedInterfaceMethods = map[string]map[string]string{
 	"ProviderOption":          {"providerOption": "func()"},
 	"Question":                {"questionType": "func() string"},
 	"Answer":                  {"answerType": "func() string"},
+	"RerankDocuments":         {"rerankDocuments": "func()"},
+	"RerankDocument":          {"rerankDocument": "func()"},
 	"ResponseBuiltInTool":     {"responseBuiltInTool": "func()"},
 	"ResponseInput":           {"responseInput": "func()"},
 	"ResponseInputItem":       {"responseInputItem": "func()"},
@@ -328,6 +345,13 @@ var expectedStructFields = map[string][]string{
 	"EmbeddingResult": {"Embeddings [][]float64", "Usage *EmbeddingUsage", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
 	"EmbeddingUsage": {"Tokens *int64"},
 	"ProviderWarning": {"Type ProviderWarningType", "Feature string", "Details *string", "Setting string", "Message string"},
+	"RerankRequest": {"Query string", "Documents RerankDocuments", "TopN *int", "ProviderOptions []ProviderOption"},
+	"RerankTexts": {"Values []string"},
+	"RerankObjects": {"Values []json.RawMessage"},
+	"RerankText": {"Text string"},
+	"RerankJSON": {"Value json.RawMessage"},
+	"RerankItem": {"OriginalIndex int", "Score float64", "Document RerankDocument"},
+	"RerankResult": {"Results []RerankItem", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
 	"ResponseWebSearchTool":     {},
 	"ResponseXSearchTool":       {},
 	"ResponseXSearchOptionsTool": {"AllowedXHandles []string", "ExcludedXHandles []string", "FromDate *string", "ToDate *string", "EnableImageUnderstanding *bool", "EnableVideoUnderstanding *bool"},
