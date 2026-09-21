@@ -325,10 +325,53 @@ func receiverName(expression ast.Expr) string {
 	}
 }
 
+func embeddedTypeName(expression ast.Expr) (string, string) {
+	switch typed := expression.(type) {
+	case *ast.Ident:
+		return typed.Name, typed.Name
+	case *ast.SelectorExpr:
+		qualifier, _ := embeddedTypeName(typed.X)
+		if qualifier == "" {
+			return typed.Sel.Name, typed.Sel.Name
+		}
+		return qualifier + "." + typed.Sel.Name, typed.Sel.Name
+	case *ast.StarExpr:
+		return embeddedTypeName(typed.X)
+	case *ast.IndexExpr:
+		return embeddedTypeName(typed.X)
+	case *ast.IndexListExpr:
+		return embeddedTypeName(typed.X)
+	case *ast.ParenExpr:
+		return embeddedTypeName(typed.X)
+	default:
+		return "", ""
+	}
+}
+
+func verifyEmbeddedTypeInspection() {
+	checks := map[string]string{
+		"io.Closer":                 "io.Closer",
+		"*fmt.Stringer":             "fmt.Stringer",
+		"constraints.Ordered[int]":  "constraints.Ordered",
+		"constraints.Pair[int, int]": "constraints.Pair",
+	}
+	for expression, expected := range checks {
+		parsed, err := parser.ParseExpr(expression)
+		if err != nil {
+			panic(err)
+		}
+		name, selected := embeddedTypeName(parsed)
+		if name != expected || !ast.IsExported(selected) {
+			fmt.Fprintf(os.Stderr, "embedded interface inspection self-check failed for %s\n", expression)
+			os.Exit(1)
+		}
+	}
+}
+
 func inspectInterfaceMethods(interfaceName string, interfaceType *ast.InterfaceType, allowed, seen map[string]bool) {
 	for _, field := range interfaceType.Methods.List {
 		if len(field.Names) == 0 {
-			if name := receiverName(field.Type); ast.IsExported(name) {
+			if name, selected := embeddedTypeName(field.Type); ast.IsExported(selected) {
 				fmt.Fprintf(os.Stderr, "unexpected exported interface embedding found: %s.%s\n", interfaceName, name)
 				os.Exit(1)
 			}
@@ -343,6 +386,7 @@ func inspectInterfaceMethods(interfaceName string, interfaceType *ast.InterfaceT
 }
 
 func main() {
+	verifyEmbeddedTypeInspection()
 	entries, err := os.ReadDir(os.Args[1])
 	if err != nil {
 		panic(err)
