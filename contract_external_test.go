@@ -2,6 +2,7 @@ package gateway_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"reflect"
 	"testing"
@@ -20,6 +21,19 @@ func compilePublicContract() {
 	var _ gateway.TokenSource = tokenSource{}
 	var _ func(...gateway.Option) (*gateway.Client, error) = gateway.NewClient
 	var _ func(*gateway.Client, context.Context, string, gateway.EvaluationRequest) (*gateway.EvaluationResult, error) = (*gateway.Client).Evaluate
+	var _ gateway.ProviderOption
+	var _ func(*gateway.Client, context.Context, string, gateway.EmbeddingRequest) (*gateway.EmbeddingResult, error) = (*gateway.Client).Embed
+	_ = gateway.EmbeddingRequest{Values: []string{"one", "two"}, ProviderOptions: []gateway.ProviderOption{}}
+	tokens := int64(-1)
+	providerDetails := "details"
+	_ = gateway.EmbeddingResult{
+		Embeddings:       [][]float64{{1, 2}},
+		Usage:            &gateway.EmbeddingUsage{Tokens: &tokens},
+		Warnings:         []gateway.ProviderWarning{{Type: gateway.ProviderWarningUnsupported, Feature: "feature", Details: &providerDetails}},
+		ProviderMetadata: map[string]json.RawMessage{"provider": json.RawMessage(`{"key":"value"}`)},
+		Response:         gateway.ResponseMetadata{ModelID: "provider/model", Headers: http.Header{}, Body: []byte{}},
+	}
+	_ = []gateway.ProviderWarningType{gateway.ProviderWarningUnsupported, gateway.ProviderWarningCompatibility, gateway.ProviderWarningDeprecated, gateway.ProviderWarningOther}
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponse
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseStream, error) = (*gateway.Client).StreamResponse
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesBuiltInToolsRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponseWithBuiltInTools
@@ -401,5 +415,58 @@ func TestExternalContractChatCompletionRequestFields(t *testing.T) {
 		if got[i].Name != want[i].name || got[i].Type != want[i].typ {
 			t.Fatalf("ChatCompletionRequest exported field %d = %s %s, want %s %s", i, got[i].Name, got[i].Type, want[i].name, want[i].typ)
 		}
+	}
+}
+
+func TestExternalContractEmbeddingFields(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+		want  []struct {
+			name string
+			typ  reflect.Type
+		}
+	}{
+		{"EmbeddingRequest", gateway.EmbeddingRequest{}, []struct {
+			name string
+			typ  reflect.Type
+		}{{"Values", reflect.TypeOf([]string(nil))}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption(nil))}}},
+		{"EmbeddingResult", gateway.EmbeddingResult{}, []struct {
+			name string
+			typ  reflect.Type
+		}{{"Embeddings", reflect.TypeOf([][]float64(nil))}, {"Usage", reflect.TypeOf((*gateway.EmbeddingUsage)(nil))}, {"Warnings", reflect.TypeOf([]gateway.ProviderWarning(nil))}, {"ProviderMetadata", reflect.TypeOf(map[string]json.RawMessage(nil))}, {"Response", reflect.TypeOf(gateway.ResponseMetadata{})}}},
+		{"EmbeddingUsage", gateway.EmbeddingUsage{}, []struct {
+			name string
+			typ  reflect.Type
+		}{{"Tokens", reflect.TypeOf((*int64)(nil))}}},
+		{"ProviderWarning", gateway.ProviderWarning{}, []struct {
+			name string
+			typ  reflect.Type
+		}{{"Type", reflect.TypeOf(gateway.ProviderWarningType(""))}, {"Feature", reflect.TypeOf("")}, {"Details", reflect.TypeOf((*string)(nil))}, {"Setting", reflect.TypeOf("")}, {"Message", reflect.TypeOf("")}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			typ := reflect.TypeOf(test.value)
+			if typ.NumField() != len(test.want) {
+				t.Fatalf("field count=%d want=%d", typ.NumField(), len(test.want))
+			}
+			for i, w := range test.want {
+				f := typ.Field(i)
+				if !f.IsExported() || f.Name != w.name || f.Type != w.typ {
+					t.Fatalf("field %d=%s %s want %s %s", i, f.Name, f.Type, w.name, w.typ)
+				}
+			}
+		})
+	}
+}
+
+func TestExternalContractProviderOptionMethods(t *testing.T) {
+	typ := reflect.TypeOf((*gateway.ProviderOption)(nil)).Elem()
+	if typ.Kind() != reflect.Interface || typ.NumMethod() != 1 {
+		t.Fatalf("ProviderOption shape=%s methods=%d", typ.Kind(), typ.NumMethod())
+	}
+	m := typ.Method(0)
+	if m.Name != "providerOption" || m.IsExported() || m.Type.NumIn() != 0 || m.Type.NumOut() != 0 {
+		t.Fatalf("method=%s %s", m.Name, m.Type)
 	}
 }

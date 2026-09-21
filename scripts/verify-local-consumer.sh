@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -30,6 +31,20 @@ import (
 type tokenSource struct{}
 
 func (tokenSource) Token(context.Context) (string, error) { return "token", nil }
+
+func compileEmbedding(client *gateway.Client) (*gateway.EmbeddingResult, error) {
+	tokens := int64(-1)
+	details := "details"
+	request := gateway.EmbeddingRequest{Values: []string{"one", "two"}, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.EmbeddingResult{
+		Embeddings: [][]float64{{1, 2}}, Usage: &gateway.EmbeddingUsage{Tokens: &tokens},
+		Warnings: []gateway.ProviderWarning{{Type: gateway.ProviderWarningUnsupported, Feature: "feature", Details: &details}},
+		ProviderMetadata: map[string]json.RawMessage{"provider": json.RawMessage(`{"key":true}`)},
+		Response: gateway.ResponseMetadata{ModelID: "provider/model", Headers: http.Header{}, Body: []byte{}},
+	}
+	_ = []gateway.ProviderWarningType{gateway.ProviderWarningUnsupported, gateway.ProviderWarningCompatibility, gateway.ProviderWarningDeprecated, gateway.ProviderWarningOther}
+	return client.Embed(context.Background(), "provider/model", request)
+}
 
 func compileEvaluation(client *gateway.Client) (*gateway.EvaluationResult, error) {
 	zero := 0
@@ -237,7 +252,7 @@ func main() {
 	)
 	inspectErrors(err)
 	if client != nil {
-		_, _, _ = compileEvaluation, compileResponses, compileChat
+		_, _, _, _ = compileEvaluation, compileEmbedding, compileResponses, compileChat
 	}
 }
 EOF
@@ -261,9 +276,10 @@ import (
 )
 
 var allowedTypes = names(
-	"Client", "Option", "TokenSource", "RetryPolicy",
+	"Client", "Option", "TokenSource", "RetryPolicy", "ProviderOption",
 	"ConfigurationError", "ValidationError", "TransportError", "ResponseError", "ResponseValidationError",
 	"EvaluationRequest", "Question", "BooleanQuestion", "ChoiceQuestion", "ScoreQuestion", "OptionalJSON", "BooleanCriteria", "EvaluationResult", "Rounding", "Usage", "WarningType", "Warning", "ResponseMetadata", "Answer", "BooleanAnswer", "ChoiceAnswer", "ScoreAnswer",
+	"EmbeddingRequest", "EmbeddingResult", "EmbeddingUsage", "ProviderWarningType", "ProviderWarning",
 	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseXSearchTool", "ResponseXSearchOptionsTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
 	"ChatCompletionRequest", "ChatServerToolsRequest", "ChatServerTool", "ChatExaSearchTool", "ChatParallelSearchTool", "ChatPerplexitySearchTool", "ChatTakoSearchTool",
 	"ChatExaSearchType", "ChatExaCategory", "ChatExaVerbosity", "ChatExaSection", "ChatExaText", "ChatExaTextEnabled", "ChatExaTextOptions", "ChatExaHighlights", "ChatExaHighlightsEnabled", "ChatExaHighlightsOptions", "ChatExaExtras", "ChatExaSubpageTarget", "ChatExaSubpageTargetString", "ChatExaSubpageTargetStrings", "ChatExaContents", "ChatExaSearchConfig",
@@ -276,7 +292,7 @@ var allowedTypes = names(
 var allowedFunctions = names("NewClient", "WithAPIKey", "WithOIDCToken", "WithOIDCTokenSource", "WithBaseURL", "WithPublicBaseURL", "WithHTTPClient", "WithTeam", "WithHeaders", "WithRetryPolicy")
 var allowedMethods = names(
 	"TokenSource.Token",
-	"Client.Evaluate", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
+	"Client.Evaluate", "Client.Embed", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
 	"ResponseResult.RawJSON", "RawResponseEvent.RawJSON", "ResponseStream.Next", "ResponseStream.Event", "ResponseStream.Err", "ResponseStream.Close",
 	"ChatCompletionResult.RawJSON", "ChatCompletionChunk.RawJSON", "ChatCompletionStream.Next", "ChatCompletionStream.Event", "ChatCompletionStream.Err", "ChatCompletionStream.Close",
 	"ConfigurationError.Error", "ConfigurationError.Option", "ConfigurationError.Reason",
@@ -287,6 +303,7 @@ var allowedMethods = names(
 )
 var expectedInterfaceMethods = map[string]map[string]string{
 	"TokenSource":             {},
+	"ProviderOption":          {"providerOption": "func()"},
 	"Question":                {"questionType": "func() string"},
 	"Answer":                  {"answerType": "func() string"},
 	"ResponseBuiltInTool":     {"responseBuiltInTool": "func()"},
@@ -307,12 +324,16 @@ var expectedInterfaceMethods = map[string]map[string]string{
 	"ChatResponseFormat":      {"chatResponseFormat": "func()"},
 }
 var expectedStructFields = map[string][]string{
+	"EmbeddingRequest": {"Values []string", "ProviderOptions []ProviderOption"},
+	"EmbeddingResult": {"Embeddings [][]float64", "Usage *EmbeddingUsage", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
+	"EmbeddingUsage": {"Tokens *int64"},
+	"ProviderWarning": {"Type ProviderWarningType", "Feature string", "Details *string", "Setting string", "Message string"},
 	"ResponseWebSearchTool":     {},
 	"ResponseXSearchTool":       {},
 	"ResponseXSearchOptionsTool": {"AllowedXHandles []string", "ExcludedXHandles []string", "FromDate *string", "ToDate *string", "EnableImageUnderstanding *bool", "EnableVideoUnderstanding *bool"},
 }
 var allowedValues = names(
-	"WarningUnsupported", "WarningCompatibility", "WarningDeprecated", "WarningOther", "ResponseToolChoiceAuto", "ResponseToolChoiceRequired", "ResponseToolChoiceNone", "ResponseTextFormatText", "ResponseTextFormatJSONObject",
+	"WarningUnsupported", "WarningCompatibility", "WarningDeprecated", "WarningOther", "ProviderWarningUnsupported", "ProviderWarningCompatibility", "ProviderWarningDeprecated", "ProviderWarningOther", "ResponseToolChoiceAuto", "ResponseToolChoiceRequired", "ResponseToolChoiceNone", "ResponseTextFormatText", "ResponseTextFormatJSONObject",
 	"ChatToolChoiceAuto", "ChatToolChoiceNone", "ChatToolChoiceRequired", "ChatResponseFormatText", "ChatResponseFormatJSON",
 	"ChatExaSearchAuto", "ChatExaSearchFast", "ChatExaSearchInstant", "ChatExaCategoryCompany", "ChatExaCategoryPeople", "ChatExaCategoryResearchPaper", "ChatExaCategoryNews", "ChatExaCategoryPersonalSite", "ChatExaCategoryFinancialReport", "ChatExaVerbosityCompact", "ChatExaVerbosityStandard", "ChatExaVerbosityFull", "ChatExaSectionHeader", "ChatExaSectionNavigation", "ChatExaSectionBanner", "ChatExaSectionBody", "ChatExaSectionSidebar", "ChatExaSectionFooter", "ChatExaSectionMetadata",
 	"ChatParallelModeOneShot", "ChatParallelModeAgentic", "ChatPerplexityRecencyDay", "ChatPerplexityRecencyWeek", "ChatPerplexityRecencyMonth", "ChatPerplexityRecencyYear", "ChatTakoEffortDeep", "ChatTakoEffortFast", "ChatTakoEffortInstant", "ChatTakoDataModeInline", "ChatTakoDataModeURL", "ChatTakoContentFormatCardJSON", "ChatTakoContentFormatCSV", "ChatTakoContentFormatJSONCompact", "ChatTakoContentFormatJSONRecords", "ChatTakoWebCategoryFinance", "ChatTakoWebCategoryNews", "ChatTakoWebCategorySports",
