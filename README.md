@@ -32,7 +32,7 @@ result, err := client.CreateResponse(ctx, gateway.ResponsesRequest{
 if err != nil {
     log.Fatal(err)
 }
-fmt.Println(string(result.RawJSON()))
+fmt.Printf("response completed: raw_json_bytes=%d\n", len(result.RawJSON()))
 ```
 
 The package also exposes `StreamResponse`, `CreateChatCompletion`, and `StreamChatCompletion`. See the [complete generation guide](docs/generation.md) and [generation example](examples/generate/main.go).

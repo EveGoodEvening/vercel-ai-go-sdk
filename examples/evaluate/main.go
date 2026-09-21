@@ -64,19 +64,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	for id, answer := range result.Answers {
-		switch answer := answer.(type) {
+	booleanAnswers, choiceAnswers, scoreAnswers, unknownAnswers := 0, 0, 0, 0
+	for _, answer := range result.Answers {
+		switch answer.(type) {
 		case gateway.BooleanAnswer:
-			fmt.Printf("answer %q: boolean probability=%g\n", id, answer.Probability)
+			booleanAnswers++
 		case gateway.ChoiceAnswer:
-			fmt.Printf("answer %q: choice=%q probabilities_present=%t\n", id, answer.Choice, answer.Probabilities != nil)
+			choiceAnswers++
 		case gateway.ScoreAnswer:
-			fmt.Printf("answer %q: score=%g probabilities_present=%t\n", id, answer.Score, answer.Probabilities != nil)
+			scoreAnswers++
+		default:
+			unknownAnswers++
 		}
 	}
-
-	fmt.Printf("response: model=%q headers_present=%t body_bytes=%d\n",
-		result.Response.ModelID, result.Response.Headers != nil, len(result.Response.Body))
+	fmt.Printf("evaluation completed: answers=%d boolean=%d choice=%d score=%d unknown=%d\n",
+		len(result.Answers), booleanAnswers, choiceAnswers, scoreAnswers, unknownAnswers)
+	fmt.Printf("response: headers_present=%t body_bytes=%d\n",
+		result.Response.Headers != nil, len(result.Response.Body))
 	fmt.Printf("metadata: rounding_present=%t usage_present=%t warnings=%d provider_metadata_present=%t\n",
 		result.Rounding != nil, result.Usage != nil, len(result.Warnings), result.ProviderMetadata != nil)
 }
@@ -90,19 +94,18 @@ func printError(err error) {
 
 	switch {
 	case errors.As(err, &configurationErr):
-		log.Printf("configuration error: option=%q reason=%q", configurationErr.Option(), configurationErr.Reason())
+		log.Printf("configuration error: option=%q", configurationErr.Option())
 	case errors.As(err, &validationErr):
-		log.Printf("validation error: path=%q reason=%q", validationErr.Path(), validationErr.Reason())
+		log.Printf("validation error: path=%q", validationErr.Path())
 	case errors.As(err, &responseValidationErr):
-		log.Printf("response validation error: status=%d path=%q reason=%q request_id=%q response_id=%q truncated=%t",
-			responseValidationErr.StatusCode(), responseValidationErr.Path(), responseValidationErr.Reason(),
-			responseValidationErr.RequestID(), responseValidationErr.ResponseID(), responseValidationErr.BodyTruncated())
+		log.Printf("response validation error: status=%d path=%q request_id_present=%t response_id_present=%t truncated=%t",
+			responseValidationErr.StatusCode(), responseValidationErr.Path(), responseValidationErr.RequestID() != "",
+			responseValidationErr.ResponseID() != "", responseValidationErr.BodyTruncated())
 	case errors.As(err, &responseErr):
-		retryAfter, hasRetryAfter := responseErr.RetryAfter()
-		log.Printf("response error: status=%d type=%q code=%q request_id=%q response_id=%q generation_id=%q retryable=%t retry_after=%s retry_after_present=%t truncated=%t",
-			responseErr.StatusCode(), responseErr.Type(), responseErr.Code(), responseErr.RequestID(),
-			responseErr.ResponseID(), responseErr.GenerationID(), responseErr.Retryable(), retryAfter,
-			hasRetryAfter, responseErr.BodyTruncated())
+		_, hasRetryAfter := responseErr.RetryAfter()
+		log.Printf("response error: status=%d request_id_present=%t response_id_present=%t generation_id_present=%t retryable=%t retry_after_present=%t truncated=%t",
+			responseErr.StatusCode(), responseErr.RequestID() != "", responseErr.ResponseID() != "",
+			responseErr.GenerationID() != "", responseErr.Retryable(), hasRetryAfter, responseErr.BodyTruncated())
 	case errors.As(err, &transportErr):
 		log.Printf("transport error: operation=%q", transportErr.Operation())
 	default:
