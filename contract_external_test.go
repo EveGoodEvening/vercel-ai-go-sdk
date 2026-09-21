@@ -98,7 +98,7 @@ func compilePublicContract() {
 	chatChunk = chatStream.Event()
 	_, _ = chatStream.Err(), chatStream.Close()
 	_ = chatChunk.Object
-	_ = []gateway.ChatCompletionChunkChoice{{Index: 0, Delta: gateway.ChatCompletionChunkDelta{Content: "text"}}}
+	_ = []gateway.ChatCompletionChunkChoice{{Delta: gateway.ChatCompletionChunkDelta{Content: "text"}}}
 	_ = chatChunk.RawJSON()
 	_ = []gateway.ResponseTextFormatType{gateway.ResponseTextFormatText, gateway.ResponseTextFormatJSONObject}
 	var responseResult *gateway.ResponseResult

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -17,6 +17,43 @@ func chatStreamClient(body io.ReadCloser, requests *int) *http.Client {
 		*requests++
 		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: body, Request: request}, nil
 	})}
+}
+
+type instrumentedBlockingBody struct {
+	readStarted chan struct{}
+	closed      chan struct{}
+	readOnce    sync.Once
+	closeOnce   sync.Once
+	mu          sync.Mutex
+	readCount   int
+	closeCount  int
+}
+
+func newInstrumentedBlockingBody() *instrumentedBlockingBody {
+	return &instrumentedBlockingBody{readStarted: make(chan struct{}), closed: make(chan struct{})}
+}
+
+func (body *instrumentedBlockingBody) Read([]byte) (int, error) {
+	body.mu.Lock()
+	body.readCount++
+	body.mu.Unlock()
+	body.readOnce.Do(func() { close(body.readStarted) })
+	<-body.closed
+	return 0, io.EOF
+}
+
+func (body *instrumentedBlockingBody) Close() error {
+	body.mu.Lock()
+	body.closeCount++
+	body.mu.Unlock()
+	body.closeOnce.Do(func() { close(body.closed) })
+	return nil
+}
+
+func (body *instrumentedBlockingBody) counts() (reads, closes int) {
+	body.mu.Lock()
+	defer body.mu.Unlock()
+	return body.readCount, body.closeCount
 }
 
 func TestStreamChatCompletionRequestChunksAndDone(t *testing.T) {
@@ -52,7 +89,7 @@ func TestStreamChatCompletionRequestChunksAndDone(t *testing.T) {
 		t.Fatalf("first Next: %v", stream.Err())
 	}
 	first := stream.Event()
-	if first.Object != "chat.completion.chunk" || len(first.Choices) != 2 || first.Choices[0].Index != 1 || first.Choices[0].Delta.Content != "B" || first.Choices[1].Index != 0 || first.Choices[1].Delta.Content != "A" {
+	if first.Object != "chat.completion.chunk" || len(first.Choices) != 2 || first.Choices[0].Delta.Content != "B" || first.Choices[1].Delta.Content != "A" {
 		t.Fatalf("first=%#v", first)
 	}
 	wantRaw := []byte(`{"id":"chunk-1","object":"chat.completion.chunk","created":1,"model":"provider/model","choices":[{"index":1,"delta":{"content":"B","role":"assistant","tool_calls":[{"future":true}]},"finish_reason":"stop"},{"index":0,"delta":{"content":"A","refusal":"no"}}],"usage":{"total_tokens":7},"future":{"x":[1]}}`)
@@ -246,25 +283,73 @@ func TestStreamChatCompletionCloseCancelAndConcurrentNext(t *testing.T) {
 	}
 }
 
-func TestStreamChatCompletionNoProducerLeakAndResponsesCompatibility(t *testing.T) {
-	before := runtime.NumGoroutine()
-	for range 20 {
-		body := newCountedBlockingBody(nil, true)
-		requests := 0
-		client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(chatStreamClient(body, &requests)))
-		stream, err := client.StreamChatCompletion(context.Background(), validChatRequest())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := stream.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}
-	time.Sleep(20 * time.Millisecond)
-	if after := runtime.NumGoroutine(); after > before+4 {
-		t.Fatalf("goroutines grew from %d to %d", before, after)
-	}
+func TestStreamChatCompletionStartsReadingOnlyInNext(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		stop func(context.CancelFunc, *ChatCompletionStream)
+	}{
+		{"Close", func(_ context.CancelFunc, stream *ChatCompletionStream) { _ = stream.Close() }},
+		{"cancel", func(cancel context.CancelFunc, _ *ChatCompletionStream) { cancel() }},
+	} {
+		t.Run(test.name+" before Next", func(t *testing.T) {
+			body := newInstrumentedBlockingBody()
+			requests := 0
+			client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(chatStreamClient(body, &requests)))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			stream, err := client.StreamChatCompletion(ctx, validChatRequest())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if reads, closes := body.counts(); reads != 0 || closes != 0 {
+				t.Fatalf("construction reads=%d closes=%d", reads, closes)
+			}
+			test.stop(cancel, stream)
+			waitForSignal(t, body.closed, "stop did not close the unread body")
+			if reads, closes := body.counts(); reads != 0 || closes != 1 {
+				t.Fatalf("stopped before Next reads=%d closes=%d", reads, closes)
+			}
+			if err := stream.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if reads, closes := body.counts(); reads != 0 || closes != 1 {
+				t.Fatalf("repeated Close reads=%d closes=%d", reads, closes)
+			}
+		})
 
+		t.Run(test.name+" during Next", func(t *testing.T) {
+			body := newInstrumentedBlockingBody()
+			requests := 0
+			client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(chatStreamClient(body, &requests)))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			stream, err := client.StreamChatCompletion(ctx, validChatRequest())
+			if err != nil {
+				t.Fatal(err)
+			}
+			done := make(chan bool, 1)
+			go func() { done <- stream.Next() }()
+			waitForSignal(t, body.readStarted, "caller Next did not start reading")
+			if reads, closes := body.counts(); reads != 1 || closes != 0 {
+				t.Fatalf("active Next reads=%d closes=%d", reads, closes)
+			}
+			test.stop(cancel, stream)
+			select {
+			case next := <-done:
+				if next {
+					t.Fatal("Next returned true")
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatal("stop did not unblock caller Next")
+			}
+			if reads, closes := body.counts(); reads != 1 || closes != 1 {
+				t.Fatalf("stopped during Next reads=%d closes=%d", reads, closes)
+			}
+		})
+	}
+}
+
+func TestStreamChatCompletionResponsesCompatibility(t *testing.T) {
 	body := newCountedBlockingBody([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n"), false)
 	requests := 0
 	client, _ := NewClient(WithAPIKey("secret"), WithHTTPClient(streamHTTPClient(http.StatusOK, nil, body, &requests)))

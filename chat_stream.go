@@ -32,8 +32,8 @@ func (c *ChatCompletionChunk) RawJSON() []byte {
 }
 
 // ChatCompletionChunkChoice is one choice in a streamed chat completion chunk.
+// Its position in Choices preserves its wire order.
 type ChatCompletionChunkChoice struct {
-	Index int
 	Delta ChatCompletionChunkDelta
 }
 
@@ -292,7 +292,6 @@ func decodeChatCompletionChunk(data []byte) (*ChatCompletionChunk, error) {
 	var wire struct {
 		Object  *string `json:"object"`
 		Choices []struct {
-			Index *int `json:"index"`
 			Delta *struct {
 				Content *string `json:"content"`
 			} `json:"delta"`
@@ -306,9 +305,6 @@ func decodeChatCompletionChunk(data []byte) (*ChatCompletionChunk, error) {
 	}
 	chunk := &ChatCompletionChunk{Object: *wire.Object, Choices: make([]ChatCompletionChunkChoice, len(wire.Choices)), rawJSON: append([]byte(nil), data...)}
 	for i, choice := range wire.Choices {
-		if choice.Index != nil {
-			chunk.Choices[i].Index = *choice.Index
-		}
 		if choice.Delta != nil && choice.Delta.Content != nil {
 			chunk.Choices[i].Delta.Content = *choice.Delta.Content
 		}
