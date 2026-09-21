@@ -6,9 +6,9 @@
 | --- | --- | --- |
 | Public generation | **NOT RUN** | Buffered and streaming Responses; buffered and streaming Chat |
 | Provider evaluation | **NOT RUN** | `Evaluate` with boolean, choice, and score questions |
-| Configurable Gateway `x_search` options | **IMPLEMENTED; FIRST ATTEMPT INCONCLUSIVE / CANCELLED** | Corrected fail-closed prerequisite gate plus bounded structural option matrix; rerun pending |
+| Configurable Gateway `x_search` options | **IMPLEMENTED; TWO ATTEMPTS INCONCLUSIVE** | Corrected fail-closed prerequisite gate plus bounded structural option matrix; rerun pending |
 
-No owner-authorized public-generation or provider-evaluation paid live-contract run or sanitized hosted result is recorded; those protected records remain **PENDING LIVE RUN**. The owner separately authorized the dedicated configurable Gateway `x_search` evidence run and accepted its bounded cost. Its first paid attempt on 2026-09-21 is **INCONCLUSIVE / CANCELLED** after one sanitized canonical record; it cleared or rejected no option field. Hermetic tests, successful compilation, credential-gate failures, search probe/harness implementation, and this inconclusive attempt do not clear any live-contract gate.
+No owner-authorized public-generation or provider-evaluation paid live-contract run or sanitized hosted result is recorded; those protected records remain **PENDING LIVE RUN**. The owner separately authorized the dedicated configurable Gateway `x_search` evidence run and accepted its bounded cost. Both paid attempts on 2026-09-21 are **INCONCLUSIVE** and cleared or rejected no option field: the first was cancelled after one sanitized canonical record, and the second timed out at the fieldless control before any configurable option case ran. Hermetic tests, successful compilation, credential-gate failures, search probe/harness implementation, and these inconclusive attempts do not clear any live-contract gate.
 
 ### Narrow Responses search evidence
 
@@ -17,9 +17,9 @@ Owner-authorized public Gateway probes on 2026-09-21 structurally corroborated o
 The durable repository evidence retains only sanitized structural facts. A non-publishable internal orchestration artifact is excluded because it contains exact prompt inputs; this record does not reproduce or paraphrase them. No credentials, authorization data, prompts, generated prose, full bodies, headers, identifiers, or raw payloads are retained here.
 ### Configurable Gateway `x_search` option evidence gate
 
-The dedicated Gate A harness is implemented. Owner authorization and cost acceptance are recorded without retaining any credential or credential value. The first paid attempt is **INCONCLUSIVE / CANCELLED** and cleared no option field; the corrected verification and authorized rerun remain pending. This is a third, separate live-evidence path: it does not run in, replace, or clear either the general `public-generation` or `provider-evaluation` job.
+The dedicated Gate A harness is implemented. Owner authorization and cost acceptance are recorded without retaining any credential or credential value. The first paid attempt is **INCONCLUSIVE / CANCELLED** and the second is **INCONCLUSIVE / TIMED OUT AT FIELDLESS CONTROL**; neither cleared or rejected an option field. The corrected verification and authorized rerun remain pending. This is a third, separate live-evidence path: it does not run in, replace, or clear either the general `public-generation` or `provider-evaluation` job.
 
-The paid selector is exactly `^TestGatewayXSearchOptionsContract$`. It sends serial, buffered requests with `-count=1` to `POST https://ai-gateway.vercel.sh/v1/responses` using only `spacexai/grok-4.6`. It makes no retry and performs no fallback. Every request has a strict 30-second deadline derived from one 8-minute overall test deadline; the protected workflow job has `timeout-minutes: 10`, so worst-case test time remains below the workflow bound. The corrected sequence sends the fieldless control first and aborts before every option-bearing case unless that control succeeds. Its static option matrix contains one combined canonical request with all six candidate fields present; explicit empty-list and explicit-false forms; `from_date` alone; `to_date` alone; and grouped wrong-type attribution cases for handle lists, dates, and booleans. Only if the combined canonical case fails may six independently controlled one-field valid diagnostics run; that canonical failure does not itself clear, reject, or attribute any field. The hard-coded ceiling remains 14 requests.
+The paid selector is exactly `^TestGatewayXSearchOptionsContract$`. It sends serial, buffered requests with `-count=1` to `POST https://ai-gateway.vercel.sh/v1/responses` using only `spacexai/grok-4.6`. It makes no retry and performs no fallback. Every request has a strict 90-second deadline derived from one 22-minute overall test deadline; the protected workflow job has `timeout-minutes: 25`, so worst-case test time remains below the workflow bound. The corrected sequence sends the fieldless control first and aborts before every option-bearing case unless that control succeeds. Its static option matrix contains one combined canonical request with all six candidate fields present; explicit empty-list and explicit-false forms; `from_date` alone; `to_date` alone; and grouped wrong-type attribution cases for handle lists, dates, and booleans. Only if the combined canonical case fails may six independently controlled one-field valid diagnostics run; that canonical failure does not itself clear, reject, or attribute any field. The hard-coded ceiling remains 14 requests.
 Canonical diagnostics expand only for HTTP 400/422 with structurally present error and no known excluded auth/permission/rate/timeout/conflict/server/transient/service category/code; absent errors or excluded classes fail without expansion.
 
 Execution fails closed unless exactly one nonblank `AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` is present, the dedicated acknowledgement is exactly `AI_GATEWAY_X_SEARCH_LIVE_COST_ACK=I_ACCEPT_LIVE_X_SEARCH_COSTS`, both `AI_GATEWAY_PUBLIC_LIVE_COST_ACK` and `AI_GATEWAY_LIVE_COST_ACK` are absent, and all five runtime-only private inputs are nonblank: `AI_GATEWAY_X_SEARCH_PROBE_INPUT`, `AI_GATEWAY_X_SEARCH_PROBE_HANDLE_A`, `AI_GATEWAY_X_SEARCH_PROBE_HANDLE_B`, `AI_GATEWAY_X_SEARCH_PROBE_FROM_DATE`, and `AI_GATEWAY_X_SEARCH_PROBE_TO_DATE`. The protected workflow supplies those variables only from GitHub secrets with the same exact names; it never accepts workflow-dispatch values. The credential-free selector `^TestGatewayXSearchOptionsPrerequisiteMismatchesZeroDispatch$` covers missing or wrong dedicated acknowledgement, either forbidden general acknowledgement, zero credentials, multiple credentials, and each private input missing or blank on an otherwise authorized configuration; every mismatch must fail before HTTP client or request construction and record zero `RoundTrip` calls.
@@ -65,7 +65,7 @@ env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK \
   -run '^TestGatewayEvaluationContract$' -count=1
 ```
 
-Configurable Gateway `x_search` options (**authorized; first attempt INCONCLUSIVE / CANCELLED; corrected rerun pending**):
+Configurable Gateway `x_search` options (**authorized; two attempts INCONCLUSIVE; corrected rerun pending**):
 
 ```sh
 env -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_LIVE_COST_ACK \
@@ -112,20 +112,19 @@ Complete only from actual runs of [evaluation_test.go](../internal/livecontract/
 
 ## Sanitized configurable `x_search` option record
 
-Complete only from the dedicated paid selector after the prerequisite selector passes. The first paid attempt below is retained solely as sanitized inconclusive accounting; it is not field evidence.
+Complete only from the dedicated paid selector after the prerequisite selector passes. The paid attempts below are retained solely as sanitized inconclusive accounting; neither is field evidence.
 
 | Field | Result | Retain only |
 | --- | --- | --- |
 | Authorization / cost acceptance | **RECORDED** | Boolean authorization and acceptance state; never a credential value |
-| First paid attempt | **2026-09-21 — INCONCLUSIVE / CANCELLED** | One sanitized record only; the remaining serial diagnostic matrix was cancelled |
-| Route | `POST https://ai-gateway.vercel.sh/v1/responses`; `spacexai/grok-4.6` | Exact endpoint and model only |
-| Case | `canonical-all-six` | Case label only; no option values |
-| HTTP / top-level shape | HTTP 400; object `absent`; status `absent` | Status and safe structural classes only |
-| Output shape | No outputs | Presence only; no generated content |
-| Error shape | Error category `other`; code `absent` | Safe classes only; no unknown/raw value or body |
-| Cleared or rejected request surface | **NONE** | The ambiguous canonical 400 does not attribute, clear, or reject any field |
-| Next action | **Corrected verification, then owner-authorized rerun** | Run the fieldless control first under the corrected bounds before option expansion |
-The first-attempt record remains sanitized accounting only. Canonical diagnostics expand only for HTTP 400/422 with structurally present error and no known excluded auth/permission/rate/timeout/conflict/server/transient/service category/code; absent errors or excluded classes fail without expansion.
+| First paid attempt | **2026-09-21 — INCONCLUSIVE / CANCELLED** | One sanitized canonical record only; the remaining serial diagnostic matrix was cancelled |
+| First-attempt route / case | `POST https://ai-gateway.vercel.sh/v1/responses`; `spacexai/grok-4.6`; `canonical-all-six` | Exact endpoint, model, and case label only; no option values |
+| First-attempt HTTP / shape | HTTP 400; object `absent`; status `absent`; no outputs; error category `other`; code `absent` | Status and safe structural classes only; no unknown/raw value or body |
+| Second paid attempt | **2026-09-21 — INCONCLUSIVE / TIMED OUT AT FIELDLESS CONTROL** | The fieldless control ended after exactly 30.02 seconds under the prior 30-second request deadline with sanitized `dispatch failed` |
+| Configurable option cases in second attempt | **ZERO** | No configurable option request was dispatched |
+| Cleared or rejected request surface | **NONE** | Neither the ambiguous first-attempt canonical 400 nor the second-attempt fieldless-control timeout attributes, clears, or rejects any field |
+| Next action | **Corrected verification, then owner-authorized rerun** | Verify the 90-second per-request / 22-minute overall bounds, then run the fieldless control first before option expansion |
+Both attempt records remain sanitized accounting only. Canonical diagnostics expand only for HTTP 400/422 with structurally present error and no known excluded auth/permission/rate/timeout/conflict/server/transient/service category/code; absent errors or excluded classes fail without expansion.
 
 No private input value, credential, body, header, ID, raw error, or generated content was retained or reconstructed. Do not add an operator/run reference, literal option value, or any excluded content to this record.
 

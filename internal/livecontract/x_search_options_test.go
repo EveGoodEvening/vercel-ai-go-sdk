@@ -25,8 +25,8 @@ const (
 	xSearchOptionsAck            = "I_ACCEPT_LIVE_X_SEARCH_COSTS"
 	xSearchOptionsBodyMax        = 1 << 20
 	xSearchOptionsMaxCalls       = 14
-	xSearchOptionsRequestTimeout = 30 * time.Second
-	xSearchOptionsOverallTimeout = 8 * time.Minute
+	xSearchOptionsRequestTimeout = 90 * time.Second
+	xSearchOptionsOverallTimeout = 22 * time.Minute
 )
 
 var xSearchGeneralAckEnvs = [...]string{"AI_GATEWAY_LIVE_COST_ACK", "AI_GATEWAY_PUBLIC_LIVE_COST_ACK"}
