@@ -2574,3 +2574,18 @@ The capability ledger above supplies the separate exact terminal classification 
 - [!] Per-model compatibility, provider limits/options, cache-hit guarantees, semantic efficacy, and universal tools remain dynamic and unclaimed.
 - [!] Public-generation/provider-evaluation paid live evidence, protected hosted CI/environment evidence, owner authorization, owner-selected license, hosted metadata/provenance/permissions/publication review, hosting authorization, immutable tagging, direct-VCS/public-proxy imports, checksum evidence, promotion, and publication all remain pending exactly as recorded in the durable release documents.
 - [!] The durable sanitization checklist remains unchecked; this closure does not convert any of its boxes or any pre-tag/release checkbox to complete.
+
+## Go 1.26/1.27 JSON compatibility maintenance
+
+This maintenance fixes the reported Go 1.27.1 CI failures without reopening completed capability chunks, changing exported types, changing the pinned CI matrix, or clearing any live/release gate.
+
+- Scope: `image_validate.go`, `image_test.go`, `contract_external_test.go`, `CHANGELOG.md`, repository `AGENTS.md`, and this plan.
+- Match image request-size preflight to the active `encoding/json` representation of invalid UTF-8 without per-request encoding allocations. Preserve exact-limit acceptance and limit-plus-one rejection.
+- Check rerank field types by `reflect.Type` identity, not display names that change when `json.RawMessage` is an alias.
+- Verify the reported tests, public image request boundaries, and shared transcription sizing on both Go 1.26.8 and Go 1.27.1; run the full hermetic suite on both and the race/vet/local-consumer gates on Go 1.27.1 with credentials and live acknowledgements unset. Record actual local results separately from hosted CI status.
+
+Local verification completed with `AI_GATEWAY_API_KEY`, `VERCEL_OIDC_TOKEN`, `AI_GATEWAY_LIVE_COST_ACK`, `AI_GATEWAY_PUBLIC_LIVE_COST_ACK`, and `AI_GATEWAY_X_SEARCH_LIVE_COST_ACK` unset and `GOPROXY=off`:
+
+- Both `GOTOOLCHAIN=go1.26.8` and `GOTOOLCHAIN=go1.27.1`: `go test -count=1 -run '^(TestImageRequestPreflight|TestExternalContractRerank|TestTranscription)' .` and `go test -count=1 ./...` passed. The image boundary regression exercises `Client.GenerateImage`, accepts an independently sized 16 MiB request with malformed UTF-8, and rejects limit+1 before another transport call.
+- `GOTOOLCHAIN=go1.27.1`: `go test -race -count=1 ./...`, `go vet ./...`, and `./scripts/verify-local-consumer.sh` passed. `gofmt` was applied to the three changed Go files.
+- Exported APIs, user-facing size limits, shared transcription validation, and CI pins are unchanged; README and client guides need no contract update. Changelog and repository lessons record the correction. Hosted CI was not rerun, and no live/release gate is cleared by these local results.

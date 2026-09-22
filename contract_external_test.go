@@ -588,30 +588,27 @@ func TestExternalContractEmbeddingFields(t *testing.T) {
 }
 
 func TestExternalContractRerankFieldsAndInterfaces(t *testing.T) {
-	tests := []struct {
-		name   string
-		value  any
-		fields []string
+	want := map[reflect.Type][]struct {
+		name string
+		typ  reflect.Type
 	}{
-		{"RerankRequest", gateway.RerankRequest{}, []string{"Query string", "Documents gateway.RerankDocuments", "TopN *int", "ProviderOptions []gateway.ProviderOption"}},
-		{"RerankTexts", gateway.RerankTexts{}, []string{"Values []string"}},
-		{"RerankObjects", gateway.RerankObjects{}, []string{"Values []json.RawMessage"}},
-		{"RerankText", gateway.RerankText{}, []string{"Text string"}},
-		{"RerankJSON", gateway.RerankJSON{}, []string{"Value json.RawMessage"}},
-		{"RerankItem", gateway.RerankItem{}, []string{"OriginalIndex int", "Score float64", "Document gateway.RerankDocument"}},
-		{"RerankResult", gateway.RerankResult{}, []string{"Results []gateway.RerankItem", "Warnings []gateway.ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response gateway.ResponseMetadata"}},
+		reflect.TypeOf(gateway.RerankRequest{}): {{"Query", reflect.TypeOf("")}, {"Documents", reflect.TypeOf((*gateway.RerankDocuments)(nil)).Elem()}, {"TopN", reflect.TypeOf((*int)(nil))}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption(nil))}},
+		reflect.TypeOf(gateway.RerankTexts{}):   {{"Values", reflect.TypeOf([]string(nil))}},
+		reflect.TypeOf(gateway.RerankObjects{}): {{"Values", reflect.TypeOf([]json.RawMessage(nil))}},
+		reflect.TypeOf(gateway.RerankText{}):    {{"Text", reflect.TypeOf("")}},
+		reflect.TypeOf(gateway.RerankJSON{}):    {{"Value", reflect.TypeOf(json.RawMessage(nil))}},
+		reflect.TypeOf(gateway.RerankItem{}):    {{"OriginalIndex", reflect.TypeOf(int(0))}, {"Score", reflect.TypeOf(float64(0))}, {"Document", reflect.TypeOf((*gateway.RerankDocument)(nil)).Elem()}},
+		reflect.TypeOf(gateway.RerankResult{}):  {{"Results", reflect.TypeOf([]gateway.RerankItem(nil))}, {"Warnings", reflect.TypeOf([]gateway.ProviderWarning(nil))}, {"ProviderMetadata", reflect.TypeOf(map[string]json.RawMessage(nil))}, {"Response", reflect.TypeOf(gateway.ResponseMetadata{})}},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			typ := reflect.TypeOf(test.value)
-			if typ.NumField() != len(test.fields) {
-				t.Fatalf("fields=%d", typ.NumField())
+	for typ, fields := range want {
+		t.Run(typ.Name(), func(t *testing.T) {
+			if typ.NumField() != len(fields) {
+				t.Fatalf("fields=%d want=%d", typ.NumField(), len(fields))
 			}
-			for i, w := range test.fields {
+			for i, w := range fields {
 				f := typ.Field(i)
-				got := f.Name + " " + f.Type.String()
-				if !f.IsExported() || got != w {
-					t.Fatalf("field %d=%q want %q", i, got, w)
+				if !f.IsExported() || f.Name != w.name || f.Type != w.typ {
+					t.Fatalf("field %d=%s %s want %s %s", i, f.Name, f.Type, w.name, w.typ)
 				}
 			}
 		})

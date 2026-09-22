@@ -4,6 +4,10 @@ All notable changes, including every exported breaking change during v0, are rec
 
 ## Unreleased
 
+### Fixes
+
+- Image request-size preflight now follows the active Go JSON encoder's invalid-UTF-8 replacement length, preserving acceptance at the 16 MiB limit on Go 1.26 and 1.27 without per-request encoding allocations. Rerank API checks compare type identity rather than alias-dependent reflection names; exported `json.RawMessage` fields are unchanged.
+
 ### Supported behavior
 
 - Historical experimental Evaluation Model V4 Go client for boolean, choice, and score evaluation questions.

@@ -139,25 +139,45 @@ func TestImageOutputBoundaries(t *testing.T) {
 
 func TestImageRequestPreflightExactBoundary(t *testing.T) {
 	dataLength := (maxRequestBodyBytes/4)*3 - 300
-	request := ImageRequest{Count: 1, Files: []ImageInput{ImageBytes{Data: make([]byte, dataLength)}}}
-	empty := ""
-	request.Prompt = &empty
-	length, err := preflightImageRequest("p/m", request)
-	if err != nil {
-		t.Fatalf("base request preflight: %v", err)
-	}
-	filler := strings.Repeat("x", maxRequestBodyBytes-length)
-	request.Prompt = &filler
-	body, err := prepareImageRequest("p/m", request)
-	if err != nil || len(body) != maxRequestBodyBytes {
-		t.Fatalf("exact boundary len=%d preflight=%d err=%v", len(body), length, err)
-	}
-	filler += "x"
-	request.Prompt = &filler
-	_, err = prepareImageRequest("p/m", request)
-	var validationErr *ValidationError
-	if !errors.As(err, &validationErr) || validationErr.Path() != "$" || validationErr.Reason() != "encoded request exceeds 16777216 bytes" {
-		t.Fatalf("limit+1 err=%T %v", err, err)
+	input := ImageBytes{Data: make([]byte, dataLength)}
+	baseLength := len(`{"prompt":"","n":1,"files":[{"type":"file","mediaType":"","data":""}]}`) + base64.StdEncoding.EncodedLen(dataLength)
+	for _, test := range []struct {
+		name   string
+		prefix string
+	}{
+		{"ASCII", ""},
+		{"invalid UTF-8", "\xff\xe2\x82\ufffd"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			encoded, err := json.Marshal(test.prefix)
+			if err != nil {
+				t.Fatal(err)
+			}
+			prompt := test.prefix + strings.Repeat("x", maxRequestBodyBytes-baseLength-(len(encoded)-2))
+			request := ImageRequest{Prompt: &prompt, Count: 1, Files: []ImageInput{input}}
+			length, err := preflightImageRequest("p/m", request)
+			if err != nil || length != maxRequestBodyBytes {
+				t.Fatalf("exact boundary preflight=%d err=%v", length, err)
+			}
+			calls := 0
+			client := imageClient(t, func(r *http.Request) *http.Response {
+				calls++
+				n, err := io.Copy(io.Discard, r.Body)
+				if err != nil || n != maxRequestBodyBytes {
+					t.Fatalf("exact boundary body length=%d err=%v", n, err)
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"images":[]}`)), Request: r}
+			})
+			if _, err := client.GenerateImage(context.Background(), "p/m", request); err != nil || calls != 1 {
+				t.Fatalf("exact boundary calls=%d err=%v", calls, err)
+			}
+			prompt += "x"
+			_, err = client.GenerateImage(context.Background(), "p/m", request)
+			var validationErr *ValidationError
+			if !errors.As(err, &validationErr) || validationErr.Path() != "$" || validationErr.Reason() != "encoded request exceeds 16777216 bytes" || calls != 1 {
+				t.Fatalf("limit+1 calls=%d err=%T %v", calls, err, err)
+			}
+		})
 	}
 }
 
@@ -177,7 +197,7 @@ func TestImageRequestPreflightAggregateAndArithmetic(t *testing.T) {
 	if _, ok := checkedImageLengthAdd(math.MaxInt, 1); ok {
 		t.Fatal("overflowing aggregate accepted")
 	}
-	for _, value := range []string{"plain", "<>&", "\x00\n\t", "\u2028", string([]byte{0xff})} {
+	for _, value := range []string{"", "plain", "<>&", "\"\\\b\f\n\r\t\x00", "\u2028\u2029", "é中\ufffd", "\xff", "a\xe2\x82\ufffd\xff<\u2028z"} {
 		encoded, marshalErr := json.Marshal(value)
 		if marshalErr != nil || jsonQuotedLength(value) != len(encoded) {
 			t.Fatalf("quoted length %q=%d want %d err=%v", value, jsonQuotedLength(value), len(encoded), marshalErr)

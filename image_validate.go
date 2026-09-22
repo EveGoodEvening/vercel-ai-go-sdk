@@ -358,6 +358,13 @@ func checkedImageLengthAdd(a, b int) (int, bool) {
 	return a + b, true
 }
 
+// encoding/json can emit invalid UTF-8 as either an escaped or literal U+FFFD.
+// Measure once so preflight matches the active encoder without allocating per call.
+var jsonInvalidUTF8Length = func() int {
+	encoded, _ := json.Marshal("\xff")
+	return len(encoded) - 2 // Exclude the surrounding quotes.
+}()
+
 func jsonQuotedLength(value string) int {
 	length := 2
 	for index := 0; index < len(value); {
@@ -378,7 +385,7 @@ func jsonQuotedLength(value string) int {
 		}
 		r, size := utf8.DecodeRuneInString(value[index:])
 		if r == utf8.RuneError && size == 1 {
-			length += 6
+			length += jsonInvalidUTF8Length
 			index++
 		} else if r == '\u2028' || r == '\u2029' {
 			length += 6
