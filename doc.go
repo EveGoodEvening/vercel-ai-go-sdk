@@ -1,7 +1,7 @@
 // Package gateway provides an experimental client for distinct Vercel AI
 // Gateway contracts: the public Responses and Chat Completions generation APIs,
 // and the AI SDK Model V4 provider protocols for evaluation, image generation,
-// speech synthesis, embeddings, and reranking.
+// speech synthesis, transcription, embeddings, and reranking.
 // Public generation uses CreateResponse and StreamResponse at
 // {publicBaseURL}/responses, and CreateChatCompletion and StreamChatCompletion
 // at {publicBaseURL}/chat/completions. The default public base URL is
@@ -10,35 +10,36 @@
 // The SDK does not execute returned tool calls.
 //
 // Evaluate posts to {baseURL}/evaluation-model, GenerateImage posts to
-// {baseURL}/image-model, GenerateSpeech posts to {baseURL}/speech-model, Embed
-// posts to {baseURL}/embedding-model, and Rerank posts to
-// {baseURL}/reranking-model; the default provider base URL is
-// https://ai-gateway.vercel.sh/v4/ai. Evaluation validates shared state and
-// keyed boolean, choice, and score questions. GenerateImage accepts a dynamic
-// provider/model ID, 1..16 requested outputs, and URL, opaque base64, or byte
-// image inputs. GenerateSpeech accepts a dynamic provider/model ID and exact
-// presence-preserving speech fields. Embed accepts a dynamic provider/model ID
-// and 1..4096 strings as one request. Rerank accepts a dynamic provider/model
-// ID, query, optional topN, and one homogeneous envelope of 1..4096 text or
-// JSON-object documents. These methods are separate from public generation and
-// do not implement corresponding public v1 evaluation, image, speech,
-// embedding, or reranking APIs.
+// {baseURL}/image-model, GenerateSpeech posts to {baseURL}/speech-model,
+// Transcribe posts to {baseURL}/transcription-model, Embed posts to
+// {baseURL}/embedding-model, and Rerank posts to {baseURL}/reranking-model; the
+// default provider base URL is https://ai-gateway.vercel.sh/v4/ai. Evaluation
+// validates shared state and keyed boolean, choice, and score questions.
+// GenerateImage accepts a dynamic provider/model ID, 1..16 requested outputs,
+// and URL, opaque base64, or byte image inputs. GenerateSpeech accepts a
+// dynamic provider/model ID and exact presence-preserving speech fields.
+// Transcribe accepts a dynamic provider/model ID and one opaque-string or byte
+// audio input. Embed accepts a dynamic provider/model ID and 1..4096 strings as
+// one request. Rerank accepts a dynamic provider/model ID, query, optional topN,
+// and one homogeneous envelope of 1..4096 text or JSON-object documents. These
+// methods are separate from public generation and do not implement corresponding
+// public v1 evaluation, image, speech, transcription, embedding, or reranking APIs.
 //
 // Construct a Client with NewClient. Credential precedence is explicit API key,
 // AI_GATEWAY_API_KEY, explicit fixed/source OIDC, then VERCEL_OIDC_TOKEN. A
 // selected TokenSource is called once per HTTP attempt. Options apply in order.
 // WithBaseURL affects provider evaluation, image generation, speech synthesis,
-// embeddings, and reranking; WithPublicBaseURL affects only public generation.
+// transcription, embeddings, and reranking; WithPublicBaseURL affects only public generation.
 // WithHeaders clones input and rejects owned headers; WithHTTPClient retains
 // the supplied pointer.
 //
 // All request methods validate before network I/O and reject a nil context.
 // Buffered generation and evaluation calls accept the bounded RetryPolicy;
 // retries are off by default and only statuses 408, 409, 429, and 500 through
-// 599 are retryable. GenerateImage, GenerateSpeech, Embed, and Rerank always
-// make exactly one request and perform no automatic batching or retry.
-// Cancellation applies to token resolution, requests, body reads, retry waits,
-// provider response decoding, and stream reads.
+// 599 are retryable. GenerateImage, GenerateSpeech, Transcribe, Embed, and
+// Rerank always make exactly one request and perform no automatic batching or
+// retry. Cancellation applies to token resolution, requests, body reads, retry
+// waits, provider response decoding, and stream reads.
 //
 // GenerateImage limits Count to 1..16 and the encoded request to 16 MiB. Prompt
 // presence is preserved; present-empty size/aspect ratio and present-zero seed
@@ -63,6 +64,18 @@
 // ResponseMetadata.Body retains at most a 1 MiB prefix. ProviderOption remains
 // sealed with no concrete exported implementation.
 //
+// Transcribe accepts TranscriptionBase64 as opaque valid UTF-8 of at most 1 MiB
+// without decoding or normalization, or TranscriptionBytes of at most 8 MiB,
+// standard-base64 encoded exactly once. MediaType is opaque valid UTF-8 of at
+// most 255 bytes; the encoded request is limited to 16 MiB. Successful bodies
+// are strictly validated up to 16 MiB. Text is required; absent segments become
+// a non-nil empty slice, and at most 4096 segments with required text and finite
+// timestamps are accepted. Language and duration preserve absent/null as nil;
+// present duration and timestamps may be negative, fractional, equal, or
+// reversed. Warnings and provider metadata use the shared strict presence rules,
+// and ResponseMetadata.Body retains at most a 1 MiB prefix. The method is
+// buffered and has no URL-audio variant, streaming, public-v1, or parity claim.
+//
 // Embed limits each input string to 1 MiB and the encoded request to 16 MiB.
 // A successful embedding body is validated up to 32 MiB; ResponseMetadata.Body
 // retains at most its first 1 MiB. The response must contain exactly one finite,
@@ -86,6 +99,7 @@
 // ResponseError, or ResponseValidationError and support errors.As. Raw JSON,
 // diagnostic bodies, prompts, image inputs and decoded outputs, speech text,
 // voices, instructions, languages, output formats, speeds and opaque audio,
+// transcription audio, transcript text, segments, language and duration,
 // embedding inputs and vectors, reranking queries, documents and scores, tool
 // data, provider options and metadata, headers, and identifiers may be sensitive
 // and must be sanitized before logging or storage.
@@ -104,11 +118,12 @@
 // search events remain RawResponseEvent values. Other web-search forms or
 // options, wider model compatibility, semantic or limit claims, date semantics,
 // wrong-kind behavior, direct-xAI support, public /v1/evaluate, public
-// /v1/embeddings, public v1 image generation, public v1 speech, and public v1
-// reranking remain unsupported. Video generation, transcription, realtime,
-// batches, and management APIs are also absent. No JavaScript parity, universal
-// provider/model compatibility, concrete provider option semantics, or hosted
-// image, speech, embedding, or reranking success is claimed. Search probes do
+// /v1/embeddings, public v1 image generation, public v1 speech, public v1
+// transcription, public v1 reranking, and streaming transcription remain
+// unsupported. Video generation, realtime, batches, and management APIs are
+// also absent. No JavaScript parity, universal provider/model compatibility,
+// concrete provider option semantics, or hosted image, speech, transcription,
+// embedding, or reranking success is claimed. Search probes do
 // not satisfy the separately gated public-generation or provider-evaluation
 // live runs, which remain NOT RUN.
 
