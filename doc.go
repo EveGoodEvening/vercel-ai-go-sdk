@@ -1,7 +1,8 @@
 // Package gateway provides an experimental client for distinct Vercel AI
-// Gateway contracts: the public Responses and Chat Completions generation APIs,
-// and the AI SDK Model V4 provider protocols for evaluation, image generation,
-// speech synthesis, transcription, embeddings, and reranking.
+// Gateway contracts: the historically implemented public Responses and Chat
+// Completions generation APIs and provider Evaluation API, plus newer staged AI
+// SDK Model V4 provider protocols for image generation, speech synthesis,
+// buffered transcription, embeddings, and reranking.
 // Public generation uses CreateResponse and StreamResponse at
 // {publicBaseURL}/responses, and CreateChatCompletion and StreamChatCompletion
 // at {publicBaseURL}/chat/completions. The default public base URL is
@@ -35,11 +36,14 @@
 //
 // All request methods validate before network I/O and reject a nil context.
 // Buffered generation and evaluation calls accept the bounded RetryPolicy;
-// retries are off by default and only statuses 408, 409, 429, and 500 through
-// 599 are retryable. GenerateImage, GenerateSpeech, Transcribe, Embed, and
-// Rerank always make exactly one request and perform no automatic batching or
-// retry. Cancellation applies to token resolution, requests, body reads, retry
-// waits, provider response decoding, and stream reads.
+// retries are off by default, may duplicate billable work, and only statuses
+// 408, 409, 429, and 500 through 599 are retryable. GenerateImage,
+// GenerateSpeech, Transcribe, Embed, and Rerank always make exactly one request
+// and perform no automatic batching or retry. Public caching fields are
+// forwarded request data only; the package provides no local cache and makes no
+// cache-acceptance, hit, lifetime, privacy, or billing decision. Cancellation
+// applies to token resolution, requests, body reads, retry waits, provider
+// response decoding, and stream reads.
 //
 // GenerateImage limits Count to 1..16 and the encoded request to 16 MiB. Prompt
 // presence is preserved; present-empty size/aspect ratio and present-zero seed
@@ -102,7 +106,10 @@
 // transcription audio, transcript text, segments, language and duration,
 // embedding inputs and vectors, reranking queries, documents and scores, tool
 // data, provider options and metadata, headers, and identifiers may be sensitive
-// and must be sanitized before logging or storage.
+// and must be sanitized before logging or storage. Media and retained response
+// bytes live in ordinary Go memory; defensive copies prevent aliasing, not
+// disclosure or persistence. The package does not fetch or upload referenced
+// files and exposes no Gateway file-service client.
 // Typed request declarations for the Exa, Parallel, Perplexity, and Tako Chat
 // Gateway server-search tools are available only through the opt-in server-tools
 // methods. Responses opt-in built-in-tools methods support fixed low-context
@@ -115,16 +122,23 @@
 // both dates, and both flags true. Simultaneous non-empty handle lists are
 // rejected locally; arbitrary subsets remain unresolved. Buffered search
 // results are available only through ResponseResult.RawJSON(), and streaming
-// search events remain RawResponseEvent values. Other web-search forms or
-// options, wider model compatibility, semantic or limit claims, date semantics,
-// wrong-kind behavior, direct-xAI support, public /v1/evaluate, public
-// /v1/embeddings, public v1 image generation, public v1 speech, public v1
-// transcription, public v1 reranking, and streaming transcription remain
-// unsupported. Video generation, realtime, batches, and management APIs are
-// also absent. No JavaScript parity, universal provider/model compatibility,
-// concrete provider option semantics, or hosted image, speech, transcription,
-// embedding, or reranking success is claimed. Search probes do
-// not satisfy the separately gated public-generation or provider-evaluation
-// live runs, which remain NOT RUN.
+// search events remain RawResponseEvent values. The package serializes function
+// and server-tool declarations and transports calls/results as data; it never
+// executes tools, runs agents, or performs searches itself. Other web-search
+// forms or options, wider model compatibility, semantic or limit claims, date
+// semantics, wrong-kind behavior, direct-xAI support, public /v1/evaluate,
+// public /v1/embeddings, public v1 image generation, public v1 speech, public
+// v1 transcription, public v1 reranking, and the internal provider
+// /v4/ai/language-model text contract remain unsupported. The blocked language
+// contract includes multimodal file input, reasoning, tools, provider search,
+// and provider caching; public Responses and Chat fields do not establish it.
+// Video generation, WebSocket or streaming transcription, realtime, batches,
+// management APIs, and file upload/storage/retrieval/deletion are also absent.
+// No JavaScript parity, universal provider/model compatibility, concrete
+// provider option semantics, or hosted image, speech, transcription, embedding,
+// or reranking success is claimed. Search probes do not satisfy the separately
+// gated public-generation or provider-evaluation live runs, which remain NOT
+// RUN. Current additions are additive: existing Evaluation, Responses, and Chat
+// methods are not redirected or reinterpreted.
 
 package gateway
