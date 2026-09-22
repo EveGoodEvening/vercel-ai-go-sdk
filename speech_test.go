@@ -108,13 +108,13 @@ func TestSpeechStrictResponseAndOpaqueAudio(t *testing.T) {
 		{`{"audio":"x","providerMetadata":{"p":{"` + strings.Repeat("k", maxStringBytes+1) + `":1}}}`, `$["providerMetadata"]["p"]`, "object key exceeds 1 MiB"},
 	}
 	for _, tc := range cases {
-		r, e := decodeSpeechResult("p/m", rawProviderResponse{statusCode: 200, headers: make(http.Header), body: []byte(tc.body)})
+		r, e := decodeSpeechResult(context.Background(), "p/m", rawProviderResponse{statusCode: 200, headers: make(http.Header), body: []byte(tc.body)})
 		var ve *ResponseValidationError
 		if r != nil || !errors.As(e, &ve) || ve.Path() != tc.path || ve.Reason() != tc.reason {
 			t.Fatalf("body prefix %.30q result=%v err=%T %v", tc.body, r, e, e)
 		}
 	}
-	r, e := decodeSpeechResult("p/m", rawProviderResponse{statusCode: 200, headers: make(http.Header), body: []byte(`{"audio":"not base64 !"}`)})
+	r, e := decodeSpeechResult(context.Background(), "p/m", rawProviderResponse{statusCode: 200, headers: make(http.Header), body: []byte(`{"audio":"not base64 !"}`)})
 	if e != nil || r.Audio != "not base64 !" {
 		t.Fatalf("%#v %v", r, e)
 	}
@@ -123,7 +123,7 @@ func TestSpeechStrictResponseAndOpaqueAudio(t *testing.T) {
 func TestSpeechAudioLimitMetadataAndCopies(t *testing.T) {
 	for _, n := range []int{maxStringBytes + 1, maxSpeechAudioBytes} {
 		body := []byte(`{"audio":"` + strings.Repeat("a", n) + `"}`)
-		r, e := decodeSpeechResult("p/m", rawProviderResponse{statusCode: 200, headers: http.Header{"X": {"y"}}, body: body})
+		r, e := decodeSpeechResult(context.Background(), "p/m", rawProviderResponse{statusCode: 200, headers: http.Header{"X": {"y"}}, body: body})
 		if e != nil || len(r.Audio) != n || len(r.Response.Body) != maxDiagnosticBodyBytes {
 			t.Fatalf("n=%d result=%v err=%v", n, r, e)
 		}
@@ -135,14 +135,46 @@ func TestSpeechAudioLimitMetadataAndCopies(t *testing.T) {
 		}
 	}
 	body := []byte(`{"audio":"` + strings.Repeat("a", maxSpeechAudioBytes+1) + `"}`)
-	_, e := decodeSpeechResult("p/m", rawProviderResponse{statusCode: 200, body: body})
+	_, e := decodeSpeechResult(context.Background(), "p/m", rawProviderResponse{statusCode: 200, body: body})
 	var ve *ResponseValidationError
 	if !errors.As(e, &ve) || ve.Path() != `$["audio"]` {
 		t.Fatalf("err=%v", e)
 	}
-	r, e := decodeSpeechResult("p/m", rawProviderResponse{statusCode: 200, body: []byte(`{"audio":"x","warnings":[],"providerMetadata":{}}`)})
+	r, e := decodeSpeechResult(context.Background(), "p/m", rawProviderResponse{statusCode: 200, body: []byte(`{"audio":"x","warnings":[],"providerMetadata":{}}`)})
 	if e != nil || r.Warnings == nil || r.ProviderMetadata == nil || !reflect.DeepEqual(r.Warnings, []ProviderWarning{}) {
 		t.Fatalf("%#v %v", r, e)
+	}
+}
+
+type cancelAfterChecksContext struct {
+	context.Context
+	checks   atomic.Int32
+	cancelAt int32
+}
+
+func (c *cancelAfterChecksContext) Err() error {
+	if c.checks.Add(1) >= c.cancelAt {
+		return context.Canceled
+	}
+	return nil
+}
+
+func TestSpeechCancellationDuringDecode(t *testing.T) {
+	body := []byte(`{"audio":"` + strings.Repeat("a", 2<<20) + `"}`)
+	ctx := &cancelAfterChecksContext{Context: context.Background(), cancelAt: 8}
+	r, err := decodeSpeechResult(ctx, "p/m", rawProviderResponse{statusCode: 200, body: body})
+	var transportErr *TransportError
+	var validationErr *ResponseValidationError
+	if r != nil || !errors.As(err, &transportErr) || transportErr.Operation() != "read response body" || !errors.Is(err, context.Canceled) || errors.As(err, &validationErr) {
+		t.Fatalf("result=%#v checks=%d error=%T %v", r, ctx.checks.Load(), err, err)
+	}
+	if ctx.checks.Load() < ctx.cancelAt {
+		t.Fatalf("decode returned before cancellation: checks=%d", ctx.checks.Load())
+	}
+
+	r, err = decodeSpeechResult(context.Background(), "p/m", rawProviderResponse{statusCode: 200, body: body})
+	if err != nil || r == nil || len(r.Audio) != 2<<20 {
+		t.Fatalf("normal decode result=%#v error=%v", r, err)
 	}
 }
 
@@ -158,7 +190,7 @@ func TestGenerateSpeechOneAttemptErrorsAndClose(t *testing.T) {
 	if !errors.As(e, &re) || calls.Load() != 1 {
 		t.Fatalf("err=%v calls=%d", e, calls.Load())
 	}
-	_, e = decodeSpeechResult("p/m", rawProviderResponse{statusCode: 200, bodyTruncated: true, body: bytes.Repeat([]byte{'x'}, maxDiagnosticBodyBytes), bodyErr: errors.New("large")})
+	_, e = decodeSpeechResult(context.Background(), "p/m", rawProviderResponse{statusCode: 200, bodyTruncated: true, body: bytes.Repeat([]byte{'x'}, maxDiagnosticBodyBytes), bodyErr: errors.New("large")})
 	var ve *ResponseValidationError
 	if !errors.As(e, &ve) || !ve.BodyTruncated() || len(ve.RawResponseBody()) != maxDiagnosticBodyBytes {
 		t.Fatalf("err=%v", e)
@@ -171,4 +203,5 @@ func TestSpeech(t *testing.T) {
 	t.Run("strict response and opaque audio", TestSpeechStrictResponseAndOpaqueAudio)
 	t.Run("audio limit metadata and copies", TestSpeechAudioLimitMetadataAndCopies)
 	t.Run("one attempt errors and close", TestGenerateSpeechOneAttemptErrorsAndClose)
+	t.Run("cancellation during decode", TestSpeechCancellationDuringDecode)
 }

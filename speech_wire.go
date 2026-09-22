@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -15,7 +16,13 @@ type speechFailure struct {
 	cause        error
 }
 
-func decodeSpeechResult(modelID string, raw rawProviderResponse) (*SpeechResult, error) {
+func decodeSpeechResult(ctx context.Context, modelID string, raw rawProviderResponse) (*SpeechResult, error) {
+	canceled := func() (*SpeechResult, error) {
+		return nil, &TransportError{operation: "read response body", cause: ctx.Err()}
+	}
+	if ctx.Err() != nil {
+		return canceled()
+	}
 	prefix := raw.body
 	if len(prefix) > maxDiagnosticBodyBytes {
 		prefix = prefix[:maxDiagnosticBodyBytes]
@@ -30,11 +37,23 @@ func decodeSpeechResult(modelID string, raw rawProviderResponse) (*SpeechResult,
 	if raw.bodyErr != nil {
 		return nil, &TransportError{operation: "read response body", cause: raw.bodyErr}
 	}
-	if f := scanSpeechJSON(raw.body); f != nil {
+	if ctx.Err() != nil {
+		return canceled()
+	}
+	if f := scanSpeechJSON(ctx, raw.body); f != nil {
+		if ctx.Err() != nil {
+			return canceled()
+		}
 		return invalid(f)
 	}
+	if ctx.Err() != nil {
+		return canceled()
+	}
 	var top map[string]json.RawMessage
-	if err := json.Unmarshal(raw.body, &top); err != nil {
+	if err := decodeSpeechJSON(ctx, raw.body, &top); err != nil {
+		if ctx.Err() != nil {
+			return canceled()
+		}
 		return invalid(&speechFailure{"$", "malformed JSON", err})
 	}
 	for _, key := range sortedRawKeys(top) {
@@ -42,32 +61,50 @@ func decodeSpeechResult(modelID string, raw rawProviderResponse) (*SpeechResult,
 			return invalid(&speechFailure{memberPath("$", key), "unknown field", nil})
 		}
 	}
+	if ctx.Err() != nil {
+		return canceled()
+	}
 	rawAudio, ok := top["audio"]
 	if !ok {
 		return invalid(&speechFailure{memberPath("$", "audio"), "required string", nil})
 	}
 	var audio string
-	if bytes.Equal(bytes.TrimSpace(rawAudio), []byte("null")) || json.Unmarshal(rawAudio, &audio) != nil {
+	if bytes.Equal(bytes.TrimSpace(rawAudio), []byte("null")) {
+		return invalid(&speechFailure{memberPath("$", "audio"), "required string", nil})
+	}
+	if err := decodeSpeechJSON(ctx, rawAudio, &audio); err != nil {
+		if ctx.Err() != nil {
+			return canceled()
+		}
 		return invalid(&speechFailure{memberPath("$", "audio"), "required string", nil})
 	}
 	if len(audio) > maxSpeechAudioBytes {
 		return invalid(&speechFailure{memberPath("$", "audio"), "must not exceed 67108864 bytes", nil})
 	}
+	if ctx.Err() != nil {
+		return canceled()
+	}
 	warnings, wf := decodeProviderWarnings(top["warnings"])
 	if wf != nil {
 		return invalid(&speechFailure{wf.path, wf.reason, wf.cause})
+	}
+	if ctx.Err() != nil {
+		return canceled()
 	}
 	metadata, mf := decodeEmbeddingMetadata(top["providerMetadata"])
 	if mf != nil {
 		return invalid(&speechFailure{mf.path, mf.reason, mf.cause})
 	}
+	if ctx.Err() != nil {
+		return canceled()
+	}
 	return &SpeechResult{Audio: audio, Warnings: warnings, ProviderMetadata: metadata, Response: ResponseMetadata{ModelID: modelID, Headers: nonNilHeaderClone(raw.headers), Body: retained}}, nil
 }
 
-func scanSpeechJSON(body []byte) *speechFailure {
-	d := json.NewDecoder(bytes.NewReader(body))
+func scanSpeechJSON(ctx context.Context, body []byte) *speechFailure {
+	d := json.NewDecoder(&speechContextReader{ctx: ctx, r: bytes.NewReader(body)})
 	d.UseNumber()
-	if f := scanSpeechValue(d, "$", 1); f != nil {
+	if f := scanSpeechValue(ctx, d, "$", 1); f != nil {
 		return f
 	}
 	if _, err := d.Token(); err == nil {
@@ -78,7 +115,10 @@ func scanSpeechJSON(body []byte) *speechFailure {
 	return nil
 }
 
-func scanSpeechValue(d *json.Decoder, path string, depth int) *speechFailure {
+func scanSpeechValue(ctx context.Context, d *json.Decoder, path string, depth int) *speechFailure {
+	if err := ctx.Err(); err != nil {
+		return &speechFailure{path, "canceled", err}
+	}
 	if depth > maxJSONDepth {
 		return &speechFailure{path, "maximum depth is 64", nil}
 	}
@@ -124,7 +164,7 @@ func scanSpeechValue(d *json.Decoder, path string, depth int) *speechFailure {
 				if count > maxCollectionItems {
 					return &speechFailure{path, "must contain at most 4096 members", nil}
 				}
-				if f := scanSpeechValue(d, kp, depth+1); f != nil {
+				if f := scanSpeechValue(ctx, d, kp, depth+1); f != nil {
 					return f
 				}
 			}
@@ -137,7 +177,7 @@ func scanSpeechValue(d *json.Decoder, path string, depth int) *speechFailure {
 				if count >= maxCollectionItems {
 					return &speechFailure{path, "must contain at most 4096 items", nil}
 				}
-				if f := scanSpeechValue(d, indexPath(path, count), depth+1); f != nil {
+				if f := scanSpeechValue(ctx, d, indexPath(path, count), depth+1); f != nil {
 					return f
 				}
 				count++
@@ -150,4 +190,25 @@ func scanSpeechValue(d *json.Decoder, path string, depth int) *speechFailure {
 		}
 	}
 	return nil
+}
+
+type speechContextReader struct {
+	ctx context.Context
+	r   *bytes.Reader
+}
+
+func (r *speechContextReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	// Bound decoder work between cancellation checks even when it asks for a large buffer.
+	if len(p) > 32<<10 {
+		p = p[:32<<10]
+	}
+	return r.r.Read(p)
+}
+
+func decodeSpeechJSON(ctx context.Context, body []byte, dst any) error {
+	d := json.NewDecoder(&speechContextReader{ctx: ctx, r: bytes.NewReader(body)})
+	return d.Decode(dst)
 }

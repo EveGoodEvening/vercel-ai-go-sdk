@@ -51,5 +51,5 @@ func (client *Client) GenerateSpeech(ctx context.Context, modelID string, reques
 		}
 		return nil, composeResponseError(raw, now)
 	}
-	return decodeSpeechResult(modelID, raw)
+	return decodeSpeechResult(ctx, modelID, raw)
 }
