@@ -1,10 +1,18 @@
 package gateway
 
 import (
+	"context"
 	"errors"
+	"io"
 	"math"
+	"net/http"
+	"reflect"
+	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/EveGoodEvening/vercel-ai-go-sdk/internal/httpx"
 )
 
 func TestErrorNilAndZeroAccessors(t *testing.T) {
@@ -118,4 +126,325 @@ func TestRetryPolicyResolution(t *testing.T) {
 func TestRetryHooksRemainPrivateShape(t *testing.T) {
 	hooks := retryHooks{}
 	_ = withRetryHooks(hooks)
+}
+
+func TestProviderOptionsOmitNilAndEmpty(t *testing.T) {
+	if got, err := encodeProviderOptions(nil); got != nil || err != nil {
+		t.Fatalf("nil options encoded as %#v with error %v", got, err)
+	}
+	if got, err := encodeProviderOptions([]ProviderOption{}); got != nil || err != nil {
+		t.Fatalf("empty options encoded as %#v with error %v", got, err)
+	}
+}
+
+func TestProviderOptionsRejectNilEntry(t *testing.T) {
+	got, err := encodeProviderOptions([]ProviderOption{nil})
+	if got != nil {
+		t.Fatalf("nil option entry encoded as %#v", got)
+	}
+	if err == nil || err.Path() != `$["providerOptions"][0]` || err.Reason() != "must be a non-nil provider option" {
+		t.Fatalf("unexpected nil option error: %T %v", err, err)
+	}
+}
+
+func TestModalityTransportExactRoutesAndHeaders(t *testing.T) {
+	clearCredentialEnvironment(t)
+	tests := []struct {
+		route  string
+		header string
+	}{
+		{providerRouteEmbedding, headerEmbeddingModelSpecificationVersion},
+		{providerRouteReranking, headerRerankingModelSpecificationVersion},
+		{providerRouteImage, headerImageModelSpecificationVersion},
+		{providerRouteSpeech, headerSpeechModelSpecificationVersion},
+		{providerRouteTranscription, headerTranscriptionModelSpecificationVersion},
+		{providerRouteLanguage, headerLanguageModelSpecificationVersion},
+	}
+	for _, test := range tests {
+		t.Run(test.route, func(t *testing.T) {
+			var request *http.Request
+			var requestBody []byte
+			callerHeaders := http.Header{"X-Caller-Multi": {"first", "second", "third"}}
+			client, err := NewClient(WithAPIKey("secret"), WithBaseURL("https://example.test/v4/ai"), WithTeam("team"), WithHeaders(callerHeaders), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(got *http.Request) (*http.Response, error) {
+				request = got
+				body, readErr := io.ReadAll(got.Body)
+				if readErr != nil {
+					t.Fatalf("read outbound request body: %v", readErr)
+				}
+				requestBody = body
+				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("{}")), ContentLength: 2}, nil
+			})}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			preparedPayload := []byte(`{"input":1,"nested":{"exact":true}}`)
+			outcome, err := client.executeProviderRequest(context.Background(), test.route, "provider/model", func() ([]byte, error) { return preparedPayload, nil }, 32)
+			if err != nil || string(outcome.body) != "{}" {
+				t.Fatalf("outcome=%#v err=%v", outcome, err)
+			}
+			if request.URL.String() != "https://example.test/v4/ai"+test.route || request.Method != http.MethodPost {
+				t.Fatalf("request = %s %s", request.Method, request.URL)
+			}
+			if string(requestBody) != string(preparedPayload) {
+				t.Fatalf("outbound payload = %q, want exact prepared payload %q", requestBody, preparedPayload)
+			}
+			for name, want := range map[string]string{
+				headerAuthorization: "Bearer secret", headerContentType: "application/json", headerGatewayProtocolVersion: gatewayProtocolVersion,
+				headerGatewayAuthMethod: "api-key", headerModelID: "provider/model", headerTeam: "team", test.header: providerModelSpecificationVersion,
+			} {
+				if got := request.Header.Get(name); got != want {
+					t.Fatalf("%s=%q want %q", name, got, want)
+				}
+			}
+			if got := request.Header.Values("X-Caller-Multi"); !reflect.DeepEqual(got, []string{"first", "second", "third"}) {
+				t.Fatalf("X-Caller-Multi = %#v, want ordered caller values", got)
+			}
+			if request.Header.Get(headerEvaluationModelSpecificationVersion) != "" {
+				t.Fatal("modality request included evaluation specification header")
+			}
+		})
+	}
+}
+
+func TestModalityTransportValidationBeforeCredentialAndOneAttempt(t *testing.T) {
+	clearCredentialEnvironment(t)
+	source := &transportTokenSource{token: "token"}
+	attempts := 0
+	client, err := NewClient(WithOIDCTokenSource(source), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		attempts++
+		return &http.Response{StatusCode: http.StatusInternalServerError, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("failure"))}, nil
+	})}), WithRetryPolicy(RetryPolicy{MaxAttempts: 10}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := validationError(`$["value"]`, "invalid")
+	_, err = client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return nil, want }, 32)
+	if err != want || source.callCount() != 0 || attempts != 0 {
+		t.Fatalf("err=%v credentials=%d attempts=%d", err, source.callCount(), attempts)
+	}
+	_, err = client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return make([]byte, maxRequestBodyBytes+1), nil }, 32)
+	var validationErr *ValidationError
+	if !errors.As(err, &validationErr) || validationErr.Path() != "$" || validationErr.Reason() != "encoded request exceeds 16777216 bytes" || source.callCount() != 0 || attempts != 0 {
+		t.Fatalf("oversized err=%T %v credentials=%d attempts=%d", err, err, source.callCount(), attempts)
+	}
+	_, err = client.executeProviderRequest(context.Background(), "/unsupported-model", "model", func() ([]byte, error) { return []byte("{}"), nil }, 32)
+	if !errors.As(err, &validationErr) || validationErr.Path() != `$["route"]` || validationErr.Reason() != "unsupported provider route" || source.callCount() != 0 || attempts != 0 {
+		t.Fatalf("unsupported route err=%T %v credentials=%d attempts=%d", err, err, source.callCount(), attempts)
+	}
+	outcome, err := client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return []byte("{}"), nil }, 32)
+	if err != nil || outcome.statusCode != http.StatusInternalServerError || attempts != 1 || source.callCount() != 1 {
+		t.Fatalf("outcome=%#v err=%v credentials=%d attempts=%d", outcome, err, source.callCount(), attempts)
+	}
+}
+
+func TestModalityTransportDistinctBodyLimitsAndSafeError(t *testing.T) {
+	clearCredentialEnvironment(t)
+	responses := []*http.Response{
+		{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("12345")), ContentLength: 5},
+		{StatusCode: http.StatusBadRequest, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(strings.Repeat("x", maxDiagnosticBodyBytes+1))), ContentLength: maxDiagnosticBodyBytes + 1},
+	}
+	client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		response := responses[0]
+		responses = responses[1:]
+		return response, nil
+	})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return []byte("{}"), nil }, 4)
+	var transportErr *TransportError
+	if !errors.As(err, &transportErr) || transportErr.Operation() != "read response body" || !errors.Is(err, httpx.ErrResponseBodyTooLarge) || strings.Contains(err.Error(), "12345") {
+		t.Fatalf("unsafe or untyped success overflow error: %T %v", err, err)
+	}
+	outcome, err := client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return []byte("{}"), nil }, 4)
+	if err != nil || len(outcome.body) != maxDiagnosticBodyBytes || !outcome.bodyTruncated || !errors.Is(outcome.bodyErr, httpx.ErrResponseBodyTooLarge) {
+		t.Fatalf("diagnostic outcome=%#v err=%v", outcome, err)
+	}
+}
+
+type instrumentedBody struct {
+	reader io.Reader
+	mu     sync.Mutex
+	reads  int
+	closes int
+}
+
+func (body *instrumentedBody) Read(buffer []byte) (int, error) {
+	body.mu.Lock()
+	body.reads++
+	body.mu.Unlock()
+	return body.reader.Read(buffer)
+}
+
+func (body *instrumentedBody) Close() error {
+	body.mu.Lock()
+	body.closes++
+	body.mu.Unlock()
+	return nil
+}
+
+func (body *instrumentedBody) counts() (int, int) {
+	body.mu.Lock()
+	defer body.mu.Unlock()
+	return body.reads, body.closes
+}
+
+func TestModalityTransportSuccessBodyLimitResourceSafety(t *testing.T) {
+	clearCredentialEnvironment(t)
+	const limit int64 = 4
+	tests := []struct {
+		name          string
+		data          string
+		contentLength int64
+		wantErr       bool
+		wantReads     bool
+	}{
+		{name: "exactly limit bytes", data: "1234", contentLength: limit, wantReads: true},
+		{name: "unknown length overflow", data: "12345", contentLength: -1, wantErr: true, wantReads: true},
+		{name: "underreported length overflow", data: "12345", contentLength: limit, wantErr: true, wantReads: true},
+		{name: "declared length overflow", data: "12345", contentLength: limit + 1, wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body := &instrumentedBody{reader: strings.NewReader(test.data)}
+			client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: body, ContentLength: test.contentLength}, nil
+			})}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			outcome, err := client.executeProviderRequest(context.Background(), providerRouteEmbedding, "model", func() ([]byte, error) { return []byte("{}"), nil }, limit)
+			if test.wantErr {
+				var transportErr *TransportError
+				if !errors.As(err, &transportErr) || transportErr.Operation() != "read response body" || !errors.Is(err, httpx.ErrResponseBodyTooLarge) {
+					t.Fatalf("overflow error=%T %v", err, err)
+				}
+			} else if err != nil || string(outcome.body) != test.data {
+				t.Fatalf("outcome=%#v err=%v", outcome, err)
+			}
+			reads, closes := body.counts()
+			if test.wantReads && reads == 0 {
+				t.Fatal("body was not read")
+			}
+			if !test.wantReads && reads != 0 {
+				t.Fatalf("body reads=%d want 0", reads)
+			}
+			if closes != 1 {
+				t.Fatalf("body closes=%d want 1", closes)
+			}
+		})
+	}
+}
+
+type cancellationBody struct {
+	ctx         context.Context
+	once        sync.Once
+	startedOnce sync.Once
+	started     chan struct{}
+	closed      chan struct{}
+	mu          sync.Mutex
+	closes      int
+}
+
+func (body *cancellationBody) Read([]byte) (int, error) {
+	body.startedOnce.Do(func() { close(body.started) })
+	<-body.closed
+	return 0, body.ctx.Err()
+}
+
+func (body *cancellationBody) Close() error {
+	body.once.Do(func() { close(body.closed) })
+	body.mu.Lock()
+	body.closes++
+	body.mu.Unlock()
+	return nil
+}
+
+func TestModalityTransportCancellationClosesExactlyOnce(t *testing.T) {
+	clearCredentialEnvironment(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	body := &cancellationBody{ctx: ctx, started: make(chan struct{}), closed: make(chan struct{})}
+	client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: body, ContentLength: -1}, nil
+	})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, callErr := client.executeProviderRequest(ctx, providerRouteEmbedding, "model", func() ([]byte, error) { return []byte("{}"), nil }, 32)
+		done <- callErr
+	}()
+	<-body.started
+	cancel()
+	err = <-done
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation not reachable: %v", err)
+	}
+	body.mu.Lock()
+	closes := body.closes
+	body.mu.Unlock()
+	if closes != 1 {
+		t.Fatalf("close calls=%d want 1", closes)
+	}
+}
+
+func TestModalityTransportRefusesRedirectAndOwnsResponse(t *testing.T) {
+	clearCredentialEnvironment(t)
+	attempts := 0
+	responseHeaders := http.Header{"Location": {"https://other.test/stolen"}, "X-Test": {"original"}}
+	client, err := NewClient(WithAPIKey("secret"), WithHTTPClient(&http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		attempts++
+		if attempts > 1 {
+			t.Fatal("redirect was followed")
+		}
+		return &http.Response{
+			StatusCode: http.StatusTemporaryRedirect,
+			Header:     responseHeaders,
+			Body:       io.NopCloser(strings.NewReader("redirect")),
+			Request:    request,
+		}, nil
+	})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := client.executeProviderRequest(context.Background(), providerRouteImage, "model", func() ([]byte, error) { return []byte("{}"), nil }, 32)
+	if err != nil || attempts != 1 || outcome.statusCode != http.StatusTemporaryRedirect || string(outcome.body) != "redirect" {
+		t.Fatalf("outcome=%#v err=%v attempts=%d", outcome, err, attempts)
+	}
+	responseHeaders.Set("X-Test", "changed")
+	if outcome.headers.Get("X-Test") != "original" {
+		t.Fatalf("response headers were not owned: %#v", outcome.headers)
+	}
+	outcome.body[0] = 'R'
+	if string(outcome.body) != "Redirect" {
+		t.Fatal("response body was not independently mutable")
+	}
+}
+
+func TestModalityTransportSpecificationHeadersAreProtected(t *testing.T) {
+	clearCredentialEnvironment(t)
+	expected := map[string]struct{}{
+		"Ai-Embedding-Model-Specification-Version":     {},
+		"Ai-Reranking-Model-Specification-Version":     {},
+		"Ai-Image-Model-Specification-Version":         {},
+		"Ai-Speech-Model-Specification-Version":        {},
+		"Ai-Transcription-Model-Specification-Version": {},
+		"Ai-Language-Model-Specification-Version":      {},
+	}
+	if !reflect.DeepEqual(providerProtectedHeaderNames, expected) {
+		t.Fatalf("provider protected headers = %#v, want %#v", providerProtectedHeaderNames, expected)
+	}
+	values := [][]string{nil, {}, {""}, {"caller-value"}, {"first", "second"}}
+	for name := range expected {
+		for _, spelling := range []string{name, strings.ToLower(name), strings.ToUpper(name)} {
+			for _, value := range values {
+				_, err := NewClient(WithAPIKey("secret"), WithHeaders(http.Header{spelling: value}))
+				var configurationErr *ConfigurationError
+				if !errors.As(err, &configurationErr) || configurationErr.Option() != "WithHeaders" || configurationErr.Reason() != "contains protected header" {
+					t.Fatalf("header %q value %#v error = %T %v", spelling, value, err, err)
+				}
+			}
+		}
+	}
 }

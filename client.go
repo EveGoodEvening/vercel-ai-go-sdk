@@ -16,6 +16,29 @@ const (
 	defaultPublicBaseURL = "https://ai-gateway.vercel.sh/v1"
 )
 
+const (
+	maxJSONDepth                      = 64
+	maxCollectionItems                = 4096
+	maxStringBytes                    = 1 << 20
+	maxRequestBodyBytes               = 16 << 20
+	maxDiagnosticBodyBytes            = 1 << 20
+	maxLanguageSuccessBodyBytes       = 8 << 20
+	maxEmbeddingSuccessBodyBytes      = 32 << 20
+	maxTranscriptionSuccessBodyBytes  = 16 << 20
+	maxSSEEvents                      = 65536
+	maxRawPartBytes                   = 64 << 10
+	maxRawPartsBytes                  = 8 << 20
+	maxImageDecodedBytes              = 16 << 20
+	maxImageAggregateDecodedBytes     = 64 << 20
+	maxImageSuccessBodyBytes          = 96 << 20
+	maxSpeechDecodedBytes             = 64 << 20
+	maxSpeechSuccessBodyBytes         = 96 << 20
+	maxTranscriptionDecodedInputBytes = 8 << 20
+	maxVideoDecodedBytes              = 256 << 20
+	maxVideoSuccessBodyBytes          = 384 << 20
+	maxVideoOperationBodyBytes        = 4 << 20
+)
+
 // Client accesses the Vercel AI Gateway public Responses and Chat Completions
 // generation APIs and the provider Evaluation Model API.
 type Client struct {
@@ -253,7 +276,12 @@ func WithTeam(teamIDOrSlug string) Option {
 // rejects protocol/auth/team-owned names case-insensitively even without values:
 // Authorization, Content-Type, Ai-Gateway-Protocol-Version,
 // Ai-Gateway-Auth-Method, Ai-Evaluation-Model-Specification-Version,
-// Ai-Model-Id, and X-Vercel-Ai-Gateway-Team.
+// Ai-Embedding-Model-Specification-Version,
+// Ai-Reranking-Model-Specification-Version,
+// Ai-Image-Model-Specification-Version, Ai-Speech-Model-Specification-Version,
+// Ai-Transcription-Model-Specification-Version,
+// Ai-Language-Model-Specification-Version, Ai-Model-Id, and
+// X-Vercel-Ai-Gateway-Team.
 func WithHeaders(headers http.Header) Option {
 	return func(config *clientConfig) error {
 		if containsProtectedHeader(headers) {

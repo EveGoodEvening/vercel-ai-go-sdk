@@ -1,17 +1,17 @@
 # Public generation guide
 
-The public generation APIs are experimental. They use the public `/v1` base URL and are separate from the provider-protocol [`Evaluate`](evaluation.md) endpoint. The full authorized paid generation contract suite remains **NOT RUN / PENDING LIVE RUN**; only the narrow sanitized Responses search-request corroboration recorded in [`x-search.md`](x-search.md#sanitized-structural-evidence) has run, and it does not establish general buffered/streaming generation compatibility.
+The public generation APIs are experimental historical surfaces. They use the public `/v1` base URL and are separate from provider-protocol [`Evaluate`](evaluation.md), image, speech, buffered transcription, embedding, and reranking endpoints. The full authorized paid generation contract suite remains **NOT RUN / PENDING LIVE RUN**; only the narrow sanitized Responses search-request corroboration recorded in [`x-search.md`](x-search.md#sanitized-structural-evidence) has run, and it does not establish general buffered/streaming generation compatibility.
 
-Examples below are independent snippets inside a function returning `error`, with a configured `client` and live `ctx`. See [client configuration](client.md) for shared authentication, HTTP, retry, error, and privacy behavior.
+Examples below are independent snippets inside a function returning `error`, with a configured `client` and live `ctx`. See [client configuration](client.md) for shared authentication, HTTP, retry, error, and privacy behavior. Every live call, including a buffered retry or server-executed search, may perform and bill work; the SDK makes no pricing or billing guarantee.
 
 ## Choose a surface
 
 | Need | Use |
 | --- | --- |
-| New, feature-rich generation; item-based input; reasoning, caching, or Responses tool controls | Responses: `CreateResponse` / `StreamResponse` |
-| OpenAI Chat Completions compatibility; multimodal message parts; Gateway routing; request-only server search | Chat: `CreateChatCompletion` / `StreamChatCompletion` |
+| New public generation; item-based input; public Responses reasoning, cache-control, or tool declarations | Responses: `CreateResponse` / `StreamResponse` |
+| Public Chat Completions compatibility; inline image/file message parts; Gateway routing; request-only server search | Chat: `CreateChatCompletion` / `StreamChatCompletion` |
 
-The request and result types are intentionally separate. There is no generic `Generate` method or automatic conversion between them. Both use the public base URL (`/responses` or `/chat/completions`); `WithBaseURL` configures only provider evaluation, while `WithPublicBaseURL` configures generation.
+The request and result types are intentionally separate. There is no generic `Generate` method or automatic conversion between them. Both use the public base URL (`/responses` or `/chat/completions`); `WithBaseURL` configures provider evaluation, image generation, speech synthesis, buffered transcription, embeddings, and reranking, while `WithPublicBaseURL` configures generation. The internal `/v4/ai/language-model` buffered/streaming protocol is not implemented: its multimodal file, reasoning, tool, provider-search, and provider-caching contracts must not be inferred from similarly named public Responses or Chat fields.
 
 ## Responses
 
@@ -32,15 +32,15 @@ fmt.Printf("response_bytes=%d\n", len(result.RawJSON()))
 
 `CreateResponse` sends `stream:false`. `ResponseResult` deliberately exposes only `RawJSON()`, which returns a defensive copy of the complete bounded status-200 JSON object. The SDK does not guess a stable typed Responses result schema; do not log the raw value.
 
-Supported request areas are:
+Supported **public Responses request** areas are:
 
 - required `provider/model` model ID and either text or typed item input;
 - sampling/token controls and instructions;
-- function tools, named/mode tool choice, parallel tool calls, and allowed tools;
-- reasoning effort/summary and text, JSON-object, or JSON-schema output formats;
-- truncation, previous-response linkage, storage, metadata, and Gateway cache controls.
+- function-tool declarations, named/mode tool choice, parallel tool calls, and allowed tools;
+- public Responses reasoning effort/summary and text, JSON-object, or JSON-schema output formats;
+- truncation, previous-response linkage, storage, metadata, and public Gateway cache-control fields.
 
-For exhaustive fields and variants, see [Responses types](../responses.go). Function tools are serialized but never executed by the SDK. The opt-in built-in-tools methods additionally support fixed low-context `web_search`, fieldless `x_search`, and the six request-only configurable `x_search` fields; see [Responses server search](#request-only-responses-server-search) and [search support](x-search.md).
+For exhaustive fields and variants, see [Responses types](../responses.go). Function tools are serialized but never executed by the SDK. Cache controls are request serialization only: `Caching`, when present, is `"auto"`; `CacheTTL` is `"5m"` or `"1h"` and requires `Caching: "auto"`; `CacheAnchorItems` is nonnegative; and `PromptCacheKey` is at most 64 runes. The SDK does not decide whether content is cached, maintain a local cache, report a cache hit, or promise provider acceptance, lifetime, privacy, billing, or relaxed semantics. The opt-in built-in-tools methods additionally support fixed low-context `web_search`, fieldless `x_search`, and the six request-only configurable `x_search` fields; see [Responses server search](#request-only-responses-server-search) and [search support](x-search.md).
 
 ### Streaming
 
@@ -244,9 +244,9 @@ if err := stream.Err(); err != nil {
 fmt.Printf("chunks=%d choices=%d\n", chunks, choices)
 ```
 
-Each event is a validated `chat.completion.chunk`. Typed data is limited to ordered choices and their text delta; `RawJSON()` retains the rest. Chat requires the exact `data: [DONE]` marker for successful termination. EOF before `[DONE]` is an error.
+Each event is a validated `chat.completion.chunk`. Typed data is limited to ordered choices and their text delta; `RawJSON()` retains the rest. Unknown raw members are retained evidence, not a typed-support promise. Chat requires the exact `data: [DONE]` marker for successful termination. EOF before `[DONE]` is an error.
 
-Both stream types accept at most 10,000 events. An explicit `Close()` ends reading; it does not prove the server completed generation. See [stream ownership and cancellation](client.md#cancellation-and-streams).
+Both stream types accept at most 10,000 events. An explicit `Close()` ends reading; it does not prove the server completed generation. Streams are never resumed or replayed. Buffered generation may use an explicitly configured retry policy, and each attempt may duplicate billable work. Provider image, speech, buffered transcription, embedding, and reranking methods remain separate exact-one-attempt calls. See [stream ownership and cancellation](client.md#cancellation-and-streams).
 
 ## Request-only Chat server search
 
@@ -296,11 +296,13 @@ Presence rules are intentional:
 
 Ordinary functions may coexist with server tools, subject to name rules. If a server tool is present, an ordinary function with its short identifier (`exa_search`, `parallel_search`, `perplexity_search`, or `tako_search`) is a collision. `ChatSpecificToolChoice` may select neither that short identifier nor its `vercel:...` form. A different function name is allowed; `ChatToolChoiceAuto`, `ChatToolChoiceRequired`, and `ChatToolChoiceNone` remain available. When the matching server tool is absent, the short ordinary-function name and matching specific choice are valid.
 
-## Limits and raw-data boundary
+## Limits, files, and raw-data boundary
 
 Requests are validated before credential or network work. Shared resource policy caps JSON nesting at 64, individual string/byte values and buffered bodies/events at 1 MiB, and arrays/objects/request collections/stream events at 10,000 where applicable. Responses metadata is capped at 16 entries. SSE lines are capped at 64 KiB.
 
-Raw result and event accessors return defensive copies, not sanitized data. They may contain prompts, generated text, tool arguments/results, search configuration/output, identifiers, usage, routing details, or provider extensions. Prefer typed presence flags and structural counts in diagnostics; do not print or log raw JSON or generated content.
+Inline Chat file parts and image/media request values are request data, not a Gateway file service. This SDK does not upload, list, retrieve, persist, or delete files, and it does not fetch image URLs. Video generation, WebSocket generation, streaming transcription, and realtime APIs are not implemented.
+
+Raw result and event accessors, provider metadata, diagnostic bodies, and retained media return bounded defensive copies where documented, not sanitized or zeroized data. They may contain prompts, inline files and media, generated text, decoded image outputs, opaque audio/transcription content, tool arguments/results, search configuration/output, cache keys, identifiers, usage, routing details, or provider extensions. These values remain in ordinary caller/process memory until released; prefer typed presence flags and structural counts in diagnostics, and do not print, log, or persist raw values without an explicit privacy decision.
 
 ## Runnable example
 

@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -30,6 +31,64 @@ import (
 type tokenSource struct{}
 
 func (tokenSource) Token(context.Context) (string, error) { return "token", nil }
+
+func compileEmbedding(client *gateway.Client) (*gateway.EmbeddingResult, error) {
+	tokens := int64(-1)
+	details := "details"
+	request := gateway.EmbeddingRequest{Values: []string{"one", "two"}, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.EmbeddingResult{
+		Embeddings: [][]float64{{1, 2}}, Usage: &gateway.EmbeddingUsage{Tokens: &tokens},
+		Warnings: []gateway.ProviderWarning{{Type: gateway.ProviderWarningUnsupported, Feature: "feature", Details: &details}},
+		ProviderMetadata: map[string]json.RawMessage{"provider": json.RawMessage(`{"key":true}`)},
+		Response: gateway.ResponseMetadata{ModelID: "provider/model", Headers: http.Header{}, Body: []byte{}},
+	}
+	_ = []gateway.ProviderWarningType{gateway.ProviderWarningUnsupported, gateway.ProviderWarningCompatibility, gateway.ProviderWarningDeprecated, gateway.ProviderWarningOther}
+	return client.Embed(context.Background(), "provider/model", request)
+}
+
+func compileImage(client *gateway.Client) (*gateway.ImageResult, error) {
+	prompt := "draw"
+	size, aspect, seed := gateway.ImageSize("1024x1024"), gateway.ImageAspectRatio("1:1"), int64(1)
+	var input gateway.ImageInput = gateway.ImageURL{URL: "https://example.com/image.png"}
+	input = &gateway.ImageURL{URL: ""}
+	input = gateway.ImageBase64{MediaType: "image/png", Data: "opaque"}
+	input = &gateway.ImageBase64{}
+	input = gateway.ImageBytes{MediaType: "image/png", Data: []byte{1}}
+	input = &gateway.ImageBytes{}
+	request := gateway.ImageRequest{Prompt: &prompt, Count: 1, Size: &size, AspectRatio: &aspect, Seed: &seed, Files: []gateway.ImageInput{input}, Mask: &input, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.ImageResult{Images: [][]byte{{1}}, Retryable: new(false), Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}, Usage: &gateway.ImageUsage{InputTokens: new(-1.5), OutputTokens: new(0.0), TotalTokens: new(2.5)}}
+	return client.GenerateImage(context.Background(), "provider/model", request)
+}
+
+func compileSpeech(client *gateway.Client) (*gateway.SpeechResult, error) {
+	speed := -1.0
+	request := gateway.SpeechRequest{Text: "hello", Voice: "voice", Instructions: "instructions", Language: "en", OutputFormat: "mp3", Speed: &speed, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.SpeechResult{Audio: "base64-audio", Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
+	return client.GenerateSpeech(context.Background(), "provider/model", request)
+}
+
+func compileTranscription(client *gateway.Client) (*gateway.TranscriptionResult, error) {
+	var audio gateway.TranscriptionAudio = gateway.TranscriptionBase64{MediaType: "audio/wav", Data: "opaque"}
+	audio = &gateway.TranscriptionBase64{}
+	audio = gateway.TranscriptionBytes{MediaType: "audio/wav", Data: []byte{1}}
+	audio = &gateway.TranscriptionBytes{}
+	_ = gateway.TranscriptionResult{Text: "text", Segments: []gateway.TranscriptionSegment{{Text: "part", StartSeconds: -1, EndSeconds: 2}}, Language: new("en"), DurationSeconds: new(-1.5), Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
+	return client.Transcribe(context.Background(), "provider/model", gateway.TranscriptionRequest{Audio: audio, ProviderOptions: []gateway.ProviderOption{}})
+}
+
+func compileRerank(client *gateway.Client) (*gateway.RerankResult, error) {
+	topN := 2
+	var documents gateway.RerankDocuments = gateway.RerankTexts{Values: []string{"one", "two"}}
+	documents = &gateway.RerankTexts{Values: []string{"one", "two"}}
+	documents = gateway.RerankObjects{Values: []json.RawMessage{json.RawMessage(`{"key":1}`)}}
+	documents = &gateway.RerankObjects{Values: []json.RawMessage{json.RawMessage(`{"key":2}`)}}
+	var document gateway.RerankDocument = gateway.RerankText{Text: "one"}
+	document = &gateway.RerankText{Text: "two"}
+	document = gateway.RerankJSON{Value: json.RawMessage(`{"key":1}`)}
+	document = &gateway.RerankJSON{Value: json.RawMessage(`{"key":2}`)}
+	_ = gateway.RerankResult{Results: []gateway.RerankItem{{OriginalIndex: 0, Score: -1, Document: document}}, Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
+	return client.Rerank(context.Background(), "provider/model", gateway.RerankRequest{Query: "query", Documents: documents, TopN: &topN, ProviderOptions: []gateway.ProviderOption{}})
+}
 
 func compileEvaluation(client *gateway.Client) (*gateway.EvaluationResult, error) {
 	zero := 0
@@ -237,7 +296,7 @@ func main() {
 	)
 	inspectErrors(err)
 	if client != nil {
-		_, _, _ = compileEvaluation, compileResponses, compileChat
+		_, _, _, _, _, _, _, _ = compileEvaluation, compileEmbedding, compileImage, compileSpeech, compileTranscription, compileRerank, compileResponses, compileChat
 	}
 }
 EOF
@@ -261,9 +320,12 @@ import (
 )
 
 var allowedTypes = names(
-	"Client", "Option", "TokenSource", "RetryPolicy",
+	"Client", "Option", "TokenSource", "RetryPolicy", "ProviderOption",
 	"ConfigurationError", "ValidationError", "TransportError", "ResponseError", "ResponseValidationError",
 	"EvaluationRequest", "Question", "BooleanQuestion", "ChoiceQuestion", "ScoreQuestion", "OptionalJSON", "BooleanCriteria", "EvaluationResult", "Rounding", "Usage", "WarningType", "Warning", "ResponseMetadata", "Answer", "BooleanAnswer", "ChoiceAnswer", "ScoreAnswer",
+	"EmbeddingRequest", "EmbeddingResult", "EmbeddingUsage", "ProviderWarningType", "ProviderWarning",
+	"ImageSize", "ImageAspectRatio", "ImageRequest", "ImageInput", "ImageURL", "ImageBase64", "ImageBytes", "ImageResult", "ImageUsage", "SpeechRequest", "SpeechResult", "TranscriptionRequest", "TranscriptionAudio", "TranscriptionBase64", "TranscriptionBytes", "TranscriptionResult", "TranscriptionSegment",
+	"RerankRequest", "RerankDocuments", "RerankTexts", "RerankObjects", "RerankDocument", "RerankText", "RerankJSON", "RerankItem", "RerankResult",
 	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseXSearchTool", "ResponseXSearchOptionsTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
 	"ChatCompletionRequest", "ChatServerToolsRequest", "ChatServerTool", "ChatExaSearchTool", "ChatParallelSearchTool", "ChatPerplexitySearchTool", "ChatTakoSearchTool",
 	"ChatExaSearchType", "ChatExaCategory", "ChatExaVerbosity", "ChatExaSection", "ChatExaText", "ChatExaTextEnabled", "ChatExaTextOptions", "ChatExaHighlights", "ChatExaHighlightsEnabled", "ChatExaHighlightsOptions", "ChatExaExtras", "ChatExaSubpageTarget", "ChatExaSubpageTargetString", "ChatExaSubpageTargetStrings", "ChatExaContents", "ChatExaSearchConfig",
@@ -276,7 +338,7 @@ var allowedTypes = names(
 var allowedFunctions = names("NewClient", "WithAPIKey", "WithOIDCToken", "WithOIDCTokenSource", "WithBaseURL", "WithPublicBaseURL", "WithHTTPClient", "WithTeam", "WithHeaders", "WithRetryPolicy")
 var allowedMethods = names(
 	"TokenSource.Token",
-	"Client.Evaluate", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
+	"Client.Evaluate", "Client.Embed", "Client.GenerateImage", "Client.GenerateSpeech", "Client.Transcribe", "Client.Rerank", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
 	"ResponseResult.RawJSON", "RawResponseEvent.RawJSON", "ResponseStream.Next", "ResponseStream.Event", "ResponseStream.Err", "ResponseStream.Close",
 	"ChatCompletionResult.RawJSON", "ChatCompletionChunk.RawJSON", "ChatCompletionStream.Next", "ChatCompletionStream.Event", "ChatCompletionStream.Err", "ChatCompletionStream.Close",
 	"ConfigurationError.Error", "ConfigurationError.Option", "ConfigurationError.Reason",
@@ -287,8 +349,13 @@ var allowedMethods = names(
 )
 var expectedInterfaceMethods = map[string]map[string]string{
 	"TokenSource":             {},
+	"ProviderOption":          {"providerOption": "func()"},
 	"Question":                {"questionType": "func() string"},
 	"Answer":                  {"answerType": "func() string"},
+	"RerankDocuments":         {"rerankDocuments": "func()"},
+	"ImageInput":              {"imageInput": "func()"},
+	"TranscriptionAudio":      {"transcriptionAudio": "func()"},
+	"RerankDocument":          {"rerankDocument": "func()"},
 	"ResponseBuiltInTool":     {"responseBuiltInTool": "func()"},
 	"ResponseInput":           {"responseInput": "func()"},
 	"ResponseInputItem":       {"responseInputItem": "func()"},
@@ -307,12 +374,36 @@ var expectedInterfaceMethods = map[string]map[string]string{
 	"ChatResponseFormat":      {"chatResponseFormat": "func()"},
 }
 var expectedStructFields = map[string][]string{
+	"EmbeddingRequest": {"Values []string", "ProviderOptions []ProviderOption"},
+	"EmbeddingResult": {"Embeddings [][]float64", "Usage *EmbeddingUsage", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
+	"EmbeddingUsage": {"Tokens *int64"},
+	"ProviderWarning": {"Type ProviderWarningType", "Feature string", "Details *string", "Setting string", "Message string"},
+	"ImageRequest": {"Prompt *string", "Count int", "Size *ImageSize", "AspectRatio *ImageAspectRatio", "Seed *int64", "Files []ImageInput", "Mask *ImageInput", "ProviderOptions []ProviderOption"},
+	"ImageURL": {"URL string", "ProviderOptions []ProviderOption"},
+	"ImageBase64": {"MediaType string", "Data string", "ProviderOptions []ProviderOption"},
+	"ImageBytes": {"MediaType string", "Data []byte", "ProviderOptions []ProviderOption"},
+	"ImageResult": {"Images [][]byte", "Retryable *bool", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata", "Usage *ImageUsage"},
+	"ImageUsage": {"InputTokens *float64", "OutputTokens *float64", "TotalTokens *float64"},
+	"SpeechRequest": {"Text string", "Voice string", "Instructions string", "Language string", "OutputFormat string", "Speed *float64", "ProviderOptions []ProviderOption"},
+	"SpeechResult": {"Audio string", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
+	"TranscriptionRequest": {"Audio TranscriptionAudio", "ProviderOptions []ProviderOption"},
+	"TranscriptionBase64": {"MediaType string", "Data string"},
+	"TranscriptionBytes": {"MediaType string", "Data []byte"},
+	"TranscriptionResult": {"Text string", "Segments []TranscriptionSegment", "Language *string", "DurationSeconds *float64", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
+	"TranscriptionSegment": {"Text string", "StartSeconds float64", "EndSeconds float64"},
+	"RerankRequest": {"Query string", "Documents RerankDocuments", "TopN *int", "ProviderOptions []ProviderOption"},
+	"RerankTexts": {"Values []string"},
+	"RerankObjects": {"Values []json.RawMessage"},
+	"RerankText": {"Text string"},
+	"RerankJSON": {"Value json.RawMessage"},
+	"RerankItem": {"OriginalIndex int", "Score float64", "Document RerankDocument"},
+	"RerankResult": {"Results []RerankItem", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
 	"ResponseWebSearchTool":     {},
 	"ResponseXSearchTool":       {},
 	"ResponseXSearchOptionsTool": {"AllowedXHandles []string", "ExcludedXHandles []string", "FromDate *string", "ToDate *string", "EnableImageUnderstanding *bool", "EnableVideoUnderstanding *bool"},
 }
 var allowedValues = names(
-	"WarningUnsupported", "WarningCompatibility", "WarningDeprecated", "WarningOther", "ResponseToolChoiceAuto", "ResponseToolChoiceRequired", "ResponseToolChoiceNone", "ResponseTextFormatText", "ResponseTextFormatJSONObject",
+	"WarningUnsupported", "WarningCompatibility", "WarningDeprecated", "WarningOther", "ProviderWarningUnsupported", "ProviderWarningCompatibility", "ProviderWarningDeprecated", "ProviderWarningOther", "ResponseToolChoiceAuto", "ResponseToolChoiceRequired", "ResponseToolChoiceNone", "ResponseTextFormatText", "ResponseTextFormatJSONObject",
 	"ChatToolChoiceAuto", "ChatToolChoiceNone", "ChatToolChoiceRequired", "ChatResponseFormatText", "ChatResponseFormatJSON",
 	"ChatExaSearchAuto", "ChatExaSearchFast", "ChatExaSearchInstant", "ChatExaCategoryCompany", "ChatExaCategoryPeople", "ChatExaCategoryResearchPaper", "ChatExaCategoryNews", "ChatExaCategoryPersonalSite", "ChatExaCategoryFinancialReport", "ChatExaVerbosityCompact", "ChatExaVerbosityStandard", "ChatExaVerbosityFull", "ChatExaSectionHeader", "ChatExaSectionNavigation", "ChatExaSectionBanner", "ChatExaSectionBody", "ChatExaSectionSidebar", "ChatExaSectionFooter", "ChatExaSectionMetadata",
 	"ChatParallelModeOneShot", "ChatParallelModeAgentic", "ChatPerplexityRecencyDay", "ChatPerplexityRecencyWeek", "ChatPerplexityRecencyMonth", "ChatPerplexityRecencyYear", "ChatTakoEffortDeep", "ChatTakoEffortFast", "ChatTakoEffortInstant", "ChatTakoDataModeInline", "ChatTakoDataModeURL", "ChatTakoContentFormatCardJSON", "ChatTakoContentFormatCSV", "ChatTakoContentFormatJSONCompact", "ChatTakoContentFormatJSONRecords", "ChatTakoWebCategoryFinance", "ChatTakoWebCategoryNews", "ChatTakoWebCategorySports",

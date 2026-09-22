@@ -2,6 +2,7 @@ package gateway_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"reflect"
 	"testing"
@@ -20,6 +21,55 @@ func compilePublicContract() {
 	var _ gateway.TokenSource = tokenSource{}
 	var _ func(...gateway.Option) (*gateway.Client, error) = gateway.NewClient
 	var _ func(*gateway.Client, context.Context, string, gateway.EvaluationRequest) (*gateway.EvaluationResult, error) = (*gateway.Client).Evaluate
+	var _ gateway.ProviderOption
+	var _ func(*gateway.Client, context.Context, string, gateway.EmbeddingRequest) (*gateway.EmbeddingResult, error) = (*gateway.Client).Embed
+	_ = gateway.EmbeddingRequest{Values: []string{"one", "two"}, ProviderOptions: []gateway.ProviderOption{}}
+	tokens := int64(-1)
+	providerDetails := "details"
+	_ = gateway.EmbeddingResult{
+		Embeddings:       [][]float64{{1, 2}},
+		Usage:            &gateway.EmbeddingUsage{Tokens: &tokens},
+		Warnings:         []gateway.ProviderWarning{{Type: gateway.ProviderWarningUnsupported, Feature: "feature", Details: &providerDetails}},
+		ProviderMetadata: map[string]json.RawMessage{"provider": json.RawMessage(`{"key":"value"}`)},
+		Response:         gateway.ResponseMetadata{ModelID: "provider/model", Headers: http.Header{}, Body: []byte{}},
+	}
+	_ = []gateway.ProviderWarningType{gateway.ProviderWarningUnsupported, gateway.ProviderWarningCompatibility, gateway.ProviderWarningDeprecated, gateway.ProviderWarningOther}
+	var _ func(*gateway.Client, context.Context, string, gateway.ImageRequest) (*gateway.ImageResult, error) = (*gateway.Client).GenerateImage
+	prompt := "draw"
+	imageSize := gateway.ImageSize("1024x1024")
+	imageAspect := gateway.ImageAspectRatio("1:1")
+	imageSeed := int64(1)
+	var imageInput gateway.ImageInput = gateway.ImageURL{URL: "https://example.com/image.png", ProviderOptions: []gateway.ProviderOption{}}
+	imageInput = &gateway.ImageURL{URL: ""}
+	imageInput = gateway.ImageBase64{MediaType: "image/png", Data: "opaque"}
+	imageInput = &gateway.ImageBase64{MediaType: "", Data: ""}
+	imageInput = gateway.ImageBytes{MediaType: "image/png", Data: []byte{1}}
+	imageInput = &gateway.ImageBytes{MediaType: "", Data: nil}
+	_ = gateway.ImageRequest{Prompt: &prompt, Count: 1, Size: &imageSize, AspectRatio: &imageAspect, Seed: &imageSeed, Files: []gateway.ImageInput{imageInput}, Mask: &imageInput, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.ImageResult{Images: [][]byte{{1}}, Retryable: new(false), Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}, Usage: &gateway.ImageUsage{InputTokens: new(-1.5), OutputTokens: new(0.0), TotalTokens: new(2.5)}}
+	var _ func(*gateway.Client, context.Context, string, gateway.SpeechRequest) (*gateway.SpeechResult, error) = (*gateway.Client).GenerateSpeech
+	speechSpeed := -1.0
+	_ = gateway.SpeechRequest{Text: "hello", Voice: "voice", Instructions: "instructions", Language: "en", OutputFormat: "mp3", Speed: &speechSpeed, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.SpeechResult{Audio: "base64-audio", Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
+	var _ func(*gateway.Client, context.Context, string, gateway.TranscriptionRequest) (*gateway.TranscriptionResult, error) = (*gateway.Client).Transcribe
+	var transcriptionAudio gateway.TranscriptionAudio = gateway.TranscriptionBase64{MediaType: "audio/wav", Data: "opaque"}
+	transcriptionAudio = &gateway.TranscriptionBase64{}
+	transcriptionAudio = gateway.TranscriptionBytes{MediaType: "audio/wav", Data: []byte{1}}
+	transcriptionAudio = &gateway.TranscriptionBytes{}
+	_ = gateway.TranscriptionRequest{Audio: transcriptionAudio, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.TranscriptionResult{Text: "text", Segments: []gateway.TranscriptionSegment{{Text: "part", StartSeconds: -1.5, EndSeconds: 2.5}}, Language: new("en"), DurationSeconds: new(-1.0), Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
+	var _ func(*gateway.Client, context.Context, string, gateway.RerankRequest) (*gateway.RerankResult, error) = (*gateway.Client).Rerank
+	topN := 2
+	var requestDocuments gateway.RerankDocuments = gateway.RerankTexts{Values: []string{"one", "two"}}
+	requestDocuments = &gateway.RerankTexts{Values: []string{"one"}}
+	requestDocuments = gateway.RerankObjects{Values: []json.RawMessage{json.RawMessage(`{"key":1}`)}}
+	requestDocuments = &gateway.RerankObjects{Values: []json.RawMessage{json.RawMessage(`{"key":2}`)}}
+	_ = gateway.RerankRequest{Query: "query", Documents: requestDocuments, TopN: &topN, ProviderOptions: []gateway.ProviderOption{}}
+	var resultDocument gateway.RerankDocument = gateway.RerankText{Text: "one"}
+	resultDocument = &gateway.RerankText{Text: "two"}
+	resultDocument = gateway.RerankJSON{Value: json.RawMessage(`{"key":1}`)}
+	resultDocument = &gateway.RerankJSON{Value: json.RawMessage(`{"key":2}`)}
+	_ = gateway.RerankResult{Results: []gateway.RerankItem{{OriginalIndex: 0, Score: -1.5, Document: resultDocument}}, Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponse
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesRequest) (*gateway.ResponseStream, error) = (*gateway.Client).StreamResponse
 	var _ func(*gateway.Client, context.Context, gateway.ResponsesBuiltInToolsRequest) (*gateway.ResponseResult, error) = (*gateway.Client).CreateResponseWithBuiltInTools
@@ -235,6 +285,7 @@ func compilePublicContract() {
 	var configurationError *gateway.ConfigurationError
 	_, _, _ = configurationError.Error(), configurationError.Option(), configurationError.Reason()
 	var validationError *gateway.ValidationError
+
 	_, _, _ = validationError.Error(), validationError.Path(), validationError.Reason()
 	var transportError *gateway.TransportError
 	_, _, _ = transportError.Error(), transportError.Operation(), transportError.Unwrap()
@@ -246,6 +297,96 @@ func compilePublicContract() {
 	var responseValidationError *gateway.ResponseValidationError
 	_, _, _, _, _, _ = responseValidationError.Error(), responseValidationError.Unwrap(), responseValidationError.StatusCode(), responseValidationError.Path(), responseValidationError.Reason(), responseValidationError.RequestID()
 	_, _, _ = responseValidationError.ResponseID(), responseValidationError.BodyTruncated(), responseValidationError.RawResponseBody()
+}
+func TestExternalContractSpeechTypes(t *testing.T) {
+	want := map[reflect.Type][]struct {
+		name string
+		typ  reflect.Type
+	}{
+		reflect.TypeOf(gateway.SpeechRequest{}): {{"Text", reflect.TypeOf("")}, {"Voice", reflect.TypeOf("")}, {"Instructions", reflect.TypeOf("")}, {"Language", reflect.TypeOf("")}, {"OutputFormat", reflect.TypeOf("")}, {"Speed", reflect.TypeOf((*float64)(nil))}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption{})}},
+		reflect.TypeOf(gateway.SpeechResult{}):  {{"Audio", reflect.TypeOf("")}, {"Warnings", reflect.TypeOf([]gateway.ProviderWarning{})}, {"ProviderMetadata", reflect.TypeOf(map[string]json.RawMessage{})}, {"Response", reflect.TypeOf(gateway.ResponseMetadata{})}},
+	}
+	for typ, fields := range want {
+		if typ.NumField() != len(fields) {
+			t.Fatalf("%v fields=%d want=%d", typ, typ.NumField(), len(fields))
+		}
+		for i, field := range fields {
+			got := typ.Field(i)
+			if got.Name != field.name || got.Type != field.typ {
+				t.Fatalf("%v field %d=%s %v want %s %v", typ, i, got.Name, got.Type, field.name, field.typ)
+			}
+		}
+	}
+}
+
+func TestExternalContractTranscriptionTypes(t *testing.T) {
+	audio := reflect.TypeOf((*gateway.TranscriptionAudio)(nil)).Elem()
+	if audio.Kind() != reflect.Interface || audio.NumMethod() != 1 || audio.Method(0).Name != "transcriptionAudio" || audio.Method(0).IsExported() {
+		t.Fatalf("TranscriptionAudio=%v", audio)
+	}
+	for _, value := range []any{gateway.TranscriptionBase64{}, &gateway.TranscriptionBase64{}, gateway.TranscriptionBytes{}, &gateway.TranscriptionBytes{}} {
+		if !reflect.TypeOf(value).Implements(audio) {
+			t.Fatalf("%T does not implement TranscriptionAudio", value)
+		}
+	}
+	want := map[reflect.Type][]struct {
+		name string
+		typ  reflect.Type
+	}{
+		reflect.TypeOf(gateway.TranscriptionRequest{}): {{"Audio", audio}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption{})}},
+		reflect.TypeOf(gateway.TranscriptionBase64{}):  {{"MediaType", reflect.TypeOf("")}, {"Data", reflect.TypeOf("")}},
+		reflect.TypeOf(gateway.TranscriptionBytes{}):   {{"MediaType", reflect.TypeOf("")}, {"Data", reflect.TypeOf([]byte{})}},
+		reflect.TypeOf(gateway.TranscriptionResult{}):  {{"Text", reflect.TypeOf("")}, {"Segments", reflect.TypeOf([]gateway.TranscriptionSegment{})}, {"Language", reflect.TypeOf((*string)(nil))}, {"DurationSeconds", reflect.TypeOf((*float64)(nil))}, {"Warnings", reflect.TypeOf([]gateway.ProviderWarning{})}, {"ProviderMetadata", reflect.TypeOf(map[string]json.RawMessage{})}, {"Response", reflect.TypeOf(gateway.ResponseMetadata{})}},
+		reflect.TypeOf(gateway.TranscriptionSegment{}): {{"Text", reflect.TypeOf("")}, {"StartSeconds", reflect.TypeOf(float64(0))}, {"EndSeconds", reflect.TypeOf(float64(0))}},
+	}
+	for typ, fields := range want {
+		if typ.NumField() != len(fields) {
+			t.Fatalf("%v fields=%d", typ, typ.NumField())
+		}
+		for i, field := range fields {
+			got := typ.Field(i)
+			if got.Name != field.name || got.Type != field.typ {
+				t.Fatalf("%v field %d=%s %v want %s %v", typ, i, got.Name, got.Type, field.name, field.typ)
+			}
+		}
+	}
+}
+
+func TestExternalContractImageTypes(t *testing.T) {
+	input := reflect.TypeOf((*gateway.ImageInput)(nil)).Elem()
+	if input.Kind() != reflect.Interface || input.NumMethod() != 1 || input.Method(0).Name != "imageInput" || input.Method(0).IsExported() {
+		t.Fatalf("ImageInput=%v methods=%v", input, input.NumMethod())
+	}
+	for _, value := range []any{gateway.ImageURL{}, &gateway.ImageURL{}, gateway.ImageBase64{}, &gateway.ImageBase64{}, gateway.ImageBytes{}, &gateway.ImageBytes{}} {
+		if !reflect.TypeOf(value).Implements(input) {
+			t.Fatalf("%T does not implement ImageInput", value)
+		}
+	}
+	want := map[reflect.Type][]struct {
+		name string
+		typ  reflect.Type
+	}{
+		reflect.TypeOf(gateway.ImageRequest{}): {{"Prompt", reflect.TypeOf((*string)(nil))}, {"Count", reflect.TypeOf(int(0))}, {"Size", reflect.TypeOf((*gateway.ImageSize)(nil))}, {"AspectRatio", reflect.TypeOf((*gateway.ImageAspectRatio)(nil))}, {"Seed", reflect.TypeOf((*int64)(nil))}, {"Files", reflect.TypeOf([]gateway.ImageInput{})}, {"Mask", reflect.TypeOf((*gateway.ImageInput)(nil))}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption{})}},
+		reflect.TypeOf(gateway.ImageURL{}):     {{"URL", reflect.TypeOf("")}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption{})}},
+		reflect.TypeOf(gateway.ImageBase64{}):  {{"MediaType", reflect.TypeOf("")}, {"Data", reflect.TypeOf("")}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption{})}},
+		reflect.TypeOf(gateway.ImageBytes{}):   {{"MediaType", reflect.TypeOf("")}, {"Data", reflect.TypeOf([]byte{})}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption{})}},
+		reflect.TypeOf(gateway.ImageResult{}):  {{"Images", reflect.TypeOf([][]byte{})}, {"Retryable", reflect.TypeOf((*bool)(nil))}, {"Warnings", reflect.TypeOf([]gateway.ProviderWarning{})}, {"ProviderMetadata", reflect.TypeOf(map[string]json.RawMessage{})}, {"Response", reflect.TypeOf(gateway.ResponseMetadata{})}, {"Usage", reflect.TypeOf((*gateway.ImageUsage)(nil))}},
+		reflect.TypeOf(gateway.ImageUsage{}):   {{"InputTokens", reflect.TypeOf((*float64)(nil))}, {"OutputTokens", reflect.TypeOf((*float64)(nil))}, {"TotalTokens", reflect.TypeOf((*float64)(nil))}},
+	}
+	for typ, fields := range want {
+		if typ.NumField() != len(fields) {
+			t.Fatalf("%s field count=%d", typ, typ.NumField())
+		}
+		for i, field := range fields {
+			got := typ.Field(i)
+			if got.Name != field.name || got.Type != field.typ {
+				t.Fatalf("%s field %d=%s %s, want %s %s", typ, i, got.Name, got.Type, field.name, field.typ)
+			}
+		}
+	}
+	if _, ok := reflect.TypeOf(gateway.ImageResult{}).FieldByName("MediaType"); ok {
+		t.Fatal("ImageResult unexpectedly exports MediaType")
+	}
 }
 
 func TestExternalContractResponseBuiltInToolMethods(t *testing.T) {
@@ -401,5 +542,101 @@ func TestExternalContractChatCompletionRequestFields(t *testing.T) {
 		if got[i].Name != want[i].name || got[i].Type != want[i].typ {
 			t.Fatalf("ChatCompletionRequest exported field %d = %s %s, want %s %s", i, got[i].Name, got[i].Type, want[i].name, want[i].typ)
 		}
+	}
+}
+
+func TestExternalContractEmbeddingFields(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+		want  []struct {
+			name string
+			typ  reflect.Type
+		}
+	}{
+		{"EmbeddingRequest", gateway.EmbeddingRequest{}, []struct {
+			name string
+			typ  reflect.Type
+		}{{"Values", reflect.TypeOf([]string(nil))}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption(nil))}}},
+		{"EmbeddingResult", gateway.EmbeddingResult{}, []struct {
+			name string
+			typ  reflect.Type
+		}{{"Embeddings", reflect.TypeOf([][]float64(nil))}, {"Usage", reflect.TypeOf((*gateway.EmbeddingUsage)(nil))}, {"Warnings", reflect.TypeOf([]gateway.ProviderWarning(nil))}, {"ProviderMetadata", reflect.TypeOf(map[string]json.RawMessage(nil))}, {"Response", reflect.TypeOf(gateway.ResponseMetadata{})}}},
+		{"EmbeddingUsage", gateway.EmbeddingUsage{}, []struct {
+			name string
+			typ  reflect.Type
+		}{{"Tokens", reflect.TypeOf((*int64)(nil))}}},
+		{"ProviderWarning", gateway.ProviderWarning{}, []struct {
+			name string
+			typ  reflect.Type
+		}{{"Type", reflect.TypeOf(gateway.ProviderWarningType(""))}, {"Feature", reflect.TypeOf("")}, {"Details", reflect.TypeOf((*string)(nil))}, {"Setting", reflect.TypeOf("")}, {"Message", reflect.TypeOf("")}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			typ := reflect.TypeOf(test.value)
+			if typ.NumField() != len(test.want) {
+				t.Fatalf("field count=%d want=%d", typ.NumField(), len(test.want))
+			}
+			for i, w := range test.want {
+				f := typ.Field(i)
+				if !f.IsExported() || f.Name != w.name || f.Type != w.typ {
+					t.Fatalf("field %d=%s %s want %s %s", i, f.Name, f.Type, w.name, w.typ)
+				}
+			}
+		})
+	}
+}
+
+func TestExternalContractRerankFieldsAndInterfaces(t *testing.T) {
+	want := map[reflect.Type][]struct {
+		name string
+		typ  reflect.Type
+	}{
+		reflect.TypeOf(gateway.RerankRequest{}): {{"Query", reflect.TypeOf("")}, {"Documents", reflect.TypeOf((*gateway.RerankDocuments)(nil)).Elem()}, {"TopN", reflect.TypeOf((*int)(nil))}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption(nil))}},
+		reflect.TypeOf(gateway.RerankTexts{}):   {{"Values", reflect.TypeOf([]string(nil))}},
+		reflect.TypeOf(gateway.RerankObjects{}): {{"Values", reflect.TypeOf([]json.RawMessage(nil))}},
+		reflect.TypeOf(gateway.RerankText{}):    {{"Text", reflect.TypeOf("")}},
+		reflect.TypeOf(gateway.RerankJSON{}):    {{"Value", reflect.TypeOf(json.RawMessage(nil))}},
+		reflect.TypeOf(gateway.RerankItem{}):    {{"OriginalIndex", reflect.TypeOf(int(0))}, {"Score", reflect.TypeOf(float64(0))}, {"Document", reflect.TypeOf((*gateway.RerankDocument)(nil)).Elem()}},
+		reflect.TypeOf(gateway.RerankResult{}):  {{"Results", reflect.TypeOf([]gateway.RerankItem(nil))}, {"Warnings", reflect.TypeOf([]gateway.ProviderWarning(nil))}, {"ProviderMetadata", reflect.TypeOf(map[string]json.RawMessage(nil))}, {"Response", reflect.TypeOf(gateway.ResponseMetadata{})}},
+	}
+	for typ, fields := range want {
+		t.Run(typ.Name(), func(t *testing.T) {
+			if typ.NumField() != len(fields) {
+				t.Fatalf("fields=%d want=%d", typ.NumField(), len(fields))
+			}
+			for i, w := range fields {
+				f := typ.Field(i)
+				if !f.IsExported() || f.Name != w.name || f.Type != w.typ {
+					t.Fatalf("field %d=%s %s want %s %s", i, f.Name, f.Type, w.name, w.typ)
+				}
+			}
+		})
+	}
+	for _, value := range []any{gateway.RerankTexts{}, (*gateway.RerankTexts)(nil), gateway.RerankObjects{}, (*gateway.RerankObjects)(nil)} {
+		if !reflect.TypeOf(value).Implements(reflect.TypeOf((*gateway.RerankDocuments)(nil)).Elem()) {
+			t.Fatalf("%T does not implement RerankDocuments", value)
+		}
+	}
+	for _, value := range []any{gateway.RerankText{}, (*gateway.RerankText)(nil), gateway.RerankJSON{}, (*gateway.RerankJSON)(nil)} {
+		if !reflect.TypeOf(value).Implements(reflect.TypeOf((*gateway.RerankDocument)(nil)).Elem()) {
+			t.Fatalf("%T does not implement RerankDocument", value)
+		}
+	}
+	for _, iface := range []reflect.Type{reflect.TypeOf((*gateway.RerankDocuments)(nil)).Elem(), reflect.TypeOf((*gateway.RerankDocument)(nil)).Elem()} {
+		if iface.NumMethod() != 1 || iface.Method(0).IsExported() || iface.Method(0).Type.NumIn() != 0 || iface.Method(0).Type.NumOut() != 0 {
+			t.Fatalf("interface=%s", iface)
+		}
+	}
+}
+
+func TestExternalContractProviderOptionMethods(t *testing.T) {
+	typ := reflect.TypeOf((*gateway.ProviderOption)(nil)).Elem()
+	if typ.Kind() != reflect.Interface || typ.NumMethod() != 1 {
+		t.Fatalf("ProviderOption shape=%s methods=%d", typ.Kind(), typ.NumMethod())
+	}
+	m := typ.Method(0)
+	if m.Name != "providerOption" || m.IsExported() || m.Type.NumIn() != 0 || m.Type.NumOut() != 0 {
+		t.Fatalf("method=%s %s", m.Name, m.Type)
 	}
 }
