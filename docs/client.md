@@ -1,6 +1,6 @@
 # Client configuration
 
-Shared behavior for [generation](generation.md), [provider evaluation](evaluation.md), and the staged provider-protocol `Client.GenerateImage`, `Client.Embed`, and `Client.Rerank` surfaces described below. `NewClient` applies options in order, stops at the first error, and makes no network request.
+Shared behavior for [generation](generation.md), [provider evaluation](evaluation.md), and the staged provider-protocol `Client.GenerateImage`, `Client.GenerateSpeech`, `Client.Embed`, and `Client.Rerank` surfaces described below. `NewClient` applies options in order, stops at the first error, and makes no network request.
 
 ## Authentication
 
@@ -21,9 +21,9 @@ For long-lived OIDC clients, use a refresh-capable `TokenSource` rather than a f
 | Option | Default base | Used by |
 | --- | --- | --- |
 | `WithPublicBaseURL` | `https://ai-gateway.vercel.sh/v1` | Responses and Chat, including server-tools methods |
-| `WithBaseURL` | `https://ai-gateway.vercel.sh/v4/ai` | `Evaluate`, `GenerateImage`, `Embed`, and `Rerank` |
+| `WithBaseURL` | `https://ai-gateway.vercel.sh/v4/ai` | `Evaluate`, `GenerateImage`, `GenerateSpeech`, `Embed`, and `Rerank` |
 
-Pass the base, not the full endpoint: methods append `/responses`, `/chat/completions`, `/evaluation-model`, `/image-model`, `/embedding-model`, or `/reranking-model`. Both options require an absolute HTTP(S) URL with a host, no surrounding whitespace, and no userinfo, query, or fragment. Existing paths and escapes are retained; trailing path slashes are removed. `WithPublicBaseURL` also rejects an empty literal `#` delimiter. No endpoint inference or cross-surface conversion occurs.
+Pass the base, not the full endpoint: methods append `/responses`, `/chat/completions`, `/evaluation-model`, `/image-model`, `/speech-model`, `/embedding-model`, or `/reranking-model`. Both options require an absolute HTTP(S) URL with a host, no surrounding whitespace, and no userinfo, query, or fragment. Existing paths and escapes are retained; trailing path slashes are removed. `WithPublicBaseURL` also rejects an empty literal `#` delimiter. No endpoint inference or cross-surface conversion occurs.
 
 Other options:
 
@@ -32,7 +32,7 @@ Other options:
 - `WithHeaders`: clones the supplied headers at construction and per request; nil is allowed. Authorization, content type, team, and provider-protocol headers are SDK-owned and rejected case-insensitively even when their values are empty. See the protected list in [client.go](../client.go).
 - `WithRetryPolicy`: copies and validates the policy described below.
 
-All requests use bearer authentication and JSON. Streams request `text/event-stream`. Provider evaluation, image generation, embeddings, and reranking send their matching `/v4` protocol headers and the caller-supplied model ID; no fixed image-, embedding-, or reranking-model catalog is built into the client.
+All requests use bearer authentication and JSON. Streams request `text/event-stream`. Provider evaluation, image generation, speech synthesis, embeddings, and reranking send their matching `/v4` protocol headers and the caller-supplied model ID; no fixed image-, speech-, embedding-, or reranking-model catalog is built into the client.
 
 ## Provider-protocol image generation
 
@@ -88,6 +88,56 @@ fmt.Printf("images=%d first_image_bytes=%d retained_body_bytes=%d\n",
 ```
 
 The snippet needs `context`, `fmt`, `io`, `log`, `net/http`, `net/http/httptest`, and the package import. It prints structural counts only. It proves local client behavior, not hosted success, model availability, universal support, release readiness, pricing, routing, fallback behavior, or output media type.
+
+## Provider-protocol speech synthesis
+
+`Client.GenerateSpeech(ctx, modelID, request)` is a staged, experimental Model V4 provider-protocol surface. It sends exactly one `POST` to `{WithBaseURL}/speech-model`, which is `/v4/ai/speech-model` at the default base, with `Ai-Speech-Model-Specification-Version: 4`. `modelID` is dynamic but must be a nonempty `provider/model` string. This is not a public v1 speech API, a direct-provider client, a JavaScript-parity claim, or evidence that every model or provider supports speech synthesis.
+
+Request presence is exact. `SpeechRequest.Text` is always emitted, including when empty. `Voice`, `Instructions`, `Language`, and `OutputFormat` are omitted when empty; whitespace-only values are emitted unchanged. `Speed` is omitted only when nil: a non-nil finite value is emitted exactly, including zero or a negative value. Text and instructions must be valid UTF-8 and are each limited to **1 MiB**; voice, language, and output format must be valid UTF-8 and are each limited to **255 bytes**. The complete encoded JSON request is limited to **16 MiB**. Validation completes before cancellation, credential resolution, or network work.
+
+`ProviderOptions` uses the shared sealed `[]ProviderOption` contract. Nil and empty slices omit `providerOptions`; this release exports no concrete implementation, so no supported nonempty option value is constructible. No provider-specific option semantics, service limits beyond the local bounds above, pricing, caching, routing, or fallback behavior is promised.
+
+The HTTP-200 body is read and strictly validated up to **96 MiB**. It requires `audio` to be a JSON string of at most **64 MiB**. `SpeechResult.Audio` is that exact decoded JSON string: the SDK treats it as opaque, does **not** validate or decode it as base64, and exposes no media-type field or format inference.
+
+Warnings and provider metadata use the shared strict presence rules: absent warnings normalize to a non-nil empty slice while null is invalid; absent provider metadata remains nil, a present empty object is preserved, and each provider value must be a non-null object retained as defensive-copy raw JSON. `Response.ModelID` is caller supplied, `Headers` is a non-nil clone, and `Body` retains a defensive copy of at most the first **1 MiB** of the validated body. Audio, warnings, metadata, headers, and the retained body do not share mutable storage with transport buffers.
+
+`GenerateSpeech` ignores `WithRetryPolicy`: it makes one HTTP attempt and performs no retry or batching. A call may be billable and is not assumed idempotent. Nil or cancelled contexts, token resolution, sending, body reading and closing, response decoding, and return-time cancellation checks follow the shared [cancellation and error rules](#cancellation-and-streams). Non-200 responses use `ResponseError` with at most 1 MiB of diagnostic body; transport/read failures use `TransportError`; local request failures use `ValidationError`; invalid HTTP-200 bodies use `ResponseValidationError`. Cancellation may be returned directly or wrapped and remains detectable with `errors.Is`.
+
+This loopback-only snippet exercises the exact route and opaque-audio boundary without hosted traffic or billing:
+
+```go
+server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost || r.URL.Path != "/v4/ai/speech-model" {
+        http.Error(w, "unexpected route", http.StatusNotFound)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    _, _ = io.WriteString(w, `{"audio":"opaque-local-audio","warnings":[]}`)
+}))
+defer server.Close()
+
+client, err := gateway.NewClient(
+    gateway.WithAPIKey("loopback-only"),
+    gateway.WithBaseURL(server.URL+"/v4/ai"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+speed := 0.0
+result, err := client.GenerateSpeech(context.Background(), "example/dynamic-model", gateway.SpeechRequest{
+    Text:         "local text",
+    Voice:        "local voice",
+    OutputFormat: "opaque-format-name",
+    Speed:        &speed,
+})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("audio_bytes=%d warnings=%d retained_body_bytes=%d\n",
+    len(result.Audio), len(result.Warnings), len(result.Response.Body))
+```
+
+The snippet needs `context`, `fmt`, `io`, `log`, `net/http`, `net/http/httptest`, and the package import. It prints structural counts only—not text, voice, audio, warnings, metadata, or raw bodies. It proves local client behavior only, not hosted success, live-service compatibility, model availability, universal support, release readiness, pricing, routing, fallback behavior, or an audio media type.
 
 ## Provider-protocol embeddings
 
@@ -190,9 +240,9 @@ The snippet needs `context`, `fmt`, `io`, `log`, `net/http`, `net/http/httptest`
 
 ## Retries
 
-**Default: one attempt.** Evaluation and public generation can be billable and are not assumed idempotent. `GenerateImage`, `Embed`, and `Rerank` are always one attempt regardless of this option.
+**Default: one attempt.** Evaluation and public generation can be billable and are not assumed idempotent. `GenerateImage`, `GenerateSpeech`, `Embed`, and `Rerank` are always one attempt regardless of this option.
 
-`WithRetryPolicy` affects buffered `Evaluate`, `CreateResponse`, `CreateResponseWithBuiltInTools`, `CreateChatCompletion`, and `CreateChatCompletionWithServerTools`. These buffered calls can be billable on every attempt. `GenerateImage`, `Embed`, and `Rerank` do not use this retry loop. Streaming methods do not use the SDK retry loop and never resume or replay a stream.
+`WithRetryPolicy` affects buffered `Evaluate`, `CreateResponse`, `CreateResponseWithBuiltInTools`, `CreateChatCompletion`, and `CreateChatCompletionWithServerTools`. These buffered calls can be billable on every attempt. `GenerateImage`, `GenerateSpeech`, `Embed`, and `Rerank` do not use this retry loop. Streaming methods do not use the SDK retry loop and never resume or replay a stream.
 
 | `RetryPolicy` field | Meaning and accepted values |
 | --- | --- |
@@ -218,7 +268,7 @@ Only HTTP 200 is success. SDK-specific errors support `errors.As`:
 | `ResponseError` | Non-200 HTTP status, including redirects and other 2xx statuses | `StatusCode`, `Retryable`, `RetryAfter`, `BodyTruncated` |
 | `ResponseValidationError` | Malformed, oversized, or contract-invalid buffered HTTP-200 body | `Path`, `Reason`, `BodyTruncated` |
 
-Most existing buffered public-generation and evaluation success bodies are limited to 1 MiB. Embedding and reranking success bodies are read and validated up to 32 MiB; image success bodies are read and validated up to 96 MiB. Their `Response.Body` fields retain at most the first 1 MiB. At status 200, overflow or invalid data is a `ResponseValidationError` where applicable; provider-protocol read-limit overflow and read/close failures are `TransportError`. At non-200, `ResponseError` preserves the status and up to 1 MiB of diagnostic body and wraps any body failure. Malformed stream data terminates iteration with a `TransportError` (`read response stream` or `read chat completion stream`). Cancellation may also return a context error directly or wrapped; use `errors.Is(err, context.Canceled)` or `context.DeadlineExceeded`.
+Most existing buffered public-generation and evaluation success bodies are limited to 1 MiB. Embedding and reranking success bodies are read and validated up to 32 MiB; image and speech success bodies are read and validated up to 96 MiB. Their `Response.Body` fields retain at most the first 1 MiB. At status 200, overflow or invalid data is a `ResponseValidationError` where applicable; provider-protocol read-limit overflow and read/close failures are `TransportError`. At non-200, `ResponseError` preserves the status and up to 1 MiB of diagnostic body and wraps any body failure. Malformed stream data terminates iteration with a `TransportError` (`read response stream` or `read chat completion stream`). Cancellation may also return a context error directly or wrapped; use `errors.Is`.
 
 Validation paths use `$["field"]` and array indexes. Paths, error envelopes, identifiers, and diagnostic bodies can contain sensitive caller or provider data. Log selected structural fields rather than dumping accessors:
 
@@ -234,12 +284,12 @@ Error strings omit raw bodies and wrapped-error text. Accessors are nil-safe; `R
 
 ## Cancellation and streams
 
-Pass a non-nil context to every operation. Nil is a local `ValidationError`; cancellation covers token resolution, HTTP execution, body reads, retry waits, and stream reads. `GenerateImage`, `Embed`, and `Rerank` have no retry wait, but their sole attempts and bounded response reads use the operation context. Keep a streaming context alive until iteration finishes. A configured `http.Client.Timeout` also applies to body and stream reads.
+Pass a non-nil context to every operation. Nil is a local `ValidationError`; cancellation covers token resolution, HTTP execution, body reads and closes, retry waits, provider response decoding, return-time checks, and stream reads. `GenerateImage`, `GenerateSpeech`, `Embed`, and `Rerank` have no retry wait, but their sole attempts and bounded response reads use the operation context. Keep a streaming context alive until iteration finishes. A configured `http.Client.Timeout` also applies to body and stream reads.
 
 Always `defer stream.Close()`, iterate with `Next()`, and check `Err()` afterward. `Event()` is valid only after a successful `Next()`. `Close()` is idempotent and can unblock a concurrent `Next()`; an explicit close is not proof that the server completed generation. Streams retain no transcript and start no producer goroutine. Responses and Chat have different termination rules; see [generation](generation.md).
 
 ## Privacy
 
-Treat prompts/state, image URLs, opaque base64 and byte inputs, masks, decoded image outputs, image usage, embedding inputs and vectors, reranking queries, source and reconstructed documents, scores and rankings, generated output, file data, schemas, tool arguments/results, search configuration, warnings, provider options/metadata, raw JSON, response metadata bodies, headers, identifiers, and diagnostic bodies as sensitive. Defensive copies prevent mutation; **they do not sanitize content**. Never log credentials or authorization headers. The examples intentionally print structural summaries rather than model output, image contents or inputs, embedding values, reranking documents, scores, metadata, or raw bodies.
+Treat prompts/state, image URLs, opaque base64 and byte inputs, masks, decoded image outputs, image usage, speech text, voices, instructions, languages, output formats, speeds, opaque audio strings, embedding inputs and vectors, reranking queries, source and reconstructed documents, scores and rankings, generated output, file data, schemas, tool arguments/results, search configuration, warnings, provider options/metadata, raw JSON, response metadata bodies, headers, identifiers, and diagnostic bodies as sensitive. Defensive copies prevent mutation; **they do not sanitize content**. Never log credentials or authorization headers. The examples intentionally print structural summaries rather than model output, image contents or inputs, speech request values or audio, embedding values, reranking documents, scores, metadata, or raw bodies.
 
 Paid-test authorization and evidence sanitization are separate from normal client configuration; see [live-contract evidence](evaluation-live-evidence.md).
