@@ -51,6 +51,13 @@ func compilePublicContract() {
 	speechSpeed := -1.0
 	_ = gateway.SpeechRequest{Text: "hello", Voice: "voice", Instructions: "instructions", Language: "en", OutputFormat: "mp3", Speed: &speechSpeed, ProviderOptions: []gateway.ProviderOption{}}
 	_ = gateway.SpeechResult{Audio: "base64-audio", Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
+	var _ func(*gateway.Client, context.Context, string, gateway.TranscriptionRequest) (*gateway.TranscriptionResult, error) = (*gateway.Client).Transcribe
+	var transcriptionAudio gateway.TranscriptionAudio = gateway.TranscriptionBase64{MediaType: "audio/wav", Data: "opaque"}
+	transcriptionAudio = &gateway.TranscriptionBase64{}
+	transcriptionAudio = gateway.TranscriptionBytes{MediaType: "audio/wav", Data: []byte{1}}
+	transcriptionAudio = &gateway.TranscriptionBytes{}
+	_ = gateway.TranscriptionRequest{Audio: transcriptionAudio, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.TranscriptionResult{Text: "text", Segments: []gateway.TranscriptionSegment{{Text: "part", StartSeconds: -1.5, EndSeconds: 2.5}}, Language: new("en"), DurationSeconds: new(-1.0), Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
 	var _ func(*gateway.Client, context.Context, string, gateway.RerankRequest) (*gateway.RerankResult, error) = (*gateway.Client).Rerank
 	topN := 2
 	var requestDocuments gateway.RerankDocuments = gateway.RerankTexts{Values: []string{"one", "two"}}
@@ -302,6 +309,39 @@ func TestExternalContractSpeechTypes(t *testing.T) {
 	for typ, fields := range want {
 		if typ.NumField() != len(fields) {
 			t.Fatalf("%v fields=%d want=%d", typ, typ.NumField(), len(fields))
+		}
+		for i, field := range fields {
+			got := typ.Field(i)
+			if got.Name != field.name || got.Type != field.typ {
+				t.Fatalf("%v field %d=%s %v want %s %v", typ, i, got.Name, got.Type, field.name, field.typ)
+			}
+		}
+	}
+}
+
+func TestExternalContractTranscriptionTypes(t *testing.T) {
+	audio := reflect.TypeOf((*gateway.TranscriptionAudio)(nil)).Elem()
+	if audio.Kind() != reflect.Interface || audio.NumMethod() != 1 || audio.Method(0).Name != "transcriptionAudio" || audio.Method(0).IsExported() {
+		t.Fatalf("TranscriptionAudio=%v", audio)
+	}
+	for _, value := range []any{gateway.TranscriptionBase64{}, &gateway.TranscriptionBase64{}, gateway.TranscriptionBytes{}, &gateway.TranscriptionBytes{}} {
+		if !reflect.TypeOf(value).Implements(audio) {
+			t.Fatalf("%T does not implement TranscriptionAudio", value)
+		}
+	}
+	want := map[reflect.Type][]struct {
+		name string
+		typ  reflect.Type
+	}{
+		reflect.TypeOf(gateway.TranscriptionRequest{}): {{"Audio", audio}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption{})}},
+		reflect.TypeOf(gateway.TranscriptionBase64{}):  {{"MediaType", reflect.TypeOf("")}, {"Data", reflect.TypeOf("")}},
+		reflect.TypeOf(gateway.TranscriptionBytes{}):   {{"MediaType", reflect.TypeOf("")}, {"Data", reflect.TypeOf([]byte{})}},
+		reflect.TypeOf(gateway.TranscriptionResult{}):  {{"Text", reflect.TypeOf("")}, {"Segments", reflect.TypeOf([]gateway.TranscriptionSegment{})}, {"Language", reflect.TypeOf((*string)(nil))}, {"DurationSeconds", reflect.TypeOf((*float64)(nil))}, {"Warnings", reflect.TypeOf([]gateway.ProviderWarning{})}, {"ProviderMetadata", reflect.TypeOf(map[string]json.RawMessage{})}, {"Response", reflect.TypeOf(gateway.ResponseMetadata{})}},
+		reflect.TypeOf(gateway.TranscriptionSegment{}): {{"Text", reflect.TypeOf("")}, {"StartSeconds", reflect.TypeOf(float64(0))}, {"EndSeconds", reflect.TypeOf(float64(0))}},
+	}
+	for typ, fields := range want {
+		if typ.NumField() != len(fields) {
+			t.Fatalf("%v fields=%d", typ, typ.NumField())
 		}
 		for i, field := range fields {
 			got := typ.Field(i)

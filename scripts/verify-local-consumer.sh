@@ -67,6 +67,15 @@ func compileSpeech(client *gateway.Client) (*gateway.SpeechResult, error) {
 	return client.GenerateSpeech(context.Background(), "provider/model", request)
 }
 
+func compileTranscription(client *gateway.Client) (*gateway.TranscriptionResult, error) {
+	var audio gateway.TranscriptionAudio = gateway.TranscriptionBase64{MediaType: "audio/wav", Data: "opaque"}
+	audio = &gateway.TranscriptionBase64{}
+	audio = gateway.TranscriptionBytes{MediaType: "audio/wav", Data: []byte{1}}
+	audio = &gateway.TranscriptionBytes{}
+	_ = gateway.TranscriptionResult{Text: "text", Segments: []gateway.TranscriptionSegment{{Text: "part", StartSeconds: -1, EndSeconds: 2}}, Language: new("en"), DurationSeconds: new(-1.5), Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
+	return client.Transcribe(context.Background(), "provider/model", gateway.TranscriptionRequest{Audio: audio, ProviderOptions: []gateway.ProviderOption{}})
+}
+
 func compileRerank(client *gateway.Client) (*gateway.RerankResult, error) {
 	topN := 2
 	var documents gateway.RerankDocuments = gateway.RerankTexts{Values: []string{"one", "two"}}
@@ -287,7 +296,7 @@ func main() {
 	)
 	inspectErrors(err)
 	if client != nil {
-		_, _, _, _, _, _, _ = compileEvaluation, compileEmbedding, compileImage, compileSpeech, compileRerank, compileResponses, compileChat
+		_, _, _, _, _, _, _, _ = compileEvaluation, compileEmbedding, compileImage, compileSpeech, compileTranscription, compileRerank, compileResponses, compileChat
 	}
 }
 EOF
@@ -315,7 +324,7 @@ var allowedTypes = names(
 	"ConfigurationError", "ValidationError", "TransportError", "ResponseError", "ResponseValidationError",
 	"EvaluationRequest", "Question", "BooleanQuestion", "ChoiceQuestion", "ScoreQuestion", "OptionalJSON", "BooleanCriteria", "EvaluationResult", "Rounding", "Usage", "WarningType", "Warning", "ResponseMetadata", "Answer", "BooleanAnswer", "ChoiceAnswer", "ScoreAnswer",
 	"EmbeddingRequest", "EmbeddingResult", "EmbeddingUsage", "ProviderWarningType", "ProviderWarning",
-	"ImageSize", "ImageAspectRatio", "ImageRequest", "ImageInput", "ImageURL", "ImageBase64", "ImageBytes", "ImageResult", "ImageUsage", "SpeechRequest", "SpeechResult",
+	"ImageSize", "ImageAspectRatio", "ImageRequest", "ImageInput", "ImageURL", "ImageBase64", "ImageBytes", "ImageResult", "ImageUsage", "SpeechRequest", "SpeechResult", "TranscriptionRequest", "TranscriptionAudio", "TranscriptionBase64", "TranscriptionBytes", "TranscriptionResult", "TranscriptionSegment",
 	"RerankRequest", "RerankDocuments", "RerankTexts", "RerankObjects", "RerankDocument", "RerankText", "RerankJSON", "RerankItem", "RerankResult",
 	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseXSearchTool", "ResponseXSearchOptionsTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
 	"ChatCompletionRequest", "ChatServerToolsRequest", "ChatServerTool", "ChatExaSearchTool", "ChatParallelSearchTool", "ChatPerplexitySearchTool", "ChatTakoSearchTool",
@@ -329,7 +338,7 @@ var allowedTypes = names(
 var allowedFunctions = names("NewClient", "WithAPIKey", "WithOIDCToken", "WithOIDCTokenSource", "WithBaseURL", "WithPublicBaseURL", "WithHTTPClient", "WithTeam", "WithHeaders", "WithRetryPolicy")
 var allowedMethods = names(
 	"TokenSource.Token",
-	"Client.Evaluate", "Client.Embed", "Client.GenerateImage", "Client.GenerateSpeech", "Client.Rerank", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
+	"Client.Evaluate", "Client.Embed", "Client.GenerateImage", "Client.GenerateSpeech", "Client.Transcribe", "Client.Rerank", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
 	"ResponseResult.RawJSON", "RawResponseEvent.RawJSON", "ResponseStream.Next", "ResponseStream.Event", "ResponseStream.Err", "ResponseStream.Close",
 	"ChatCompletionResult.RawJSON", "ChatCompletionChunk.RawJSON", "ChatCompletionStream.Next", "ChatCompletionStream.Event", "ChatCompletionStream.Err", "ChatCompletionStream.Close",
 	"ConfigurationError.Error", "ConfigurationError.Option", "ConfigurationError.Reason",
@@ -345,6 +354,7 @@ var expectedInterfaceMethods = map[string]map[string]string{
 	"Answer":                  {"answerType": "func() string"},
 	"RerankDocuments":         {"rerankDocuments": "func()"},
 	"ImageInput":              {"imageInput": "func()"},
+	"TranscriptionAudio":      {"transcriptionAudio": "func()"},
 	"RerankDocument":          {"rerankDocument": "func()"},
 	"ResponseBuiltInTool":     {"responseBuiltInTool": "func()"},
 	"ResponseInput":           {"responseInput": "func()"},
@@ -376,6 +386,11 @@ var expectedStructFields = map[string][]string{
 	"ImageUsage": {"InputTokens *float64", "OutputTokens *float64", "TotalTokens *float64"},
 	"SpeechRequest": {"Text string", "Voice string", "Instructions string", "Language string", "OutputFormat string", "Speed *float64", "ProviderOptions []ProviderOption"},
 	"SpeechResult": {"Audio string", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
+	"TranscriptionRequest": {"Audio TranscriptionAudio", "ProviderOptions []ProviderOption"},
+	"TranscriptionBase64": {"MediaType string", "Data string"},
+	"TranscriptionBytes": {"MediaType string", "Data []byte"},
+	"TranscriptionResult": {"Text string", "Segments []TranscriptionSegment", "Language *string", "DurationSeconds *float64", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
+	"TranscriptionSegment": {"Text string", "StartSeconds float64", "EndSeconds float64"},
 	"RerankRequest": {"Query string", "Documents RerankDocuments", "TopN *int", "ProviderOptions []ProviderOption"},
 	"RerankTexts": {"Values []string"},
 	"RerankObjects": {"Values []json.RawMessage"},
