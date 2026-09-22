@@ -47,6 +47,10 @@ func compilePublicContract() {
 	imageInput = &gateway.ImageBytes{MediaType: "", Data: nil}
 	_ = gateway.ImageRequest{Prompt: &prompt, Count: 1, Size: &imageSize, AspectRatio: &imageAspect, Seed: &imageSeed, Files: []gateway.ImageInput{imageInput}, Mask: &imageInput, ProviderOptions: []gateway.ProviderOption{}}
 	_ = gateway.ImageResult{Images: [][]byte{{1}}, Retryable: new(false), Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}, Usage: &gateway.ImageUsage{InputTokens: new(-1.5), OutputTokens: new(0.0), TotalTokens: new(2.5)}}
+	var _ func(*gateway.Client, context.Context, string, gateway.SpeechRequest) (*gateway.SpeechResult, error) = (*gateway.Client).GenerateSpeech
+	speechSpeed := -1.0
+	_ = gateway.SpeechRequest{Text: "hello", Voice: "voice", Instructions: "instructions", Language: "en", OutputFormat: "mp3", Speed: &speechSpeed, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.SpeechResult{Audio: "base64-audio", Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
 	var _ func(*gateway.Client, context.Context, string, gateway.RerankRequest) (*gateway.RerankResult, error) = (*gateway.Client).Rerank
 	topN := 2
 	var requestDocuments gateway.RerankDocuments = gateway.RerankTexts{Values: []string{"one", "two"}}
@@ -287,6 +291,27 @@ func compilePublicContract() {
 	_, _, _, _, _, _ = responseValidationError.Error(), responseValidationError.Unwrap(), responseValidationError.StatusCode(), responseValidationError.Path(), responseValidationError.Reason(), responseValidationError.RequestID()
 	_, _, _ = responseValidationError.ResponseID(), responseValidationError.BodyTruncated(), responseValidationError.RawResponseBody()
 }
+func TestExternalContractSpeechTypes(t *testing.T) {
+	want := map[reflect.Type][]struct {
+		name string
+		typ  reflect.Type
+	}{
+		reflect.TypeOf(gateway.SpeechRequest{}): {{"Text", reflect.TypeOf("")}, {"Voice", reflect.TypeOf("")}, {"Instructions", reflect.TypeOf("")}, {"Language", reflect.TypeOf("")}, {"OutputFormat", reflect.TypeOf("")}, {"Speed", reflect.TypeOf((*float64)(nil))}, {"ProviderOptions", reflect.TypeOf([]gateway.ProviderOption{})}},
+		reflect.TypeOf(gateway.SpeechResult{}):  {{"Audio", reflect.TypeOf("")}, {"Warnings", reflect.TypeOf([]gateway.ProviderWarning{})}, {"ProviderMetadata", reflect.TypeOf(map[string]json.RawMessage{})}, {"Response", reflect.TypeOf(gateway.ResponseMetadata{})}},
+	}
+	for typ, fields := range want {
+		if typ.NumField() != len(fields) {
+			t.Fatalf("%v fields=%d want=%d", typ, typ.NumField(), len(fields))
+		}
+		for i, field := range fields {
+			got := typ.Field(i)
+			if got.Name != field.name || got.Type != field.typ {
+				t.Fatalf("%v field %d=%s %v want %s %v", typ, i, got.Name, got.Type, field.name, field.typ)
+			}
+		}
+	}
+}
+
 func TestExternalContractImageTypes(t *testing.T) {
 	input := reflect.TypeOf((*gateway.ImageInput)(nil)).Elem()
 	if input.Kind() != reflect.Interface || input.NumMethod() != 1 || input.Method(0).Name != "imageInput" || input.Method(0).IsExported() {

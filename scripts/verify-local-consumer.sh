@@ -60,6 +60,13 @@ func compileImage(client *gateway.Client) (*gateway.ImageResult, error) {
 	return client.GenerateImage(context.Background(), "provider/model", request)
 }
 
+func compileSpeech(client *gateway.Client) (*gateway.SpeechResult, error) {
+	speed := -1.0
+	request := gateway.SpeechRequest{Text: "hello", Voice: "voice", Instructions: "instructions", Language: "en", OutputFormat: "mp3", Speed: &speed, ProviderOptions: []gateway.ProviderOption{}}
+	_ = gateway.SpeechResult{Audio: "base64-audio", Warnings: []gateway.ProviderWarning{}, ProviderMetadata: map[string]json.RawMessage{}, Response: gateway.ResponseMetadata{}}
+	return client.GenerateSpeech(context.Background(), "provider/model", request)
+}
+
 func compileRerank(client *gateway.Client) (*gateway.RerankResult, error) {
 	topN := 2
 	var documents gateway.RerankDocuments = gateway.RerankTexts{Values: []string{"one", "two"}}
@@ -280,7 +287,7 @@ func main() {
 	)
 	inspectErrors(err)
 	if client != nil {
-		_, _, _, _, _ = compileEvaluation, compileEmbedding, compileRerank, compileResponses, compileChat
+		_, _, _, _, _, _, _ = compileEvaluation, compileEmbedding, compileImage, compileSpeech, compileRerank, compileResponses, compileChat
 	}
 }
 EOF
@@ -308,7 +315,7 @@ var allowedTypes = names(
 	"ConfigurationError", "ValidationError", "TransportError", "ResponseError", "ResponseValidationError",
 	"EvaluationRequest", "Question", "BooleanQuestion", "ChoiceQuestion", "ScoreQuestion", "OptionalJSON", "BooleanCriteria", "EvaluationResult", "Rounding", "Usage", "WarningType", "Warning", "ResponseMetadata", "Answer", "BooleanAnswer", "ChoiceAnswer", "ScoreAnswer",
 	"EmbeddingRequest", "EmbeddingResult", "EmbeddingUsage", "ProviderWarningType", "ProviderWarning",
-	"ImageSize", "ImageAspectRatio", "ImageRequest", "ImageInput", "ImageURL", "ImageBase64", "ImageBytes", "ImageResult", "ImageUsage",
+	"ImageSize", "ImageAspectRatio", "ImageRequest", "ImageInput", "ImageURL", "ImageBase64", "ImageBytes", "ImageResult", "ImageUsage", "SpeechRequest", "SpeechResult",
 	"RerankRequest", "RerankDocuments", "RerankTexts", "RerankObjects", "RerankDocument", "RerankText", "RerankJSON", "RerankItem", "RerankResult",
 	"ResponsesRequest", "ResponsesBuiltInToolsRequest", "ResponseBuiltInTool", "ResponseWebSearchTool", "ResponseXSearchTool", "ResponseXSearchOptionsTool", "ResponseInput", "ResponseTextInput", "ResponseItemsInput", "ResponseInputItem", "ResponseMessage", "ResponseFunctionCall", "ResponseFunctionCallOutput", "ResponseTool", "ResponseToolChoice", "ResponseToolChoiceMode", "ResponseSpecificToolChoice", "ResponseReasoning", "ResponseText", "ResponseTextFormat", "ResponseTextFormatType", "ResponseJSONSchemaFormat", "ResponseResult", "ResponseEvent", "ResponseOutputTextDeltaEvent", "RawResponseEvent", "ResponseStream",
 	"ChatCompletionRequest", "ChatServerToolsRequest", "ChatServerTool", "ChatExaSearchTool", "ChatParallelSearchTool", "ChatPerplexitySearchTool", "ChatTakoSearchTool",
@@ -322,7 +329,7 @@ var allowedTypes = names(
 var allowedFunctions = names("NewClient", "WithAPIKey", "WithOIDCToken", "WithOIDCTokenSource", "WithBaseURL", "WithPublicBaseURL", "WithHTTPClient", "WithTeam", "WithHeaders", "WithRetryPolicy")
 var allowedMethods = names(
 	"TokenSource.Token",
-	"Client.Evaluate", "Client.Embed", "Client.GenerateImage", "Client.Rerank", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
+	"Client.Evaluate", "Client.Embed", "Client.GenerateImage", "Client.GenerateSpeech", "Client.Rerank", "Client.CreateResponse", "Client.StreamResponse", "Client.CreateResponseWithBuiltInTools", "Client.StreamResponseWithBuiltInTools", "Client.CreateChatCompletion", "Client.StreamChatCompletion", "Client.CreateChatCompletionWithServerTools", "Client.StreamChatCompletionWithServerTools",
 	"ResponseResult.RawJSON", "RawResponseEvent.RawJSON", "ResponseStream.Next", "ResponseStream.Event", "ResponseStream.Err", "ResponseStream.Close",
 	"ChatCompletionResult.RawJSON", "ChatCompletionChunk.RawJSON", "ChatCompletionStream.Next", "ChatCompletionStream.Event", "ChatCompletionStream.Err", "ChatCompletionStream.Close",
 	"ConfigurationError.Error", "ConfigurationError.Option", "ConfigurationError.Reason",
@@ -367,6 +374,8 @@ var expectedStructFields = map[string][]string{
 	"ImageBytes": {"MediaType string", "Data []byte", "ProviderOptions []ProviderOption"},
 	"ImageResult": {"Images [][]byte", "Retryable *bool", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata", "Usage *ImageUsage"},
 	"ImageUsage": {"InputTokens *float64", "OutputTokens *float64", "TotalTokens *float64"},
+	"SpeechRequest": {"Text string", "Voice string", "Instructions string", "Language string", "OutputFormat string", "Speed *float64", "ProviderOptions []ProviderOption"},
+	"SpeechResult": {"Audio string", "Warnings []ProviderWarning", "ProviderMetadata map[string]json.RawMessage", "Response ResponseMetadata"},
 	"RerankRequest": {"Query string", "Documents RerankDocuments", "TopN *int", "ProviderOptions []ProviderOption"},
 	"RerankTexts": {"Values []string"},
 	"RerankObjects": {"Values []json.RawMessage"},
