@@ -2165,7 +2165,7 @@ For stream provenance, the complete pinned discriminator set is nevertheless cla
 | Image generation | 39 | `[ ]` |
 | Video generation | 47 | `[!]` complete field/state/result export owner decision above |
 | Speech | 40 | `[ ]` exact opaque Gateway audio string; local bounded optional-string and finite-speed policies |
-| Buffered transcription | 41 | `[-]` active pre-implementation correction; opaque exact string audio <=1 MiB, raw bytes <=8 MiB encoded once, no URL, and 16 MiB allocation-safe request boundary |
+| Buffered transcription | 41 | `[x]` complete and accounted after implementation, resource-safety correction, documentation, all six exact verification commands, documentation review, and clean substantive final rereview; opaque exact string audio <=1 MiB, raw bytes <=8 MiB encoded once, no URL, and 16 MiB allocation-safe request boundary |
 | Streaming transcription | 49 | `[!]` Chunk 48 approval/completion |
 | Realtime | 50 | `[!]` Chunk 48 approval/completion; no WebRTC/SDP |
 | Embeddings | 37 | `[x]` complete and accounted after implementation, documentation, focused verification, and four clean final rereviews; staged/experimental only, with no JavaScript-parity or broad release claim |
@@ -2191,7 +2191,7 @@ For stream provenance, the complete pinned discriminator set is nevertheless cla
 Independent review and clean rereview verified the frozen provenance, exports, signatures, variants, fields, limits, raw representations, helpers, ownership rules, ledger mappings, blockers, rollback rules, commands, and subjects with no unresolved finding. The landed predecessor plan commit is exactly `f289e31e24b0304c8c6108c71478bb81b280fcde` (`docs: approve gateway capability expansion plan`) with sole changed path `planning/IMPLEMENTATION_PLAN.md`. This post-review accounting handoff updates both durable status documents to point to “the first dependency-ready item in the authoritative Chunk 35–52 queue”, preserving every external live/release blocker, and closes Chunk 35 without claiming this accounting commit's own hash. Rollback removes only this continuation and its two status pointers.
 
 #### Chunk 36 — Shared provider transport and sealed options foundation
-**Status:** `[x]` — complete and accounted through Chunk 40; Chunk 41 is the first dependency-ready item and is active as `[-]` for its reviewed pre-implementation correction in the authoritative Chunk 35–52 queue after the Chunk 40 tracker-only handoff.
+**Status:** `[x]` — complete and accounted through Chunk 41. Chunk 42 remains `[!]` blocked on the approved complete language field-by-field exported API decision and is not dependency-ready. No later implementation chunk is active; Chunk 51 is the next dependency-ready doable terminal reconciliation only after every Chunk 42–50 status is terminal, with all existing owner-decision, WebSocket, live-evidence, and release blockers preserved.
 
 
 **Depends on:** 35. **Paths:** `client.go`, `headers.go`, `transport.go`, `provider_options.go`, `contract_internal_test.go`. **Subject:** `feat: add gateway modality transport foundation`. **Tracker:** `docs: record gateway modality foundation accounting`.
@@ -2445,6 +2445,22 @@ env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go doc -all .
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^(TestDocumentation|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
 ```
+
+**Chunk 41 accounting handoff.** **Status:** `[x]`. Chunk 41 is complete and accounted after its reviewed plan-only correction, implementation, one implementation review-fix commit, separate documentation commit, all six exact focused/API/consumer/documentation commands, documentation review, and clean substantive independent final rereview. The direct predecessor is `17a509731b0e16c0e4e466709f40d8d07db75076` (`docs: record gateway speech synthesis accounting`) with sole changed path `planning/IMPLEMENTATION_PLAN.md`. The exact landed Chunk 41 series is:
+
+- `d2b498a518118ea0f3c72cc0745ca958cad1ddff` (`fix: correct gateway transcription accounting`) — sole changed path: `planning/IMPLEMENTATION_PLAN.md`.
+- `eb725ae008258b3abe47dc955628349dd38902a7` (`feat: add gateway transcription`) — changed paths: `contract_external_test.go`, `scripts/verify-local-consumer.sh`, `transcription.go`, `transcription_test.go`, `transcription_validate.go`, `transcription_wire.go`.
+- `14490e0b62e3e8ef55447483c729bf2eaa6d9266` (`fix: correct gateway transcription resource safety`) — changed paths: `transcription_test.go`, `transcription_wire.go`.
+- `9b395761e40d72db87baecf0bf15ea2d431d0e6e` (`docs: describe experimental gateway transcription`) — changed paths: `CHANGELOG.md`, `README.md`, `doc.go`, `docs/client.md`.
+
+Implementation review found that cancellation observed during top-level scalar response decoding could be returned as a `ResponseValidationError` instead of the required response-body-reading `TransportError`. The dedicated resource-safety fix added cancellation checks after required text, nullable language, and nullable duration scalar decoding and added focused regression coverage. Both documentation reviewers completed the four-path privacy/maturity and implementation fact-check with no remaining factual issue. Independent final review `chunk41-final-review-1` returned **CLEAN** with no remaining actionable correctness, security, API/wire, documentation, or test-quality finding across the full landed series; `chunk41-final-review-2` found only the missing terminal tracker accounting, which this tracker-only handoff fixes without changing the implementation or documentation boundary.
+
+All six exact Chunk 41 commands above passed after the resource-safety fix and documentation commit, with `AI_GATEWAY_API_KEY`, `VERCEL_OIDC_TOKEN`, `AI_GATEWAY_LIVE_COST_ACK`, `AI_GATEWAY_PUBLIC_LIVE_COST_ACK`, and `AI_GATEWAY_X_SEARCH_LIVE_COST_ACK` unset and `GOPROXY=off`: the focused ordinary transcription plus hermetic-transport check, the identical focused race check, the external-contract check, the strict local-consumer check, `go doc -all .`, and the documentation plus hermetic-transport check. `gopls` was unavailable, so no LSP result is claimed. The exhaustive eleven-path rollback boundary, retained owner-decision/WebSocket/live-evidence/release blockers, non-goals, and immutable post-publication handling remain unchanged.
+
+Chunk 42 remains `[!]` blocked on an approved complete field-by-field exported language API decision; completion of Chunk 41 does not make it ready. Chunks 43–50 retain their recorded dependency and owner-decision blockers. No implementation chunk is selected active. The next dependency-ready doable item is Chunk 51 terminal documentation/migration/external-audit reconciliation, and it may begin only after every Chunk 42–50 status is terminal; until then its blocker is preserved.
+
+The intended tracker subject is `docs: record gateway transcription accounting`, and its sole changed path is `planning/IMPLEMENTATION_PLAN.md`; this accounting does not and cannot record the tracker commit's own future hash. No gate is run and no commit is made by this tracker-only update.
+
 **Exact Chunk 42 commands:**
 ```sh
 env -u AI_GATEWAY_API_KEY -u VERCEL_OIDC_TOKEN -u AI_GATEWAY_LIVE_COST_ACK -u AI_GATEWAY_PUBLIC_LIVE_COST_ACK -u AI_GATEWAY_X_SEARCH_LIVE_COST_ACK GOPROXY=off go test -count=1 -run '^(Test(Language|GenerateLanguage)|TestHermeticTransportAllowsLoopbackAndRejectsGateway)$' .
