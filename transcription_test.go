@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -131,6 +132,52 @@ func TestTranscriptionStrictResponse(t *testing.T) {
 	}
 }
 
+type transcriptionScalarCancelContext struct {
+	context.Context
+	target   string
+	canceled atomic.Bool
+}
+
+func (c *transcriptionScalarCancelContext) Err() error {
+	if c.canceled.Load() {
+		return context.Canceled
+	}
+	pcs := make([]uintptr, 16)
+	n := runtime.Callers(2, pcs)
+	frames := runtime.CallersFrames(pcs[:n])
+	for {
+		frame, more := frames.Next()
+		if strings.HasSuffix(frame.Function, c.target) {
+			c.canceled.Store(true)
+			return context.Canceled
+		}
+		if !more {
+			return nil
+		}
+	}
+}
+
+func TestTranscriptionScalarDecodeCancellation(t *testing.T) {
+	cases := []struct {
+		name, target, body string
+	}{
+		{"text", ".transcriptionRequiredString", `{"text":1}`},
+		{"language", ".transcriptionNullableString", `{"text":"x","language":1}`},
+		{"duration", ".transcriptionNullableFloat", `{"text":"x","durationInSeconds":"bad"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := &transcriptionScalarCancelContext{Context: context.Background(), target: tc.target}
+			_, err := decodeTranscriptionResult(ctx, "p/m", rawProviderResponse{statusCode: 200, body: []byte(tc.body)})
+			var transportErr *TransportError
+			var validationErr *ResponseValidationError
+			if !errors.As(err, &transportErr) || transportErr.operation != "read response body" || !errors.Is(err, context.Canceled) || errors.As(err, &validationErr) {
+				t.Fatalf("%T %v", err, err)
+			}
+		})
+	}
+}
+
 func TestTranscriptionCopiesCancellationAndOneAttempt(t *testing.T) {
 	body := []byte(`{"text":"x","segments":[{"text":"s","startSecond":1,"endSecond":2}],"language":"en","durationInSeconds":2,"warnings":[],"providerMetadata":{"p":{"x":1}}}`)
 	headers := http.Header{"X": {"y"}}
@@ -176,5 +223,6 @@ func TestTranscription(t *testing.T) {
 	t.Run("wire and variants", TestTranscribeExactWireAndVariants)
 	t.Run("validation", TestTranscriptionValidationAndBounds)
 	t.Run("strict response", TestTranscriptionStrictResponse)
+	t.Run("scalar decode cancellation", TestTranscriptionScalarDecodeCancellation)
 	t.Run("copies cancellation one attempt", TestTranscriptionCopiesCancellationAndOneAttempt)
 }

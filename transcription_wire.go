@@ -64,6 +64,9 @@ func decodeTranscriptionResult(ctx context.Context, modelID string, raw rawProvi
 	}
 	text, f := transcriptionRequiredString(ctx, top["text"], memberPath("$", "text"), maxStringBytes)
 	if f != nil {
+		if ctx.Err() != nil {
+			return canceled()
+		}
 		return invalid(f)
 	}
 	segments, f := decodeTranscriptionSegments(ctx, top["segments"])
@@ -75,10 +78,16 @@ func decodeTranscriptionResult(ctx context.Context, modelID string, raw rawProvi
 	}
 	language, f := transcriptionNullableString(ctx, top["language"], memberPath("$", "language"), 255)
 	if f != nil {
+		if ctx.Err() != nil {
+			return canceled()
+		}
 		return invalid(f)
 	}
 	duration, f := transcriptionNullableFloat(ctx, top["durationInSeconds"], memberPath("$", "durationInSeconds"))
 	if f != nil {
+		if ctx.Err() != nil {
+			return canceled()
+		}
 		return invalid(f)
 	}
 	warnings, wf := decodeTranscriptionWarnings(ctx, top["warnings"])
